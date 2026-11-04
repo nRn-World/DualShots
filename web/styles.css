@@ -915,6 +915,10 @@ body[data-screen="record"] .tabbar { display: none; }
   color: rgba(255, 255, 255, .88);
 }
 .rec-top .mode-pill { margin: 0 auto; }
+.mode-pill { gap: 6px; padding-right: 9px; cursor: pointer; }
+.mode-pill:hover { background: rgba(28, 33, 42, .76); }
+.mode-pill .caret { display: flex; opacity: .6; }
+.mode-pill .caret svg { width: 12px; height: 12px; }
 .rec-timer {
   font-family: var(--mono);
   font-size: 11.5px;
@@ -952,8 +956,22 @@ body[data-screen="record"] .tabbar { display: none; }
   line-height: 1.45;
   color: var(--text-3);
 }
-.rec-status .saved { display: block; color: var(--text-2); margin-top: 2px; }
-.rec-status.error { color: #ff8a80; }
+.rec-line { color: var(--text-3); }
+.rec-formats {
+  margin-top: 2px;
+  font-size: 11px;
+  letter-spacing: .01em;
+  color: var(--text-3);
+  opacity: .85;
+}
+.rec-saved {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .rec-controls {
   display: flex;
@@ -1042,6 +1060,31 @@ body[data-screen="record"] .tabbar { display: none; }
   margin: 0 auto 18px;
 }
 .sheet-title { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.sheet .label { margin: 18px 0 8px; }
+.sheet .label:first-of-type { margin-top: 22px; }
+.sheet .btn-primary { margin-top: 20px; }
+.mini-btn {
+  margin-top: 14px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background .16s, color .16s;
+}
+.mini-btn:hover { background: var(--surface-3); color: #fff; }
+.sheet-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 69, 58, .1);
+  border: 1px solid rgba(255, 69, 58, .22);
+  color: #ffb3ac;
+  font-size: 12px;
+  line-height: 1.45;
+}
 .sheet-sub { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-2); }
 .sheet-actions { display: flex; gap: 8px; margin-top: 18px; }
 .sheet-actions .btn-ghost { margin-top: 0; }

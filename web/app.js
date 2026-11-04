@@ -90,6 +90,7 @@ const ICONS = {
   close: svg('<path d="M6.8 6.8l10.4 10.4M17.2 6.8 6.8 17.2"/>'),
   flip: svg('<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.4 4.7v5.1h-5.1"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>'),
   chevron: svg('<path d="M9.5 6.5 15 12l-5.5 5.5"/>', 'stroke-width="2"'),
+  caretDown: svg('<path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>', 'stroke-width="2.1"'),
   check: svg('<path d="M4.5 12.6 9.4 17.5 19.5 6.9"/>', 'stroke-width="2.1"'),
   play: svg('<path d="M8.4 5.6v12.8L19 12z" fill="currentColor" stroke="none"/>', 'stroke-width="0"'),
   download: svg('<path d="M12 4v11"/><path d="m7.8 11.4 4.2 4.2 4.2-4.2"/><path d="M4.8 19.4h14.4"/>'),
@@ -250,14 +251,16 @@ function showAbout() {
       <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
 
       <h3>Build</h3>
-      <p>v2 — redesigned interface (graphite surfaces, viewfinder record screen,
-      bottom sheets, poster gallery). Last updated 2026-11-04.</p>
+      <p>v2.1 — redesigned interface plus a camera setup sheet on the record screen:
+      pick the format for the front and the back camera (and swap them) without
+      leaving the viewfinder. Last updated 2026-11-04.</p>
 
       <h3>What works here</h3>
       <ul>
         <li>All three recording modes: composed picture-in-picture, two separate files, or both.</li>
         <li>Clips are encoded live in the browser and land in the Gallery tab, playable and downloadable.</li>
         <li>Settings persist in <code>localStorage</code> (SharedPreferences in the app).</li>
+        <li>Tap the mode pill on the record screen to set a format per camera while you film.</li>
         <li>4K and HEVC are gated behind the mock Pro purchase — same as <code>grantPremium()</code>.</li>
       </ul>
 
@@ -506,6 +509,7 @@ async function switchCamera() {
 const rec = {
   active: false,
   starting: false,
+  take: null,
   startedAt: 0,
   timer: 0,
   raf: 0,
@@ -578,8 +582,10 @@ function makeOutput(key, name, aspectKey, withAudio, existingStream) {
   let ctx = null;
   let stream = existingStream || null;
 
+  const quality = (rec.take && rec.take.quality) || state.quality;
+
   if (!stream) {
-    const { width, height } = outputSize(aspectKey, state.quality);
+    const { width, height } = outputSize(aspectKey, quality);
     canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -599,7 +605,7 @@ function makeOutput(key, name, aspectKey, withAudio, existingStream) {
   let recorder;
   try {
     recorder = new MediaRecorder(stream, mime
-      ? { mimeType: mime, videoBitsPerSecond: state.quality === 'UHD4K' ? 12_000_000 : 6_000_000 }
+      ? { mimeType: mime, videoBitsPerSecond: quality === 'UHD4K' ? 12_000_000 : 6_000_000 }
       : undefined);
   } catch (_) {
     try { recorder = new MediaRecorder(stream); } catch (__) { return null; }
@@ -629,7 +635,7 @@ function drawOutput(o) {
     if (back) drawCover(ctx, back.el, w, h, back.mirror);
     if (front) {
       const pipW = Math.round(w * 0.34);
-      const fa = ASPECTS[state.frontAspect];
+      const fa = ASPECTS[(rec.take && rec.take.frontAspect) || state.frontAspect];
       const pipH = Math.round(pipW * (fa.h / fa.w));
       const margin = Math.round(w * 0.04);
       const x = w - pipW - margin;
@@ -691,6 +697,15 @@ async function startRecording() {
     rec.audio = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (_) { rec.audio = null; }
 
+  // Snapshot the layout: format changes made mid-take must not tear the file apart.
+  const take = {
+    mode: state.mode,
+    frontAspect: state.frontAspect,
+    backAspect: state.backAspect,
+    quality: state.quality,
+  };
+  rec.take = take;
+
   const stamp = stampNow();
   const single = cam.singleFallback || !cam.feeds.back || !cam.feeds.front;
   const outs = [];
@@ -698,20 +713,20 @@ async function startRecording() {
   if (single) {
     const key = cam.active;
     const o = makeOutput(key, `duelshot_${key}_${stamp}`,
-      key === 'back' ? state.backAspect : state.frontAspect, true);
+      key === 'back' ? take.backAspect : take.frontAspect, true);
     if (o) outs.push(o);
-  } else if (state.mode === 'DUAL_VIEW') {
-    const o = makeOutput('composed', `duelshot_combined_${stamp}`, state.backAspect, true);
+  } else if (take.mode === 'DUAL_VIEW') {
+    const o = makeOutput('composed', `duelshot_combined_${stamp}`, take.backAspect, true);
     if (o) outs.push(o);
-  } else if (state.mode === 'SEPARATE') {
-    const b = makeOutput('back', `duelshot_back_${stamp}`, state.backAspect, true);
-    const f = makeOutput('front', `duelshot_front_${stamp}`, state.frontAspect, false);
+  } else if (take.mode === 'SEPARATE') {
+    const b = makeOutput('back', `duelshot_back_${stamp}`, take.backAspect, true);
+    const f = makeOutput('front', `duelshot_front_${stamp}`, take.frontAspect, false);
     if (b) outs.push(b);
     if (f) outs.push(f);
   } else {
-    const c = makeOutput('composed', `duelshot_combined_${stamp}`, state.backAspect, true);
-    const b = makeOutput('back', `duelshot_back_${stamp}`, state.backAspect, false);
-    const f = makeOutput('front', `duelshot_front_${stamp}`, state.frontAspect, false);
+    const c = makeOutput('composed', `duelshot_combined_${stamp}`, take.backAspect, true);
+    const b = makeOutput('back', `duelshot_back_${stamp}`, take.backAspect, false);
+    const f = makeOutput('front', `duelshot_front_${stamp}`, take.frontAspect, false);
     [c, b, f].forEach((o) => o && outs.push(o));
   }
 
@@ -721,7 +736,7 @@ async function startRecording() {
     const src = feed && feed.el && feed.el.srcObject;
     if (src instanceof MediaStream) {
       const o = makeOutput(cam.active, `duelshot_${cam.active}_${stamp}`,
-        cam.active === 'back' ? state.backAspect : state.frontAspect, false, src);
+        cam.active === 'back' ? take.backAspect : take.frontAspect, false, src);
       if (o) outs.push(o);
     }
   }
@@ -753,7 +768,7 @@ async function startRecording() {
   }, 250);
 
   recordSaved = [];
-  recordMessage = `Recording · ${MODES[state.mode].title.toLowerCase()}${single ? ' · single camera' : ''}`;
+  recordMessage = `Recording · ${MODES[take.mode].title.toLowerCase()}${single ? ' · single camera' : ''}`;
   refreshRecord();
 }
 
@@ -783,7 +798,9 @@ async function stopRecording() {
       mime: type,
       duration: hms(durationMs),
       when: new Date(),
-      mode: o.key === 'composed' ? (state.mode === 'BOTH' ? 'BOTH' : 'DUAL_VIEW') : state.mode,
+      mode: o.key === 'composed'
+        ? ((rec.take && rec.take.mode === 'BOTH') ? 'BOTH' : 'DUAL_VIEW')
+        : ((rec.take && rec.take.mode) || state.mode),
       poster: posterFor(o),
     };
   });
@@ -797,6 +814,8 @@ async function stopRecording() {
   state.clips.unshift(...newClips);
   recordSaved = newClips.map((c) => c.name);
 
+  rec.take = null;
+  mountedKey = null; // pick up formats chosen during the take
   recordMessage = newClips.length === 1 ? 'Saved to Gallery' : `Saved ${newClips.length} clips to Gallery`;
   refreshRecord();
   toast(newClips.length === 1 ? 'Saved to Gallery' : `Saved ${newClips.length} clips`);
@@ -819,13 +838,20 @@ function buildRecordShell() {
         <div class="rec-scrim"></div>
         <div class="rec-top">
           <button class="glass" id="rec-close" type="button" aria-label="Close">${ICONS.close}</button>
-          <span class="pill-glass mode-pill" id="rec-mode">Dual View</span>
+          <button class="pill-glass mode-pill" id="rec-mode" type="button" aria-label="Camera setup">
+            <span id="rec-mode-label">Separate</span>
+            <span class="caret">${ICONS.caretDown}</span>
+          </button>
           <span class="pill-glass rec-timer"><span class="dot"></span><span id="rec-timer">00:00</span></span>
         </div>
       </div>
 
       <div class="rec-dock">
-        <div class="rec-status" id="rec-status"></div>
+        <div class="rec-status" id="rec-status">
+          <div class="rec-line" id="rec-line"></div>
+          <div class="rec-formats" id="rec-formats"></div>
+          <div class="rec-saved" id="rec-saved"></div>
+        </div>
         <div class="rec-controls">
           <button class="dock-btn" id="rec-thumb" type="button" aria-label="Open gallery">${ICONS.gallery}</button>
           <button class="shutter" id="rec-btn" type="button" aria-label="Record"><i></i></button>
@@ -838,9 +864,13 @@ function buildRecordShell() {
   recDom.preview = $('#rec-preview');
   recDom.feeds = $('#rec-feeds');
   recDom.status = $('#rec-status');
+  recDom.line = $('#rec-line');
+  recDom.formats = $('#rec-formats');
+  recDom.saved = $('#rec-saved');
   recDom.timer = $('#rec-timer');
   recDom.btn = $('#rec-btn');
   recDom.mode = $('#rec-mode');
+  recDom.modeLabel = $('#rec-mode-label');
   recDom.flip = $('#rec-flip');
   recDom.thumb = $('#rec-thumb');
 
@@ -849,6 +879,7 @@ function buildRecordShell() {
     closeRecord();
   });
   recDom.flip.addEventListener('click', switchCamera);
+  recDom.mode.addEventListener('click', mountCameraSheet);
   recDom.thumb.addEventListener('click', () => {
     if (rec.active) { toast('Stop recording first'); return; }
     closeRecord();
@@ -947,8 +978,18 @@ function mountFeeds() {
   });
 }
 
+function activeTake() {
+  return rec.active && rec.take ? rec.take : {
+    mode: state.mode,
+    frontAspect: state.frontAspect,
+    backAspect: state.backAspect,
+    quality: state.quality,
+  };
+}
+
 function layoutKey() {
-  return [cam.ready, cam.singleFallback, cam.active, state.mode].join('|');
+  const t = activeTake();
+  return [cam.ready, cam.singleFallback, cam.active, t.mode, t.frontAspect, t.backAspect].join('|');
 }
 
 function unmountFeeds() {
@@ -959,8 +1000,24 @@ function recordStatusText() {
   if (recordMessage) return recordMessage;
   if (!cam.ready) return 'Starting cameras…';
   if (cam.demo) return 'Demo feed — camera unavailable here';
-  if (cam.singleFallback) return `Single camera · ${cam.active} · one file`;
-  return `${MODES[state.mode].title} · front + back`;
+  const t = activeTake();
+  const front = ASPECTS[t.frontAspect].short;
+  const back = ASPECTS[t.backAspect].short;
+  if (cam.singleFallback) {
+    const which = cam.active === 'back' ? back : front;
+    return `Single camera · ${cam.active} ${which} · one file`;
+  }
+  return `${MODES[t.mode].title} · front ${front} · back ${back}`;
+}
+
+function formatSummary() {
+  const t = activeTake();
+  const quality = QUALITIES[t.quality].label;
+  if (cam.singleFallback) {
+    const short = ASPECTS[cam.active === 'back' ? t.backAspect : t.frontAspect].short;
+    return `${cam.active === 'back' ? 'Back' : 'Front'} ${short} · ${quality}`;
+  }
+  return `Front ${ASPECTS[t.frontAspect].short} · Back ${ASPECTS[t.backAspect].short} · ${quality}`;
 }
 
 function updateDockThumb() {
@@ -980,7 +1037,7 @@ function refreshRecord() {
 
   if (layoutKey() !== mountedKey) mountFeeds();
 
-  if (recDom.mode) recDom.mode.textContent = MODES[state.mode].title;
+  if (recDom.modeLabel) recDom.modeLabel.textContent = MODES[activeTake().mode].title;
   if (recDom.preview) recDom.preview.classList.toggle('recording', rec.active);
   if (recDom.btn) {
     recDom.btn.classList.toggle('on', rec.active);
@@ -989,10 +1046,12 @@ function refreshRecord() {
   if (recDom.timer) {
     recDom.timer.textContent = rec.active ? shortTime(Date.now() - rec.startedAt) : '00:00';
   }
-  if (recDom.status) {
-    recDom.status.innerHTML = esc(recordStatusText()) + (recordSaved.length
-      ? `<span class="saved">${esc(recordSaved.join(' · '))}</span>`
-      : '');
+  if (recDom.line) recDom.line.textContent = recordStatusText();
+  if (recDom.formats) recDom.formats.textContent = formatSummary();
+  if (recDom.saved) {
+    recDom.saved.textContent = recordSaved.length
+      ? `Saved ${recordSaved.join(' · ')}`
+      : '';
   }
   updateDockThumb();
 }
@@ -1022,6 +1081,86 @@ function closeRecord() {
   document.body.dataset.screen = state.tab.toLowerCase();
   tabbarEl.hidden = false;
   renderTab(true);
+}
+
+/* =====================================================================
+   SHEET: CAMERA SETUP (formats for both cameras, reachable while filming)
+   ===================================================================== */
+
+function cameraSheetHTML() {
+  const locked = rec.active;
+  return `
+    <div class="grabber"></div>
+    <div class="sheet-title">Camera setup</div>
+    <p class="sheet-sub">Frame each camera the way you want it. Both formats are used for the take.</p>
+    ${locked ? '<div class="sheet-note">Recording — new formats start with the next take</div>' : ''}
+
+    <div class="label">Mode</div>
+    ${segmentedHTML(modeItems(), state.mode, { name: 'rec-mode', attr: 'recMode' })}
+    <p class="mode-desc">${MODES[state.mode].desc}</p>
+
+    <div class="label">Front camera</div>
+    <div class="chips">
+      ${ASPECT_ORDER.map((k) => `
+        <button class="chip ${k === state.frontAspect ? 'active' : ''}" data-recfront="${k}" type="button">${ASPECTS[k].label}</button>
+      `).join('')}
+    </div>
+
+    <div class="label">Back camera</div>
+    <div class="chips">
+      ${ASPECT_ORDER.map((k) => `
+        <button class="chip ${k === state.backAspect ? 'active' : ''}" data-recback="${k}" type="button">${ASPECTS[k].label}</button>
+      `).join('')}
+    </div>
+
+    <button class="mini-btn" data-swap type="button">Swap front and back</button>
+
+    <button class="btn-primary" data-close type="button">Done</button>`;
+}
+
+function mountCameraSheet() {
+  const html = cameraSheetHTML();
+  const existing = $('.sheet', modalRoot);
+  if (existing) existing.innerHTML = html;
+  else openSheet(html);
+  wireCameraSheet();
+}
+
+function wireCameraSheet() {
+  $$('[data-close]', modalRoot).forEach((b) => b.addEventListener('click', closeSheet));
+
+  $$('[data-recmode]', modalRoot).forEach((b) => b.addEventListener('click', () => {
+    if (rec.active) { toast('Mode is locked while recording'); return; }
+    state.mode = b.dataset.recmode;
+    savePrefs();
+    mountCameraSheet();
+    refreshRecord();
+  }));
+
+  const pick = (which, key) => {
+    const prop = which === 'front' ? 'frontAspect' : 'backAspect';
+    state[prop] = key;
+    savePrefs();
+    if (rec.active) {
+      toast(`${which === 'front' ? 'Front' : 'Back'} camera ${ASPECTS[key].short} · starts with the next take`);
+    }
+    mountCameraSheet();
+    if (!rec.active) refreshRecord();
+  };
+
+  $$('[data-recfront]', modalRoot).forEach((b) => b.addEventListener('click', () => pick('front', b.dataset.recfront)));
+  $$('[data-recback]', modalRoot).forEach((b) => b.addEventListener('click', () => pick('back', b.dataset.recback)));
+
+  const swap = $('[data-swap]', modalRoot);
+  if (swap) swap.addEventListener('click', () => {
+    const front = state.frontAspect;
+    state.frontAspect = state.backAspect;
+    state.backAspect = front;
+    savePrefs();
+    if (rec.active) toast('Swapped · starts with the next take');
+    mountCameraSheet();
+    if (!rec.active) refreshRecord();
+  });
 }
 
 /* =====================================================================

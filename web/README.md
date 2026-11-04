@@ -48,6 +48,12 @@ same components used in the native Compose UI.
   the second stream the preview degrades to the same single-camera fallback the
   app uses. If camera access is blocked entirely (permissions, iframe policy,
   plain HTTP) an animated demo feed keeps the recorder usable.
+- **Camera setup while filming.** Tap the mode pill on the record screen to set the
+  format (9:16, 16:9, 1:1, 4:3) for the front and back camera independently, swap
+  them in one tap, or change the recording mode — no trip to Settings. A take keeps
+  the formats it started with (a file cannot change resolution mid-stream), so
+  changes made while recording start with the next take; the dock always shows the
+  formats currently in use.
 - **Settings persistence** and the freemium gating (4K, HEVC) behave like the app:
   picking a locked option opens the Pro sheet, and unlocking applies that option.
 
