@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DuelShots — UI Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#05070D; --bg2:#0A0E1A; --surface:#141A2A; --surface2:#1B2236;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --cyan:#22D3EE; --blue:#2E7DFF; --purple:#7C3AED; --magenta:#E94FD0;
+    --gold:#F5C24B; --gold2:#FFB020; --rec:#FF3B4E; --green:#34D399;
+    --text:#FFFFFF; --muted:#A7B0C4; --faint:#6B768F;
+    --grad:linear-gradient(90deg,var(--cyan),var(--blue) 35%,var(--purple) 70%,var(--magenta));
+    --font-display:"Space Grotesk",system-ui,sans-serif;
+    --font-ui:"Inter",system-ui,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 15% -10%,#141b3a 0%,transparent 60%),
+               radial-gradient(1000px 700px at 110% 10%,#2a1440 0%,transparent 55%),var(--bg);
+    color:var(--text);font-family:var(--font-ui);min-height:100vh;-webkit-font-smoothing:antialiased}
+  .page{max-width:1280px;margin:0 auto;padding:28px 24px 60px;display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
+
+  /* ---------- Header ---------- */
+  .topbar{width:100%;display:flex;align-items:center;gap:16px;padding:4px 2px 20px}
+  .wordmark{font-family:var(--font-display);font-weight:700;font-size:34px;letter-spacing:-.5px}
+  .wordmark .s{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .topbar .tag{font-size:12px;color:var(--faint);letter-spacing:2px;text-transform:uppercase;font-family:var(--font-display);margin-top:2px}
+  .topbar .pill{margin-left:auto;font-size:11px;color:var(--muted);border:1px solid var(--line2);border-radius:20px;padding:6px 12px;white-space:nowrap}
+
+  /* ---------- Phone ---------- */
+  .phone{width:min(392px,94vw);aspect-ratio:9/19;background:#000;border:2px solid var(--line2);border-radius:46px;padding:10px;
+    box-shadow:0 40px 80px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.03);position:relative;flex:none}
+  .notch{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:112px;height:24px;background:#000;border-radius:14px;z-index:9}
+  .screen{width:100%;height:100%;border-radius:38px;overflow:hidden;position:relative;background:var(--bg);display:flex;flex-direction:column}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:13px 22px 4px;font-size:11px;color:#dfe4f0;font-weight:600;flex:none}
+  .body{flex:1;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column}
+  .body::-webkit-scrollbar{display:none}
+  .body.black{background:#000}
+
+  /* ---------- Shared UI atoms (mirror Compose components) ---------- */
+  .pad{padding:14px 20px 20px;display:flex;flex-direction:column}
+  .section-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--faint);font-weight:600;padding:6px 0}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
+  .card.click{cursor:pointer;transition:border-color .15s}
+  .card.click:active{border-color:var(--line2)}
+  .row{display:flex;align-items:center;gap:12px}
+  .gradbtn{border-radius:18px;background:var(--grad);border:1px solid rgba(255,255,255,.15);cursor:pointer;
+    display:flex;align-items:center;gap:12px;padding:16px 20px;width:100%;text-align:left;
+    box-shadow:0 12px 30px rgba(124,58,237,.35)}
+  .gradbtn .t{color:#04060D;font-weight:700;font-size:17px;font-family:var(--font-display)}
+  .gradbtn .s{color:rgba(4,6,13,.7);font-size:12px;margin-top:1px}
+  .goldbtn{border-radius:14px;background:linear-gradient(180deg,var(--gold),var(--gold2));border:none;cursor:pointer;
+    width:100%;padding:13px;color:#241703;font-weight:700;font-size:14px;font-family:var(--font-ui)}
+  .seg{display:flex;background:var(--surface2);border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none}
+  .seg span{padding:7px 13px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap}
+  .seg span.on{background:var(--grad);color:#04060D;font-weight:700}
+  .chip{border-radius:10px;padding:8px 12px;font-size:12px;cursor:pointer;user-select:none;color:var(--muted);background:var(--surface2)}
+  .chip.on{background:rgba(124,58,237,.28);color:#fff;font-weight:700}
+  .radio{width:18px;height:18px;border-radius:9px;flex:none;display:grid;place-items:center}
+  .radio.on{background:var(--purple)}
+  .radio.on i{width:8px;height:8px;border-radius:4px;background:#fff;display:block}
+  .radio.off{background:var(--surface2);border:1px solid var(--line2)}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+
+  /* ---------- Bottom bar ---------- */
+  .navbar{flex:none;display:flex;justify-content:space-around;background:rgba(5,7,13,.96);border-top:1px solid var(--line);padding:10px 8px 14px}
+  .navbar .item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--faint);cursor:pointer;padding:4px 0;flex:1;border-radius:12px}
+  .navbar .item .ic{font-size:19px;line-height:1}
+  .navbar .item.active{color:var(--cyan);font-weight:700}
+
+  /* ---------- Record screen ---------- */
+  .rec-top{display:flex;align-items:center;gap:12px;padding:12px 16px;flex:none}
+  .iconchip{width:38px;height:38px;border-radius:11px;background:var(--surface);border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);font-size:16px;cursor:pointer;flex:none}
+  .timer{display:flex;align-items:center;gap:8px;border-radius:20px;padding:6px 12px;font-family:var(--font-mono);font-weight:700;font-size:13px;
+    background:var(--surface);border:1px solid var(--line);color:var(--text)}
+  .timer.live{background:rgba(255,59,78,.16);border-color:rgba(255,59,78,.5);color:#ffd7db}
+  .timer .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+  .timer.live .dot{background:var(--rec);box-shadow:0 0 8px var(--rec);animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .feeds{flex:1;display:flex;gap:6px;padding:0 8px;min-height:0}
+  .feed{flex:1;border-radius:14px;position:relative;overflow:hidden;border:1px solid var(--line);min-height:0}
+  .feed.front{background:linear-gradient(135deg,#f0a67a,#c56b8f 55%,#7b4b8f)}
+  .feed.back{background:linear-gradient(160deg,#2b6cb0,#1a3a6b 55%,#0d1830)}
+  .feed .sheen{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.10) 45%,transparent 60%);
+    background-size:250% 100%;animation:sheen 5s linear infinite}
+  @keyframes sheen{from{background-position:200% 0}to{background-position:-100% 0}}
+  .feed .tag{position:absolute;top:10px;left:10px;font-size:11px;font-weight:700;background:rgba(0,0,0,.45);border:1px solid var(--line2);
+    padding:3px 8px;border-radius:8px;backdrop-filter:blur(4px)}
+  .feed .ratio{position:absolute;bottom:10px;left:10px;font-size:11px;color:#CFE6FF;font-family:var(--font-mono);background:rgba(0,0,0,.45);padding:2px 6px;border-radius:6px}
+  .feed .pip{position:absolute;right:8px;bottom:8px;width:38%;aspect-ratio:9/16;border-radius:10px;border:1px solid var(--line2);overflow:hidden}
+  .rec-status{padding:10px 16px 0;color:var(--muted);font-size:12px;flex:none}
+  .rec-saved{padding:2px 16px 0;color:#8FA0C8;font-size:11px;flex:none}
+  .rec-bottom{display:flex;align-items:center;justify-content:center;padding:20px 0 26px;flex:none}
+  .recbtn{width:74px;height:74px;border-radius:50%;background:#fff;display:grid;place-items:center;cursor:pointer;border:none}
+  .recbtn.disabled{background:rgba(128,128,128,.3);cursor:default}
+  .recbtn i{display:block;width:56px;height:56px;border-radius:50%;background:var(--rec);box-shadow:0 0 18px rgba(255,59,78,.7);transition:all .2s}
+  .recbtn.rec i{width:30px;height:30px;border-radius:6px}
+
+  /* ---------- Dialog ---------- */
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:20;padding:24px}
+  .dialog{background:var(--surface2);border:1px solid var(--line2);border-radius:26px;padding:22px;width:100%}
+  .dialog h3{color:var(--gold);font-family:var(--font-display);font-size:18px;margin-bottom:10px}
+  .dialog p{color:var(--muted);font-size:13px;line-height:1.55}
+  .dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+  .dialog .acts button{background:none;border:none;font-size:14px;font-weight:600;cursor:pointer;padding:8px 12px;border-radius:10px}
+  .dialog .acts .up{color:var(--gold)} .dialog .acts .later{color:var(--muted)}
+
+  /* ---------- Toast ---------- */
+  .toast{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--line2);
+    color:var(--text);font-size:12px;padding:9px 14px;border-radius:12px;z-index:30;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1}
+
+  /* ---------- Info panel ---------- */
+  .info{flex:1;min-width:300px;max-width:460px;display:flex;flex-direction:column;gap:16px}
+  .infocard{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent);border:1px solid var(--line);border-radius:20px;padding:20px 22px}
+  .infocard h2{font-family:var(--font-display);font-size:19px;margin-bottom:12px}
+  .infocard h2 .g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .infocard p, .infocard li{color:var(--muted);font-size:13.5px;line-height:1.65}
+  .infocard ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .infocard li{padding-left:22px;position:relative}
+  .infocard li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:800}
+  .infocard code{font-family:var(--font-mono);font-size:12px;background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;color:#cfe}
+  .switchrow{display:flex;align-items:center;gap:12px;margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer}
+  .switchrow .lab{flex:1;font-size:13px;color:var(--text);font-weight:600}
+  .switchrow .sub{display:block;font-size:11px;color:var(--faint);font-weight:400;margin-top:2px}
+  .toggle{width:44px;height:24px;border-radius:14px;background:var(--surface2);border:1px solid var(--line2);position:relative;flex:none;transition:background .15s}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:all .15s}
+  .toggle.on{background:var(--purple)}
+  .toggle.on::after{left:22px;background:#fff}
+  .hint{font-size:12px;color:var(--faint);line-height:1.6}
+  kbd{font-family:var(--font-mono);font-size:11px;background:var(--surface2);border:1px solid var(--line2);border-bottom-width:2px;border-radius:6px;padding:1px 6px;color:#cfe}
+</style>
+</head>
+<body>
+<div class="page">
+  <div style="width:100%">
+    <div class="topbar">
+      <svg width="52" height="52" viewBox="0 0 100 100" fill="none">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#22D3EE"/><stop offset=".35" stop-color="#2E7DFF"/><stop offset=".7" stop-color="#7C3AED"/><stop offset="1" stop-color="#E94FD0"/>
+          </linearGradient>
+        </defs>
+        <ellipse cx="50" cy="50" rx="43" ry="29" stroke="url(#g)" stroke-width="3.5" opacity=".8" transform="rotate(-24 50 50)" stroke-dasharray="190 43"/>
+        <circle cx="42" cy="60" r="17" fill="#05070D" stroke="url(#g)" stroke-width="3.2"/>
+        <circle cx="58" cy="60" r="17" fill="#05070D" stroke="url(#g)" stroke-width="3.2"/>
+        <circle cx="39" cy="55" r="5.5" fill="#22D3EE"/><circle cx="55" cy="55" r="5.5" fill="#E94FD0"/>
+      </svg>
+      <div>
+        <div class="wordmark"><span>Duel</span><span class="s">Shots</span></div>
+        <div class="tag">UI Preview · webb</div>
+      </div>
+      <div class="pill">Native Android-app · Kotlin + Compose + CameraX</div>
+    </div>
+  </div>
+
+  <!-- ================= Phone ================= -->
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="screen">
+      <div class="statusbar"><span id="clock">9:41</span><span>▮▮&nbsp;&nbsp;⌾&nbsp;&nbsp;▰</span></div>
+      <div class="body" id="screenBody"></div>
+      <div id="navbarHost"></div>
+      <div class="toast" id="toast"></div>
+      <div id="dialogHost"></div>
+    </div>
+  </div>
+
+  <!-- ================= Info panel ================= -->
+  <div class="info">
+    <div class="infocard">
+      <h2>Vad är <span class="g">detta</span>?</h2>
+      <p>En interaktiv förhandsvisning av DuelShots-UI:t, byggd direkt ur Compose-koden i
+      <code>app/src/main/java/com/nrworld/duelshot/ui/</code>. Själva appen är native Android och
+      måste köras på telefon eller emulator — den kan inte köras som en webbapp.</p>
+    </div>
+
+    <div class="infocard">
+      <h2>Prova <span class="g">här</span></h2>
+      <ul>
+        <li>Välj inspelningsläge (Dual View / Separate / Both)</li>
+        <li>Tryck <b>Start Recording</b> — timer och inspelningsknapp fungerar</li>
+        <li>Stoppa inspelningen → klipp hamnar i Galleriet</li>
+        <li>I Inställningar: 4K/HEVC är premium-låsta → dialogen öppnas</li>
+      </ul>
+      <div class="switchrow" id="fallbackToggle">
+        <div class="lab">Simulera enhet utan dubbla kameror
+          <span class="sub">Visar appens fallback till enstaka kamera</span>
+        </div>
+        <div class="toggle" id="fallbackSwitch"></div>
+      </div>
+    </div>
+
+    <div class="infocard">
+      <h2>Bygga den <span class="g">riktiga appen</span></h2>
+      <p>Krav: JDK 17 eller 21 samt Android SDK (compileSdk 35). Öppna projektet i Android Studio
+      och tryck ▶, eller från terminalen:</p>
+      <p style="margin-top:10px"><code>./gradlew installDebug</code></p>
+      <p class="hint" style="margin-top:12px">Tips: inspelning med båda kameror kräver en telefon vars
+      camera-HAL stödjer concurrent cameras (annars används fallback-läget automatiskt).
+      Filerna sparas till <b>Movies/DuelShots</b>.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= State (speglar AppViewModel + AppPrefs) ================= */
+const ASPECTS = [
+  {id:'R_9_16', label:'9:16 Portrait'},
+  {id:'R_16_9', label:'16:9 Landscape'},
+  {id:'R_1_1',  label:'1:1 Square'},
+  {id:'R_4_3',  label:'4:3'}
+];
+const MODES = [
+  {id:'DUAL_VIEW', title:'Dual View',       subtitle:'Both cameras in one video',   icon:'▢'},
+  {id:'SEPARATE',  title:'Separate Videos', subtitle:'Two files, one for each',     icon:'▯'},
+  {id:'BOTH',      title:'Both Options',    subtitle:'Combined + two separate files', icon:'⇄'}
+];
+const QUALITY = [{label:'720p',premium:false},{label:'1080p Full HD',premium:false},{label:'4K Ultra HD',premium:true}];
+const CODEC   = [{label:'MP4',premium:false},{label:'HEVC',premium:true}];
+
+const DEFAULTS = { tab:'HOME', recording:false, premium:false, mode:'DUAL_VIEW',
+  frontAspect:'R_9_16', backAspect:'R_16_9', quality:1, codec:0, clips:[], supported:true };
+let state = Object.assign({}, DEFAULTS);
+try { Object.assign(state, JSON.parse(localStorage.getItem('duelshots-preview') || '{}')); } catch(e) {}
+function save(){ try { localStorage.setItem('duelshots-preview', JSON.stringify(state)); } catch(e) {} }
+
+const $ = s => document.querySelector(s);
+const screenBody = $('#screenBody'), navbarHost = $('#navbarHost'), dialogHost = $('#dialogHost');
+
+function logo(size){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" fill="none">
+    <ellipse cx="50" cy="50" rx="43" ry="29" stroke="url(#g)" stroke-width="4" opacity=".85" transform="rotate(-24 50 50)" stroke-dasharray="185 48"/>
+    <circle cx="42" cy="60" r="17" fill="#05070D" stroke="url(#g)" stroke-width="3.4"/>
+    <circle cx="58" cy="60" r="17" fill="#05070D" stroke="url(#g)" stroke-width="3.4"/>
+    <circle cx="39" cy="55" r="5.5" fill="#22D3EE"/><circle cx="55" cy="55" r="5.5" fill="#E94FD0"/></svg>`;
+}
+const frontA = () => ASPECTS.find(a => a.id === state.frontAspect);
+const backA  = () => ASPECTS.find(a => a.id === state.backAspect);
+const curMode = () => MODES.find(m => m.id === state.mode);
+
+/* ================= Render ================= */
+function render(){
+  if (state.recording) renderRecord(); else renderTab();
+  navbarHost.innerHTML = state.recording ? '' : navbar();
+  save();
+}
+
+function navbar(){
+  const items = [['HOME','⌂','Home'],['GALLERY','▶','Gallery'],['SETTINGS','⚙','Settings']];
+  return '<div class="navbar">' + items.map(([id,ic,label]) =>
+    `<div class="item ${state.tab===id?'active':''}" data-tab="${id}"><span class="ic">${ic}</span><span>${label}</span></div>`).join('') + '</div>';
+}
+
+function renderTab(){
+  screenBody.classList.remove('black');
+  if (state.tab === 'HOME') renderHome();
+  else if (state.tab === 'GALLERY') renderGallery();
+  else renderSettings();
+}
+
+/* ---------- Home ---------- */
+function renderHome(){
+  const m = curMode();
+  screenBody.innerHTML = `
+    <div class="pad">
+      <div class="row">
+        ${logo(44)}
+        <div style="margin-left:12px;font-family:var(--font-display);font-weight:800;font-size:26px">
+          <span>Duel</span><span style="background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent">Shots</span>
+        </div>
+        <div style="flex:1"></div>
+        <div style="border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;
+          background:${state.premium?'var(--gold)':'var(--surface2)'};color:${state.premium?'#241703':'var(--muted)'}">
+          ${state.premium?'♛ Premium':'Free'}
+        </div>
+      </div>
+
+      <div style="height:18px"></div>
+      <div class="muted" style="font-size:14px">Capture More. From Every Angle.</div>
+      <div style="height:14px"></div>
+
+      <button class="gradbtn" id="startBtn">
+        <span style="font-size:20px">🎥</span>
+        <span><span class="t">Start Recording</span><span class="s" style="display:block">Choose your mode</span></span>
+      </button>
+
+      <div style="height:20px"></div>
+      <div class="section-label">Recording Mode</div>
+      ${MODES.map(md => `
+        <div class="card click" data-mode="${md.id}" style="margin-bottom:10px">
+          <div class="row">
+            <div style="width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:18px;flex:none;
+              background:${state.mode===md.id?'rgba(233,79,208,.22)':'var(--surface2)'};color:${state.mode===md.id?'var(--magenta)':'var(--muted)'}">${md.icon}</div>
+            <div style="flex:1;margin-left:2px">
+              <div style="font-weight:600;font-size:14px">${md.title}</div>
+              <div class="muted" style="font-size:12px;margin-top:2px">${md.subtitle}</div>
+            </div>
+            <div class="radio ${state.mode===md.id?'on':'off'}">${state.mode===md.id?'<i></i>':''}</div>
+          </div>
+        </div>`).join('')}
+
+      <div style="height:8px"></div>
+      <div class="section-label">Quick Settings</div>
+      <div class="card">
+        <div class="row">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px">⚡  ${frontA().label} · ${backA().label}</div>
+            <div class="muted" style="font-size:12px;margin-top:2px">${QUALITY[state.quality].label} · ${CODEC[state.codec].label}</div>
+          </div>
+          <div class="muted" style="font-size:22px">›</div>
+        </div>
+      </div>
+
+      ${state.premium ? '' : `
+      <div style="height:16px"></div>
+      <div class="card click" id="premiumCard">
+        <div class="row">
+          <span style="color:var(--gold);font-size:20px">♛</span>
+          <div style="flex:1;margin-left:10px">
+            <div style="font-weight:700;font-size:14px">Go Premium</div>
+            <div class="muted" style="font-size:11px;margin-top:2px">4K · 60fps · HEVC · custom formats · watermark-free</div>
+          </div>
+        </div>
+      </div>`}
+    </div>`;
+
+  $('#startBtn').onclick = () => { state.recording = true; render(); };
+  screenBody.querySelectorAll('[data-mode]').forEach(el => el.onclick = () => { state.mode = el.dataset.mode; renderHome(); save(); });
+  const pc = $('#premiumCard'); if (pc) pc.onclick = () => showPremiumDialog('DuelShots Premium');
+}
+
+/* ---------- Record ---------- */
+let tick = null;
+function feedHTML(kind, label, ratio, pip){
+  return `<div class="feed ${kind}"><div class="sheen"></div>
+    ${label?`<span class="tag">${label}</span>`:''}
+    ${ratio?`<span class="ratio">${ratio}</span>`:''}
+    ${pip?`<div class="pip"><div class="feed front" style="border:none;border-radius:0"><div class="sheen"></div></div></div>`:''}
+  </div>`;
+}
+function renderRecord(){
+  screenBody.classList.add('black');
+  screenBody.innerHTML = `
+    <div class="rec-top">
+      <div class="iconchip" id="exitBtn">✕</div>
+      <div class="timer" id="timerPill"><span class="dot"></span><span id="timerText">00:00:00</span></div>
+      <div style="flex:1"></div>
+      <div class="iconchip">⟳</div>
+    </div>
+    <div class="feeds" id="feeds"></div>
+    <div class="rec-status" id="recStatus">Starting cameras…</div>
+    <div class="rec-saved" id="recSaved" style="display:none"></div>
+    <div class="rec-bottom">
+      <button class="recbtn disabled" id="recBtn"><i></i></button>
+    </div>`;
+
+  const feeds = $('#feeds');
+  if (!state.supported){
+    feeds.innerHTML = feedHTML('back','CAMERA', backA().label);
+  } else if (state.mode === 'DUAL_VIEW'){
+    feeds.innerHTML = feedHTML('back', null, null, true);
+  } else {
+    feeds.innerHTML = feedHTML('back','BACK', backA().label) + feedHTML('front','FRONT', frontA().label);
+  }
+
+  $('#exitBtn').onclick = () => stopTicking();
+  const btn = $('#recBtn');
+  let ready = false;
+  setTimeout(() => {
+    ready = true;
+    btn.classList.remove('disabled');
+    $('#recStatus').textContent = state.supported
+      ? 'Ready · ' + curMode().title
+      : 'Fallback: single camera mode';
+  }, 900);
+
+  btn.onclick = () => {
+    if (!ready) return;
+    if (!recordingActive){ startRec(); } else { stopRec(); }
+  };
+
+  let recordingActive = false, elapsed = 0, savedNames = [];
+  function startRec(){
+    recordingActive = true; elapsed = 0; savedNames = [];
+    btn.classList.add('rec');
+    $('#timerPill').classList.add('live');
+    $('#recStatus').textContent = 'Recording…';
+    tick = setInterval(() => { elapsed++; $('#timerText').textContent = fmt(elapsed); }, 1000);
+  }
+  function stopRec(){
+    recordingActive = false;
+    clearInterval(tick);
+    btn.classList.remove('rec');
+    $('#timerPill').classList.remove('live');
+    const stamp = new Date().toISOString().slice(0,19).replace('T','_').replace(/:/g,'-');
+    if (state.mode === 'DUAL_VIEW') savedNames = [`DuelShots_DUAL_VIEW_${stamp}.mp4`];
+    else if (state.mode === 'SEPARATE') savedNames = [`DuelShots_FRONT_${stamp}.mp4`,`DuelShots_BACK_${stamp}.mp4`];
+    else savedNames = [`DuelShots_COMPOSED_${stamp}.mp4`,`DuelShots_FRONT_${stamp}.mp4`,`DuelShots_BACK_${stamp}.mp4`];
+    savedNames.forEach((n,i) => state.clips.unshift({id:Date.now()+i, name:n, sizeMb: 8 + ((n.length*7 + i*13) % 90)}));
+    $('#recStatus').textContent = 'Stopped. Saved to Gallery → Movies/DuelShots';
+    const sv = $('#recSaved'); sv.style.display = 'block';
+    sv.textContent = 'Saved: ' + savedNames.join(', ');
+    save();
+  }
+  function stopTicking(){ clearInterval(tick); state.recording = false; render(); }
+  $('#exitBtn').onclick = () => { clearInterval(tick); state.recording = false; render(); };
+}
+function fmt(s){ return [s/3600, (s%3600)/60, s%60].map(v => String(Math.floor(v)).padStart(2,'0')).join(':'); }
+
+/* ---------- Settings ---------- */
+function renderSettings(){
+  screenBody.innerHTML = `
+    <div class="pad">
+      <div style="font-weight:700;font-size:24px">Settings</div>
+      <div style="height:16px"></div>
+
+      <div class="section-label">Recording Mode</div>
+      ${MODES.map(md => `
+        <div class="card click" data-mode="${md.id}" style="margin-bottom:8px">
+          <div class="row">
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px">${md.title}</div>
+              <div class="muted" style="font-size:12px;margin-top:2px">${md.subtitle}</div>
+            </div>
+            <div class="radio ${state.mode===md.id?'on':'off'}">${state.mode===md.id?'<i></i>':''}</div>
+          </div>
+        </div>`).join('')}
+
+      <div style="height:12px"></div>
+      <div class="section-label">Camera Formats</div>
+      <div class="card" style="margin-bottom:10px">
+        <div style="font-weight:600;font-size:14px">Front Camera</div>
+        <div style="height:8px"></div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          ${ASPECTS.map(a => `<div class="chip ${state.frontAspect===a.id?'on':''}" data-front="${a.id}">${a.label}</div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-weight:600;font-size:14px">Back Camera</div>
+        <div style="height:8px"></div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          ${ASPECTS.map(a => `<div class="chip ${state.backAspect===a.id?'on':''}" data-back="${a.id}">${a.label}</div>`).join('')}
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+      <div class="section-label">Video Quality</div>
+      <div class="card">
+        <div class="row">
+          <div style="flex:1;font-size:14px">Resolution</div>
+          <div class="seg">${QUALITY.map((q,i)=>`<span class="${state.quality===i?'on':''}" data-q="${i}">${['720p','1080p','4K★'][i]}</span>`).join('')}</div>
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="section-label">Container / Codec</div>
+      <div class="card">
+        <div class="row">
+          <div style="flex:1;font-size:14px">Format</div>
+          <div class="seg">${CODEC.map((c,i)=>`<span class="${state.codec===i?'on':''}" data-c="${i}">${c.label}${c.premium?'★':''}</span>`).join('')}</div>
+        </div>
+      </div>
+
+      <div style="height:16px"></div>
+      <div class="card" style="border-color:rgba(245,194,75,.45);background:linear-gradient(180deg,rgba(245,194,75,.12),transparent)">
+        <div style="color:var(--gold);font-weight:700;font-size:16px">♛  Premium</div>
+        <div style="height:8px"></div>
+        ${['More format options (4K, HEVC)','60fps & custom bitrate','Per-camera aspect control','No watermark']
+          .map(t=>`<div class="row" style="padding:3px 0"><span style="color:var(--cyan);font-weight:800">✓</span><span class="muted" style="font-size:13px;margin-left:8px">${t}</span></div>`).join('')}
+        <div style="height:12px"></div>
+        ${state.premium
+          ? `<div style="color:var(--gold);font-weight:700">Premium aktivt</div>`
+          : `<button class="goldbtn" id="goPremium">♛ Go Premium</button>`}
+      </div>
+    </div>`;
+
+  screenBody.querySelectorAll('[data-mode]').forEach(el => el.onclick = () => { state.mode = el.dataset.mode; renderSettings(); save(); });
+  screenBody.querySelectorAll('[data-front]').forEach(el => el.onclick = () => { state.frontAspect = el.dataset.front; renderSettings(); save(); });
+  screenBody.querySelectorAll('[data-back]').forEach(el => el.onclick = () => { state.backAspect = el.dataset.back; renderSettings(); save(); });
+  screenBody.querySelectorAll('[data-q]').forEach(el => el.onclick = () => {
+    const i = +el.dataset.q;
+    if (QUALITY[i].premium && !state.premium) showPremiumDialog(QUALITY[i].label);
+    else { state.quality = i; renderSettings(); save(); }
+  });
+  screenBody.querySelectorAll('[data-c]').forEach(el => el.onclick = () => {
+    const i = +el.dataset.c;
+    if (CODEC[i].premium && !state.premium) showPremiumDialog(CODEC[i].label);
+    else { state.codec = i; renderSettings(); save(); }
+  });
+  const gp = $('#goPremium'); if (gp) gp.onclick = () => { state.premium = true; save(); renderSettings(); toast('Premium unlocked (mock)'); };
+}
+
+/* ---------- Gallery ---------- */
+function renderGallery(){
+  const body = state.clips.length ? `
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${state.clips.map(c => `
+        <div class="card click" data-clip="${c.id}">
+          <div class="row">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(124,58,237,.25);display:grid;place-items:center;flex:none">
+              <span style="color:var(--rec);font-size:15px">▶</span>
+            </div>
+            <div style="flex:1;margin-left:2px">
+              <div style="font-weight:600;font-size:13px;word-break:break-all">${c.name}</div>
+              <div class="muted" style="font-size:12px;margin-top:2px">${c.sizeMb} MB</div>
+            </div>
+            <div class="muted" style="font-size:20px">›</div>
+          </div>
+        </div>`).join('')}
+    </div>` : `
+    <div class="card" style="height:160px;display:grid;place-items:center;text-align:center">
+      <div class="muted" style="font-size:13px">No recordings yet. Tap “Start Recording”.</div>
+    </div>`;
+  screenBody.innerHTML = `
+    <div class="pad">
+      <div style="font-weight:700;font-size:24px">Gallery</div>
+      <div class="muted" style="font-size:12px;margin-top:4px">Recordings are saved to Gallery → Movies/DuelShots</div>
+      <div style="height:16px"></div>
+      ${body}
+    </div>`;
+  screenBody.querySelectorAll('[data-clip]').forEach(el => el.onclick = () => toast('Opens in system player'));
+}
+
+/* ---------- Premium dialog ---------- */
+function showPremiumDialog(feature){
+  dialogHost.innerHTML = `
+    <div class="scrim" id="scrim">
+      <div class="dialog">
+        <h3>♛  ${feature}</h3>
+        <p>This is a Premium feature. Upgrade for 4K, 60fps, HEVC, per-camera format control and watermark-free export.</p>
+        <div class="acts">
+          <button class="later" id="dlgLater">Later</button>
+          <button class="up" id="dlgUp">Upgrade</button>
+        </div>
+      </div>
+    </div>`;
+  $('#dlgLater').onclick = () => dialogHost.innerHTML = '';
+  $('#dlgUp').onclick = () => {
+    state.premium = true; save(); dialogHost.innerHTML = ''; render(); toast('Premium unlocked (mock)');
+  };
+}
+
+/* ---------- Toast ---------- */
+let toastT = null;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------- Events ---------- */
+navbarHost.addEventListener('click', e => {
+  const item = e.target.closest('[data-tab]');
+  if (!item) return;
+  state.tab = item.dataset.tab; render();
+});
+$('#fallbackToggle').onclick = () => {
+  state.supported = !state.supported; save();
+  $('#fallbackSwitch').classList.toggle('on', !state.supported);
+  toast(state.supported ? 'Dual cameras: supported' : 'Fallback: single camera');
+  if (state.recording) render();
+};
+$('#fallbackSwitch').classList.toggle('on', !state.supported);
+
+/* Live clock in status bar */
+setInterval(() => {
+  const d = new Date();
+  $('#clock').textContent = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}, 10000);
+
+render();
+</script>
+</body>
+</html>
