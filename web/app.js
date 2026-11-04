@@ -115,29 +115,37 @@ function logoMark(size = 76, cls = 'logo-lg') {
       <defs>
         <linearGradient id="dsGrad" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stop-color="#FFC65C"/>
-          <stop offset=".5" stop-color="#FF7A1A"/>
+          <stop offset=".52" stop-color="#FF7A1A"/>
           <stop offset="1" stop-color="#FF4D00"/>
         </linearGradient>
-        <radialGradient id="dsGlass" cx=".36" cy=".3" r=".78">
-          <stop offset="0" stop-color="#463429"/>
-          <stop offset=".5" stop-color="#151110"/>
+        <radialGradient id="dsGlass" cx=".36" cy=".3" r=".8">
+          <stop offset="0" stop-color="#4a372b"/>
+          <stop offset=".48" stop-color="#171211"/>
           <stop offset="1" stop-color="#070605"/>
         </radialGradient>
+        <linearGradient id="dsPlay" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FFD27A"/>
+          <stop offset="1" stop-color="#FF6A1A"/>
+        </linearGradient>
       </defs>
 
-      <!-- split lens: the two halves of the product -->
-      <circle cx="54" cy="60" r="30" fill="#0b0806" stroke="url(#dsGrad)" stroke-width="4"/>
-      <path d="M54 30a30 30 0 0 0 0 60z" fill="url(#dsGrad)" opacity=".14"/>
-      <path d="M54 24v72" stroke="rgba(255,227,194,.4)" stroke-width="1.4" stroke-dasharray="3 5"/>
-      <circle cx="54" cy="60" r="16.5" fill="url(#dsGlass)" stroke="rgba(255,227,194,.22)" stroke-width="1.4"/>
-      <circle cx="47" cy="53" r="5" fill="#FFC65C" opacity=".9"/>
-      <circle cx="59" cy="66" r="2.4" fill="#FF7A1A" opacity=".55"/>
+      <!-- orbit: broken arc, one side only -->
+      <path d="M20 44A38 38 0 0 1 58 24" fill="none" stroke="url(#dsGrad)" stroke-width="3"
+            stroke-linecap="round" opacity=".85"/>
+      <path d="M96 96A38 38 0 0 1 62 100" fill="none" stroke="url(#dsGrad)" stroke-width="2.4"
+            stroke-linecap="round" opacity=".45"/>
 
-      <!-- play cuts into the frame -->
-      <path d="M82 46.5 108 60 82 73.5z" fill="url(#dsGrad)"/>
+      <!-- split lens: the two sides of the product -->
+      <circle cx="56" cy="60" r="31" fill="#0b0806" stroke="url(#dsGrad)" stroke-width="3.4"/>
+      <path d="M56 29a31 31 0 0 0 0 62z" fill="url(#dsGrad)" opacity=".13"/>
+      <path d="M56 25v70" stroke="rgba(255,227,194,.42)" stroke-width="1.2" stroke-dasharray="3 5"/>
+      <circle cx="56" cy="60" r="17" fill="url(#dsGlass)" stroke="rgba(255,227,194,.2)" stroke-width="1.2"/>
+      <circle cx="49" cy="52" r="4.6" fill="#FFC65C" opacity=".9"/>
+      <circle cx="62" cy="67" r="2.2" fill="#FF7A1A" opacity=".5"/>
 
-      <!-- rec led -->
-      <circle cx="54" cy="30" r="2.6" fill="#FF3B30"/>
+      <!-- play bites into the frame -->
+      <path d="M84 47.2 105 60 84 72.8z" fill="url(#dsPlay)" stroke="url(#dsPlay)" stroke-width="2.4"
+            stroke-linejoin="round"/>
     </svg>`;
 }
 
@@ -413,10 +421,11 @@ function showAbout() {
       <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
 
       <h3>Build</h3>
-      <p><b>3.1 · “two sides”.</b> The interface is built like an analog camera manual: a split
-      viewfinder title card, monospaced metadata, hairline lists and a live capture readout.
-      Colour is reserved for the brand gradient, the record state and premium.
-      Format controls live on the record screen and in Settings. Last updated 2026-11-04.</p>
+      <p><b>3.2 · poster menu.</b> A centred lens mark and wordmark, one orange action, then
+      rounded cards for Gallery, Settings, Premium and About — each with a lit icon orb and a
+      monospaced value on the right. Technical detail stays in mono, prose in the system sans,
+      and colour is reserved for the brand gradient, the record state and premium.
+      Last updated 2026-11-04.</p>
 
       <h3>What works here</h3>
       <ul>
@@ -1546,79 +1555,48 @@ function renderHome() {
         <button class="icon-btn" id="home-settings" type="button" aria-label="Settings">${ICONS.gear}</button>
       </div>
 
-      <div class="hero">
-        <div class="hero-panes" aria-hidden="true">
-          <span class="pane back"></span>
-          <span class="pane front"></span>
-          <span class="seam"></span>
-        </div>
-        <span class="pane-tag left">Back · ${ASPECTS[state.backAspect].short}</span>
-        <span class="pane-tag right">Front · ${ASPECTS[state.frontAspect].short}</span>
-        <div class="hero-content">
-          ${logoMark(62)}
-          <h1 class="wordmark">Duel<span>Shots</span></h1>
-        </div>
+      <div class="lockup">
+        <div class="lockup-mark">${logoMark(100)}</div>
+        <h1 class="wordmark">Duel<span>Shots</span></h1>
+        <p class="tagline">Record both sides. At once.</p>
       </div>
-
-      <p class="tagline">Record both sides. At once.</p>
 
       <button class="btn-primary" id="start-btn" type="button">
         ${ICONS.camera}
         <span class="grow">Start Recording</span>
         <span class="chev">${ICONS.chevronRight}</span>
       </button>
-      <p class="cta-meta">${MODES[state.mode].title} · ${outputCount()} file${outputCount() === 1 ? '' : 's'}</p>
-
-      <div class="spec">
-        <div class="spec-head">
-          <span class="spec-title">Capture</span>
-          <span class="spec-line"></span>
-          <span class="spec-state">Ready</span>
-        </div>
-        <div class="spec-grid">
-          <div class="spec-cell"><span class="k">Front</span><span class="v">${ASPECTS[state.frontAspect].short}</span></div>
-          <div class="spec-cell"><span class="k">Back</span><span class="v">${ASPECTS[state.backAspect].short}</span></div>
-          <div class="spec-cell"><span class="k">Video</span><span class="v">${QUALITIES[state.quality].label}</span></div>
-          <div class="spec-cell"><span class="k">Audio</span><span class="v">${state.audio ? 'On' : 'Off'}</span></div>
-        </div>
-      </div>
-
-      <div class="rail">
-        <span class="rail-label">Library</span>
-        <i class="rail-line"></i>
-        <span class="rail-count">${clipCount} clip${clipCount === 1 ? '' : 's'}</span>
-      </div>
+      <p class="cta-meta">${MODES[state.mode].title} · ${outputCount()} file${outputCount() === 1 ? '' : 's'} · ${QUALITIES[state.quality].label}</p>
 
       <div class="menu-list">
         <button class="menu-row" data-go="GALLERY" type="button">
-          <span class="idx">01</span>
           <span class="menu-ico">${ICONS.gallery}</span>
           <span class="label">Gallery</span>
+          <span class="meta">${clipCount} clip${clipCount === 1 ? '' : 's'}</span>
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
         <button class="menu-row" data-go="SETTINGS" type="button">
-          <span class="idx">02</span>
           <span class="menu-ico">${ICONS.gear}</span>
           <span class="label">Settings</span>
+          <span class="meta">${ASPECTS[state.frontAspect].short} + ${ASPECTS[state.backAspect].short}</span>
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
         <button class="menu-row gold" id="menu-premium" type="button">
-          <span class="idx">03</span>
           <span class="menu-ico">${ICONS.crown}</span>
           <span class="label">${state.premium ? 'Premium active' : 'Premium'}</span>
-          ${state.premium ? '' : '<span class="pro-tag">Pro</span>'}
+          ${state.premium ? '<span class="meta">Active</span>' : '<span class="pro-tag">Pro</span>'}
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
         <button class="menu-row" id="menu-about" type="button">
-          <span class="idx">04</span>
           <span class="menu-ico">${ICONS.info}</span>
           <span class="label">About</span>
+          <span class="meta">v3.2</span>
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
       </div>
 
       <div class="menu-foot">
-        <span>Build 3.1</span>
+        <span>Build 3.2</span>
         <i class="foot-line"></i>
         <span>On this device</span>
       </div>

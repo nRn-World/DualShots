@@ -31,17 +31,16 @@ No build step, no npm packages — just `index.html`, `styles.css` and `app.js`.
 
 The interface is built like an analog camera manual rather than a dashboard.
 
-- **Split title card.** The home screen opens on a duotone panel split down the middle —
-  back camera on the left, front camera on the right — with the lens mark and the
-  DuelShots wordmark sitting on the seam, and a strip of film perforations along the
-  bottom edge.
-- **One accent, used sparingly.** Orange appears on the brand gradient, the record state
-  and premium. Everything else is warm near-black, paper white and hairline rules.
+- **Poster menu.** The home screen is a single column: the split-lens mark and the
+  DuelShots wordmark, the tagline in tracked mono, one full-width *Start Recording*
+  action, then rounded cards for Gallery, Settings, Premium and About — each with a lit
+  icon orb and a monospaced value (clip count, formats, Pro, build) on the right.
+- **One accent, used sparingly.** Orange appears on the brand gradient, the icon orbs,
+  the record state and premium. Everything else is warm near-black, paper white and
+  hairline rules.
 - **Monospaced metadata.** Every technical value (formats, resolution, durations,
   filenames, section labels) is set in mono with wide tracking; prose stays in the system
-  sans. The home screen carries a live *Capture* readout of the current settings.
-- **Hairlines, not cards.** Rows are separated by 1px rules instead of stacked rounded
-  cards and drop shadows, so the screens read as one continuous instrument panel.
+  sans. Settings and the gallery are hairline lists, not stacks of shadowed cards.
 - **Viewfinder HUD.** The record screen frames the preview with corner brackets, a
   red-dot timer, a torch control in the top bar, a white-ring shutter and mono status
   lines. A fine film grain sits over the whole device.

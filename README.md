@@ -71,10 +71,10 @@ python3 web/serve.py 8000
 
 It records real (downloadable) clips into the Gallery, persists settings in
 `localStorage`, and falls back to a single camera — or an animated demo feed — when the
-browser cannot open both cameras. The web build carries its own visual identity — a
-split duotone title card, monospaced metadata, hairline lists and a viewfinder HUD — with
-one primary *Start Recording* action, rows for Gallery / Settings / Premium / About, and
-a grouped Settings screen with the premium card. The native Android app remains the
+browser cannot open both cameras. The web build carries its own visual identity — a poster menu with a
+split-lens mark, monospaced metadata, icon-orb rows and a viewfinder HUD — with one
+primary *Start Recording* action, cards for Gallery / Settings / Premium / About, and a
+grouped Settings screen with the premium card. The native Android app remains the
 reference implementation; see [`web/README.md`](web/README.md) for the mapping.
 
 ## 🚀 Getting started
