@@ -79,12 +79,12 @@ class DualCameraController(private val context: Context) {
             }
             canBind = backSelector != null || frontSelector != null
             when {
-                supported -> "Redo – dubbla kameror."
-                canBind -> "Enheten stöder inte dubbla kameror samtidigt – enskild kamera aktiverad."
-                else -> "Enheten har ingen tillgänglig kamera."
+                supported -> "Ready – dual cameras."
+                canBind -> "This device does not support simultaneous dual cameras – single camera enabled."
+                else -> "No camera available on this device."
             }
         } catch (e: Exception) {
-            "Kunde inte starta kamera: ${e.localizedMessage}"
+            "Could not start camera: ${e.localizedMessage}"
         }
     }
 
@@ -105,7 +105,7 @@ class DualCameraController(private val context: Context) {
         frontView: PreviewView?,
         composedView: PreviewView?
     ): String {
-        val p = provider ?: return "Kameran är inte redo än."
+        val p = provider ?: return "Camera is not ready yet."
 
         p.unbindAll()
         backVideo = null; frontVideo = null; composedVideo = null
@@ -127,16 +127,16 @@ class DualCameraController(private val context: Context) {
                 RecordingMode.BOTH -> bindBoth(p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner, backView, frontView, composedView)
             }
             activeMode = wanted
-            "Kamera redo – ${wanted.title}."
+            "Camera ready – ${wanted.title}."
         } catch (e: Exception) {
             // Fallback: försök enklare läge så användaren alltid kan spela in.
             try {
                 p.unbindAll()
                 bindSeparate(p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner, backView, frontView)
                 activeMode = RecordingMode.SEPARATE
-                "Avancerat läge stöds ej här – spelar in som Separata filer istället."
+                "Advanced mode not supported here – recording as Separate files instead."
             } catch (e2: Exception) {
-                "Kunde inte binda kameror: ${e2.localizedMessage}"
+                "Could not bind cameras: ${e2.localizedMessage}"
             }
         }
     }
@@ -148,7 +148,7 @@ class DualCameraController(private val context: Context) {
     ): String {
         val useFront = backSelector == null && frontSelector != null
         val sel = (if (useFront) frontSelector else backSelector)
-            ?: return "Ingen kamera tillgänglig."
+            ?: return "No camera available."
         return try {
             p.unbindAll()
             val view = if (useFront) frontView else backView
@@ -159,9 +159,9 @@ class DualCameraController(private val context: Context) {
             if (useFront) frontVideo = vc else backVideo = vc
             activeMode = RecordingMode.SEPARATE
             singleFallback = true
-            "Enskild kamera (${if (useFront) "FRAM" else "BAK"}) – spelar in en fil."
+            "Single camera (${if (useFront) "FRONT" else "BACK"}) – recording one file."
         } catch (e: Exception) {
-            "Kunde inte binda kamera: ${e.localizedMessage}"
+            "Could not bind camera: ${e.localizedMessage}"
         }
     }
 
@@ -283,7 +283,7 @@ class DualCameraController(private val context: Context) {
             onStarted(names)
         } catch (e: Exception) {
             started.forEach { runCatching { it.stop() } }
-            onError("Inspelningen startade inte: ${e.localizedMessage}")
+            onError("Recording did not start: ${e.localizedMessage}")
         }
     }
 

@@ -55,7 +55,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     var frontView by remember { mutableStateOf<PreviewView?>(null) }
     var composedView by remember { mutableStateOf<PreviewView?>(null) }
 
-    var status by remember { mutableStateOf("Startar kameror…") }
+    var status by remember { mutableStateOf("Starting cameras…") }
     var camReady by remember { mutableStateOf(false) }
     var ready by remember { mutableStateOf(false) }
     var renderedMode by remember { mutableStateOf(vm.mode) }
@@ -118,14 +118,14 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp)) {
             if (!controller.supported) {
                 // Enskild kamera: en fullmatad förhandsvisning.
-                Feed(backView, label = "KAMERA", ratio = vm.backAspect.label, modifier = Modifier.fillMaxSize()) { backView = it }
+                Feed(backView, label = "CAMERA", ratio = vm.backAspect.label, modifier = Modifier.fillMaxSize()) { backView = it }
             } else {
                 when (renderedMode) {
                     RecordingMode.DUAL_VIEW -> Feed(composedView) { composedView = it }
                     else -> Row(modifier = Modifier.fillMaxSize()) {
-                        Feed(backView, label = "BAK", ratio = vm.backAspect.label, modifier = Modifier.weight(1f)) { backView = it }
+                        Feed(backView, label = "BACK", ratio = vm.backAspect.label, modifier = Modifier.weight(1f)) { backView = it }
                         Spacer(Modifier.width(6.dp))
-                        Feed(frontView, label = "FRAM", ratio = vm.frontAspect.label, modifier = Modifier.weight(1f)) { frontView = it }
+                        Feed(frontView, label = "FRONT", ratio = vm.frontAspect.label, modifier = Modifier.weight(1f)) { frontView = it }
                     }
                 }
                 // Dold yta som behövs för composition i BOTH-läget.
@@ -143,7 +143,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             Text(status, color = DuelTextMuted, fontSize = 12.sp)
             if (savedNames.isNotEmpty()) {
                 Text(
-                    "Sparade: " + savedNames.joinToString(", "),
+                    "Saved: " + savedNames.joinToString(", "),
                     color = Color(0xFF8FA0C8), fontSize = 11.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -168,7 +168,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     } else {
                         controller.stopRecording()
                         isRecording = false
-                        status = "Stoppad. Sparad i Galleri → Movies/DuelShots"
+                        status = "Stopped. Saved to Gallery → Movies/DuelShots"
                     }
                 }
             )

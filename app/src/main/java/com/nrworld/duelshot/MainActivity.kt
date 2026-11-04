@@ -82,13 +82,13 @@ private fun PermissionPlaceholder(onRequest: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "DuelShots behöver tillstånd för kamera och mikrofon " +
-                "för att spela in från båda kamerorna samtidigt.",
+            text = "DuelShots needs camera and microphone permissions " +
+                "to record from both cameras at the same time.",
             color = DuelTextMuted,
             modifier = Modifier.padding(bottom = 24.dp)
         )
         Button(onClick = onRequest) {
-            Text("Be om tillstånd", color = DuelText)
+            Text("Request permission", color = DuelText)
         }
     }
 }

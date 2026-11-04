@@ -53,20 +53,20 @@ fun GalleryScreen() {
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text("Gallery", color = DuelText, fontWeight = FontWeight.Bold, fontSize = 24.sp)
         Text(
-            "Inspelningar sparas i Galleri → Movies/DuelShots",
+            "Recordings are saved to Gallery → Movies/DuelShots",
             color = DuelTextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)
         )
         Spacer(Modifier.height(16.dp))
 
         if (loading) {
-            Text("Laddar…", color = DuelTextMuted)
+            Text("Loading…", color = DuelTextMuted)
         } else if (clips.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(16.dp))
                     .background(DuelSurface),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Inga inspelningar än. Tryck ”Start Recording”.", color = DuelTextMuted)
+                Text("No recordings yet. Tap “Start Recording”.", color = DuelTextMuted)
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize()) {

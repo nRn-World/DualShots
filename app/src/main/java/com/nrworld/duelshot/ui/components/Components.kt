@@ -218,12 +218,12 @@ fun PremiumDialog(onDismiss: () -> Unit, onUpgrade: () -> Unit, feature: String)
         title = { Text("♛  $feature", color = DuelGold, fontWeight = FontWeight.Bold) },
         text = {
             Text(
-                "Det här är en Premium-funktion. Uppgradera för 4K, 60fps, HEVC, " +
-                    "fri formatkontroll per kamera och watermark-fritt.",
+                "This is a Premium feature. Upgrade for 4K, 60fps, HEVC, " +
+                    "per-camera format control and watermark-free export.",
                 color = DuelTextMuted
             )
         },
-        confirmButton = { TextButton(onClick = onUpgrade) { Text("Uppgradera", color = DuelGold) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Senare", color = DuelTextMuted) } }
+        confirmButton = { TextButton(onClick = onUpgrade) { Text("Upgrade", color = DuelGold) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Later", color = DuelTextMuted) } }
     )
 }

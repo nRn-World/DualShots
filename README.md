@@ -8,6 +8,19 @@ Built with **Kotlin**, **Jetpack Compose**, and the **CameraX Dual Concurrent Ca
 
 ---
 
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td align="center"><b>Home</b><br/><img src="screenshots/01-home.png" width="210" alt="Home screen"/></td>
+    <td align="center"><b>Record</b><br/><img src="screenshots/02-record.png" width="210" alt="Live record screen"/></td>
+    <td align="center"><b>Settings</b><br/><img src="screenshots/03-settings.png" width="210" alt="Settings screen"/></td>
+    <td align="center"><b>Gallery</b><br/><img src="screenshots/04-gallery.png" width="210" alt="Gallery screen"/></td>
+  </tr>
+</table>
+
+---
+
 ## ✨ Features
 
 - **Simultaneous dual-camera recording** — front + back at the same time (device-dependent).

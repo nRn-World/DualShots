@@ -107,7 +107,7 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit)
                     Spacer(Modifier.size(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Go Premium", color = DuelText, fontWeight = FontWeight.Bold)
-                        Text("4K · 60fps · HEVC · fri format · utan watermark", color = DuelTextMuted, fontSize = 11.sp)
+                        Text("4K · 60fps · HEVC · custom formats · watermark-free", color = DuelTextMuted, fontSize = 11.sp)
                     }
                 }
             }
