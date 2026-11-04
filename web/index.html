@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#05070D" />
+  <title>DuelShots — Web Preview</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2305070D'/%3E%3Ccircle cx='24' cy='32' r='10' fill='none' stroke='%2322D3EE' stroke-width='4'/%3E%3Ccircle cx='40' cy='32' r='10' fill='none' stroke='%23E94FD0' stroke-width='4'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true">
+    <span class="glow g1"></span>
+    <span class="glow g2"></span>
+    <span class="glow g3"></span>
+    <span class="grid"></span>
+  </div>
+
+  <main class="stage">
+    <header class="stage-head">
+      <div class="stage-brand">
+        <span class="stage-dot"></span>
+        <span><b>DuelShots</b> — web preview</span>
+      </div>
+      <button class="about-btn" id="about-btn" type="button" title="About this preview">i</button>
+    </header>
+
+    <div class="device" id="device">
+      <div class="device-inner">
+        <div class="statusbar">
+          <span id="clock">9:41</span>
+          <span class="statusbar-icons">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 17h3v-5H2zm5 0h3V9H7zm5 0h3V6h-3zm5 0h3V3h-3z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 19.5 1.5 8.2A15 15 0 0 1 22.5 8.2z" fill="currentColor"/></svg>
+            <span class="battery"><i></i></span>
+          </span>
+        </div>
+
+        <div class="app">
+          <div class="screen" id="screen"></div>
+          <nav class="tabbar" id="tabbar">
+            <button class="tab" data-tab="HOME" type="button">
+              <span class="tab-icon" data-icon="home"></span><span class="tab-label">Home</span>
+            </button>
+            <button class="tab" data-tab="GALLERY" type="button">
+              <span class="tab-icon" data-icon="gallery"></span><span class="tab-label">Gallery</span>
+            </button>
+            <button class="tab" data-tab="SETTINGS" type="button">
+              <span class="tab-icon" data-icon="settings"></span><span class="tab-label">Settings</span>
+            </button>
+          </nav>
+        </div>
+
+        <div class="home-indicator" aria-hidden="true"></div>
+        <div class="modal-root" id="modal-root"></div>
+      </div>
+    </div>
+
+    <footer class="stage-foot">
+      <span class="badge">Kotlin · Compose</span>
+      <span>UI, settings &amp; recording flow mirrored from the native app</span>
+    </footer>
+  </main>
+
+  <div class="media-sink" id="media-sink" aria-hidden="true"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
