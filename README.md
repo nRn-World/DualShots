@@ -87,6 +87,21 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 > **Note:** The Android emulator does not support concurrent dual-camera. Use it to validate the UI and single-camera recording; test true dual-camera capture on a physical device.
 
+### Interactive preview (no Android toolchain needed)
+
+`web-preview/` is a browser port of the app — same screens, same copy, same controller
+logic — so the UX can be clicked through without a device or emulator:
+
+```bash
+cd web-preview
+npm start        # → http://localhost:3000
+```
+
+You can walk the permission gate, switch recording modes, record (timer, file naming and
+MediaStore output are simulated), toggle a **dual-concurrent-camera capable device** on and
+off to see the single-camera fallback, and hit the premium locks on 4K/HEVC. See
+[`web-preview/README.md`](web-preview/README.md) for the source-by-source mapping.
+
 ## 🔐 Permissions
 
 - `CAMERA` — required for recording.
@@ -121,6 +136,7 @@ DuelShots/
 │       ├── settings/SettingsScreen.kt
 │       └── gallery/GalleryScreen.kt
 ├── design/                          # Design poster & mockups
+├── web-preview/                     # Interactive browser preview (npm start)
 └── build.gradle.kts / settings.gradle.kts
 ```
 

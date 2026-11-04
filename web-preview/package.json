@@ -1,0 +1,12 @@
+{
+  "name": "duelshots-web-preview",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive browser preview of the DuelShots Android app",
+  "scripts": {
+    "start": "node dev-server.js",
+    "dev": "node dev-server.js",
+    "lint": "node -e \"const r=require('http');r.get('http://127.0.0.1:'+(process.env.PORT||3000)+'/__lint',x=>{let d='';x.on('data',c=>d+=c);x.on('end',()=>{console.log(d);process.exit(x.statusCode===200?0:1)})})\""
+  },
+  "license": "MIT"
+}
