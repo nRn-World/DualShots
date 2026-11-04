@@ -35,7 +35,7 @@ import com.nrworld.duelshot.ui.home.HomeScreen
 import com.nrworld.duelshot.ui.record.RecordScreen
 import com.nrworld.duelshot.ui.settings.SettingsScreen
 import com.nrworld.duelshot.ui.theme.DuelBg
-import com.nrworld.duelshot.ui.theme.DuelCyan
+import com.nrworld.duelshot.ui.theme.DuelAccent
 import com.nrworld.duelshot.ui.theme.DuelLine
 import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelTextFaint
@@ -113,7 +113,7 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         t.label,
-                        color = if (active) DuelCyan else DuelTextFaint,
+                        color = if (active) DuelAccent else DuelTextFaint,
                         fontSize = 11.sp,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
                     )

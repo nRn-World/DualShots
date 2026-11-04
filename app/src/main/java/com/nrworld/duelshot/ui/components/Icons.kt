@@ -19,7 +19,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /** Egna linjeikoner – avsiktligt inga standard-mobilikoner. */
-enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, PLAY }
+enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, PLAY, CAMERA, VIDEO, CROWN, INFO }
 
 /** Ritar en ikon på en 24×24-yta, skalad till [size]. */
 @Composable
@@ -69,6 +69,30 @@ fun DuelIcon(kind: DuelIconKind, tint: Color, size: Dp = 22.dp, modifier: Modifi
                 arrowAt(c, r, 160f, tint, s)
             }
             DuelIconKind.PLAY -> drawPath(pathOf(listOf(p(8f, 5.5f), p(19f, 12f), p(8f, 18.5f)), close = true), tint)
+            DuelIconKind.CAMERA -> {
+                drawRoundRect(
+                    tint, topLeft = p(3f, 7f), size = Size(18f * s, 13f * s),
+                    cornerRadius = CornerRadius(3f * s), style = stroke
+                )
+                drawPath(pathOf(listOf(p(8f, 7f), p(9.5f, 4.5f), p(14.5f, 4.5f), p(16f, 7f))), tint, style = stroke)
+                drawCircle(tint, radius = 3.2f * s, center = p(12f, 13.5f), style = stroke)
+            }
+            DuelIconKind.VIDEO -> {
+                drawRoundRect(
+                    tint, topLeft = p(2.5f, 6.5f), size = Size(13f * s, 11f * s),
+                    cornerRadius = CornerRadius(2.5f * s), style = stroke
+                )
+                drawPath(pathOf(listOf(p(15.5f, 10.5f), p(21.5f, 7f), p(21.5f, 17f), p(15.5f, 13.5f))), tint, style = stroke)
+            }
+            DuelIconKind.CROWN -> drawPath(
+                pathOf(listOf(p(3f, 8f), p(7.5f, 12.5f), p(12f, 5f), p(16.5f, 12.5f), p(21f, 8f), p(19f, 19f), p(5f, 19f)), close = true),
+                tint, style = stroke
+            )
+            DuelIconKind.INFO -> {
+                drawCircle(tint, radius = 9f * s, center = p(12f, 12f), style = stroke)
+                drawPath(pathOf(listOf(p(12f, 11f), p(12f, 16.5f))), tint, style = stroke)
+                drawCircle(tint, radius = 1.2f * s, center = p(12f, 7.8f))
+            }
         }
     }
 }

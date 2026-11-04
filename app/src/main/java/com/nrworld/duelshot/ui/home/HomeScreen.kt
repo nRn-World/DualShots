@@ -3,6 +3,7 @@ package com.nrworld.duelshot.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,36 +15,35 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nrworld.duelshot.model.RecordingMode
 import com.nrworld.duelshot.ui.AppViewModel
 import com.nrworld.duelshot.ui.components.DuelIcon
 import com.nrworld.duelshot.ui.components.DuelIconKind
-import com.nrworld.duelshot.ui.components.DuelLogoMark
-import com.nrworld.duelshot.ui.components.GradientButton
-import com.nrworld.duelshot.ui.components.ModeDiagram
-import com.nrworld.duelshot.ui.components.RadioDot
-import com.nrworld.duelshot.ui.components.SectionLabel
-import com.nrworld.duelshot.ui.components.SurfaceCard
-import com.nrworld.duelshot.ui.components.WordmarkText
-import com.nrworld.duelshot.ui.theme.DuelCyan
+import com.nrworld.duelshot.ui.theme.DuelBg
 import com.nrworld.duelshot.ui.theme.DuelGold
 import com.nrworld.duelshot.ui.theme.DuelGradient
 import com.nrworld.duelshot.ui.theme.DuelLine
-import com.nrworld.duelshot.ui.theme.DuelLineStrong
+import com.nrworld.duelshot.ui.theme.DuelOrange
 import com.nrworld.duelshot.ui.theme.DuelSurface
 import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
@@ -52,169 +52,157 @@ import com.nrworld.duelshot.ui.theme.DuelTextMuted
 
 private val Ink = Color(0xFF04060D)
 
+/** Startmenyn i studiodesignen: logotyp, titel och menyknappar. */
 @Composable
 fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit, onOpenSettings: () -> Unit) {
-    Column(
+    var showAbout by remember { mutableStateOf(false) }
+
+    Box(
         modifier = Modifier.fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .background(Brush.verticalGradient(listOf(Color(0xFF0E1018), Color(0xFF121522), Color(0xFF0A0C13))))
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            DuelLogoMark(size = 40.dp)
-            Spacer(Modifier.width(10.dp))
-            WordmarkText(fontSize = 24.sp)
-            Spacer(Modifier.weight(1f))
-            PlanBadge(vm.isPremium)
-        }
-
-        Spacer(Modifier.height(24.dp))
-        HeroCard(vm, onStart)
-
-        Spacer(Modifier.height(30.dp))
-        SectionLabel("Recording mode")
-        RecordingMode.values().forEach { m ->
-            ModeCard(mode = m, selected = vm.mode == m, onClick = { vm.mode = m })
-            Spacer(Modifier.height(10.dp))
-        }
-
-        Spacer(Modifier.height(14.dp))
-        SectionLabel("Current setup")
-        SetupCard(vm, onClick = onOpenSettings)
-
-        if (!vm.isPremium) {
-            Spacer(Modifier.height(14.dp))
-            PremiumTeaser(onOpenPremium)
-        }
-    }
-}
-
-@Composable
-private fun HeroCard(vm: AppViewModel, onStart: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(Brush.verticalGradient(listOf(Color(0xFF151C38), DuelSurface)))
-            .border(1.dp, DuelLineStrong, RoundedCornerShape(28.dp))
-            .padding(22.dp)
-    ) {
-        DuelLogoMark(size = 56.dp)
-        Spacer(Modifier.height(18.dp))
-        Text(
-            "Capture more.",
-            color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, letterSpacing = (-1).sp
-        )
-        Text(
-            "From every angle.",
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp, brush = DuelGradient
+        // Orange glöd överst
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.radialGradient(
+                    colors = listOf(DuelOrange.copy(alpha = .22f), Color.Transparent),
+                    radius = 900f
+                )
             )
         )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            "Front and back camera, recorded at the same time.",
-            color = DuelTextMuted, fontSize = 14.sp
-        )
-        Spacer(Modifier.height(22.dp))
-        GradientButton(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-            Box(Modifier.size(14.dp).clip(CircleShape).background(Ink))
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Start recording", color = Ink, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+
+        Column(
+            modifier = Modifier.fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(24.dp))
+            LogoTile()
+            Spacer(Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Duel", color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, letterSpacing = (-0.8).sp)
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    "${vm.mode.title} · ${vm.quality.label}",
-                    color = Ink.copy(alpha = .7f), fontSize = 12.sp
+                    "Shots",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.8).sp, brush = DuelGradient
+                    )
                 )
             }
-            DuelIcon(DuelIconKind.CHEVRON, Ink, 18.dp)
+            Text(
+                "RECORD BOTH SIDES. AT ONCE.",
+                color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                letterSpacing = 1.sp, modifier = Modifier.padding(top = 6.dp)
+            )
+
+            Spacer(Modifier.height(44.dp))
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PrimaryMenuButton(onClick = onStart)
+                MenuButton(DuelIconKind.SETTINGS, "Settings", onClick = onOpenSettings)
+                PremiumMenuButton(isPremium = vm.isPremium, onClick = onOpenPremium)
+                MenuButton(DuelIconKind.INFO, "About", onClick = { showAbout = true })
+            }
+
+            Spacer(Modifier.height(32.dp))
+            Text(
+                "MADE BY NRN WORLD",
+                color = DuelTextFaint, fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 1.sp
+            )
+        }
+    }
+
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            containerColor = DuelSurface2,
+            title = { Text("DuelShots", color = DuelText, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Version 1.0 · Dual lens recording engine",
+                    color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp
+                )
+            },
+            confirmButton = { TextButton(onClick = { showAbout = false }) { Text("OK", color = DuelOrange) } }
+        )
+    }
+}
+
+@Composable
+private fun LogoTile() {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
+        Box(
+            Modifier.size(120.dp).clip(RoundedCornerShape(60.dp))
+                .background(Brush.radialGradient(listOf(DuelOrange.copy(alpha = .45f), Color.Transparent)))
+        )
+        Box(
+            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(24.dp)).background(DuelGradient),
+            contentAlignment = Alignment.Center
+        ) {
+            DuelIcon(DuelIconKind.CAMERA, Ink, 42.dp)
         }
     }
 }
 
 @Composable
-private fun ModeCard(mode: RecordingMode, selected: Boolean, onClick: () -> Unit) {
+private fun PrimaryMenuButton(onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (selected) DuelSurface2 else DuelSurface)
-            .border(1.dp, if (selected) DuelCyan.copy(alpha = .5f) else DuelLine, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(DuelGradient)
             .clickable(onClick = onClick)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ModeDiagram(
-            mode = mode,
-            color = if (selected) DuelCyan else DuelTextFaint,
-            width = 56.dp, height = 40.dp
-        )
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(mode.title, color = DuelText, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text(mode.subtitle, color = DuelTextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-        }
-        RadioDot(selected)
-    }
-}
-
-@Composable
-private fun SetupCard(vm: AppViewModel, onClick: () -> Unit) {
-    SurfaceCard(onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Row(Modifier.fillMaxWidth()) {
-                    KeyValue("Back", vm.backAspect.label, Modifier.weight(1f))
-                    KeyValue("Front", vm.frontAspect.label, Modifier.weight(1f))
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth()) {
-                    KeyValue("Quality", vm.quality.label, Modifier.weight(1f))
-                    KeyValue("Format", vm.codec.label, Modifier.weight(1f))
-                }
-            }
-            DuelIcon(DuelIconKind.CHEVRON, DuelTextFaint, 18.dp)
-        }
-    }
-}
-
-@Composable
-private fun KeyValue(key: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(key.uppercase(), color = DuelTextFaint, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
-        Text(value, color = DuelText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
-    }
-}
-
-@Composable
-private fun PremiumTeaser(onOpenPremium: () -> Unit) {
-    SurfaceCard(onClick = onOpenPremium, borderColor = DuelGold.copy(alpha = .4f)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            DuelIcon(DuelIconKind.GEM, DuelGold, 24.dp)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Go Premium", color = DuelText, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(
-                    "4K · 60fps · HEVC · watermark-free",
-                    color = DuelTextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-            DuelIcon(DuelIconKind.CHEVRON, DuelGold, 18.dp)
-        }
-    }
-}
-
-@Composable
-private fun PlanBadge(premium: Boolean) {
-    Row(
-        modifier = Modifier.clip(CircleShape)
-            .background(if (premium) DuelGold else DuelSurface2)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        DuelIcon(DuelIconKind.GEM, if (premium) Ink else DuelTextMuted, 12.dp)
-        Spacer(Modifier.width(6.dp))
+        Box(
+            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(Color.Black.copy(alpha = .2f)),
+            contentAlignment = Alignment.Center
+        ) { DuelIcon(DuelIconKind.VIDEO, Ink, 18.dp) }
+        Spacer(Modifier.width(14.dp))
         Text(
-            if (premium) "Premium" else "Free",
-            color = if (premium) Ink else DuelTextMuted,
-            fontSize = 12.sp, fontWeight = FontWeight.Bold
+            "START RECORDING",
+            color = Ink, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, letterSpacing = 1.sp,
+            modifier = Modifier.weight(1f)
         )
+        DuelIcon(DuelIconKind.CHEVRON, Ink, 18.dp)
+    }
+}
+
+@Composable
+private fun MenuButton(icon: DuelIconKind, label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF161A29))
+            .border(1.dp, Color.White.copy(alpha = .1f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DuelIcon(icon, DuelOrange, 18.dp)
+        Spacer(Modifier.width(14.dp))
+        Text(label, color = Color(0xFFE2E8F0), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        DuelIcon(DuelIconKind.CHEVRON, DuelTextFaint, 16.dp)
+    }
+}
+
+@Composable
+private fun PremiumMenuButton(isPremium: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Brush.horizontalGradient(listOf(DuelOrange.copy(alpha = .15f), DuelGold.copy(alpha = .15f))))
+            .border(1.dp, DuelOrange.copy(alpha = .4f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DuelIcon(DuelIconKind.CROWN, DuelGold, 18.dp)
+        Spacer(Modifier.width(14.dp))
+        Text(
+            if (isPremium) "Premium active" else "Premium Features",
+            color = DuelGold, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f)
+        )
+        DuelIcon(DuelIconKind.CHEVRON, DuelGold, 16.dp)
     }
 }

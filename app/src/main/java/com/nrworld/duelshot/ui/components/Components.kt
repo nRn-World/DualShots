@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,8 +31,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.window.Dialog
+import com.nrworld.duelshot.ui.theme.DuelOrange
+import com.nrworld.duelshot.ui.theme.DuelOrangeLight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,7 +44,7 @@ import com.nrworld.duelshot.ui.theme.DuelGradient
 import com.nrworld.duelshot.ui.theme.DuelGold
 import com.nrworld.duelshot.ui.theme.DuelLine
 import com.nrworld.duelshot.ui.theme.DuelMagenta
-import com.nrworld.duelshot.ui.theme.DuelCyan
+import com.nrworld.duelshot.ui.theme.DuelAccent
 import com.nrworld.duelshot.ui.theme.DuelSurface
 import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
@@ -72,7 +77,7 @@ fun DuelLogoMark(size: Dp = 64.dp, modifier: Modifier = Modifier) {
             )
             drawCircle(color = Color(0xFF0B1024), radius = lensR - w * 0.02f, center = Offset(x, cy))
             drawCircle(
-                color = if (i == 0) DuelCyan else DuelMagenta,
+                color = if (i == 0) DuelAccent else DuelMagenta,
                 radius = lensR * 0.35f,
                 center = Offset(x - lensR * 0.2f, cy - lensR * 0.2f)
             )
@@ -144,9 +149,9 @@ fun GoldButton(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DuelIcon(DuelIconKind.GEM, Color(0xFF241703), 16.dp)
+            DuelIcon(DuelIconKind.CROWN, Color(0xFF04060D), 16.dp)
             Spacer(Modifier.width(8.dp))
-            Text(text, color = Color(0xFF241703), fontWeight = FontWeight.Bold)
+            Text(text.uppercase(), color = Color(0xFF04060D), fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
         }
     }
 }
@@ -192,7 +197,7 @@ fun ScreenHeader(title: String, subtitle: String? = null, modifier: Modifier = M
 fun RadioDot(selected: Boolean, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier.size(22.dp)
-            .border(1.5.dp, if (selected) DuelCyan else DuelTextFaint, CircleShape),
+            .border(1.5.dp, if (selected) DuelAccent else DuelTextFaint, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         if (selected) Box(Modifier.size(11.dp).clip(CircleShape).background(DuelGradient))
@@ -203,9 +208,10 @@ fun RadioDot(selected: Boolean, modifier: Modifier = Modifier) {
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text.uppercase(),
-        color = DuelTextFaint,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 11.sp,
+        color = DuelTextMuted,
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        fontSize = 10.sp,
         letterSpacing = 1.5.sp,
         modifier = modifier.padding(vertical = 6.dp)
     )
@@ -245,21 +251,75 @@ fun SegmentedControl(
     }
 }
 
-/** Dialog för premium-låst val. */
+/** Premium-modal i studiodesignen: kronikon, funktionslista och orange CTA. */
 @Composable
 fun PremiumDialog(onDismiss: () -> Unit, onUpgrade: () -> Unit, feature: String) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = DuelSurface2,
-        title = { Text(feature, color = DuelGold, fontWeight = FontWeight.Bold) },
-        text = {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF141724), Color(0xFF0D0F18))))
+                .border(1.dp, DuelOrange.copy(alpha = .4f), RoundedCornerShape(28.dp))
+                .padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(GoldGradient),
+                contentAlignment = Alignment.Center
+            ) { DuelIcon(DuelIconKind.CROWN, Color.Black, 30.dp) }
+            Spacer(Modifier.height(14.dp))
+            Text("DuelShots PRO", color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
             Text(
-                "This is a Premium feature. Upgrade for 4K, 60fps, HEVC, " +
-                    "per-camera format control and watermark-free export.",
-                color = DuelTextMuted
+                feature.uppercase(),
+                color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                letterSpacing = 1.sp, modifier = Modifier.padding(top = 4.dp)
             )
-        },
-        confirmButton = { TextButton(onClick = onUpgrade) { Text("Upgrade", color = DuelGold) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Later", color = DuelTextMuted) } }
-    )
+            Spacer(Modifier.height(18.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black.copy(alpha = .4f))
+                    .border(1.dp, DuelLine, RoundedCornerShape(16.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                listOf(
+                    "4K Ultra HD recording",
+                    "HEVC codec",
+                    "60fps & custom bitrate",
+                    "Per-camera aspect control",
+                    "Watermark-free export"
+                ).forEach { line ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier.size(18.dp).clip(CircleShape)
+                                .background(DuelOrange.copy(alpha = .2f))
+                                .border(1.dp, DuelOrange, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) { DuelIcon(DuelIconKind.CHECK, DuelOrangeLight, 11.dp) }
+                        Spacer(Modifier.width(10.dp))
+                        Text(line, color = Color(0xFFE2E8F0), fontSize = 13.sp)
+                    }
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(DuelGradient)
+                    .clickable(onClick = onUpgrade)
+                    .padding(vertical = 15.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "UNLOCK PRO",
+                    color = Color(0xFF04060D), fontWeight = FontWeight.Black,
+                    fontSize = 14.sp, letterSpacing = 1.2.sp
+                )
+            }
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+            }
+        }
+    }
 }

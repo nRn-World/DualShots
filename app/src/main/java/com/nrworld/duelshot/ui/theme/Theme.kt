@@ -9,13 +9,16 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.nrworld.duelshot.ui.theme.DuelAccent
+import com.nrworld.duelshot.ui.theme.DuelOrange
+import com.nrworld.duelshot.ui.theme.DuelOrangeLight
 
 private val DuelColorScheme = darkColorScheme(
-    primary = DuelBlue,
-    onPrimary = Color.White,
-    secondary = DuelMagenta,
-    onSecondary = Color.White,
-    tertiary = DuelCyan,
+    primary = DuelOrange,
+    onPrimary = Color(0xFF04060D),
+    secondary = DuelOrangeLight,
+    onSecondary = Color(0xFF04060D),
+    tertiary = DuelAccent,
     background = DuelBg,
     onBackground = DuelText,
     surface = DuelSurface,

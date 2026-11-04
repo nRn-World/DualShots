@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,13 +41,13 @@ import com.nrworld.duelshot.ui.components.DuelIconKind
 import com.nrworld.duelshot.ui.components.GoldButton
 import com.nrworld.duelshot.ui.components.PremiumDialog
 import com.nrworld.duelshot.ui.components.RadioDot
-import com.nrworld.duelshot.ui.components.ScreenHeader
 import com.nrworld.duelshot.ui.components.SectionLabel
 import com.nrworld.duelshot.ui.components.SegmentedControl
 import com.nrworld.duelshot.ui.components.SurfaceCard
-import com.nrworld.duelshot.ui.theme.DuelCyan
+import com.nrworld.duelshot.ui.theme.DuelAccent
 import com.nrworld.duelshot.ui.theme.DuelGold
 import com.nrworld.duelshot.ui.theme.DuelLine
+import com.nrworld.duelshot.ui.theme.DuelOrange
 import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
@@ -58,7 +59,15 @@ fun SettingsScreen(vm: AppViewModel) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)
     ) {
-        ScreenHeader("Settings", "Formats and quality for your recordings")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            DuelIcon(DuelIconKind.SETTINGS, DuelOrange, 22.dp)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "SETTINGS STUDIO",
+                color = DuelText, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                fontSize = 16.sp, letterSpacing = 1.sp
+            )
+        }
         Spacer(Modifier.height(22.dp))
 
         SectionLabel("Recording Mode")
@@ -127,9 +136,13 @@ fun SettingsScreen(vm: AppViewModel) {
         SurfaceCard(borderColor = DuelGold.copy(alpha = .45f)) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    DuelIcon(DuelIconKind.GEM, DuelGold, 20.dp)
+                    DuelIcon(DuelIconKind.CROWN, DuelGold, 18.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("Premium", color = DuelGold, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(
+                        "PREMIUM FEATURES",
+                        color = DuelGold, fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 1.sp
+                    )
                 }
                 Spacer(Modifier.height(10.dp))
                 listOf(
@@ -139,7 +152,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     "No watermark"
                 ).forEach {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                        DuelIcon(DuelIconKind.CHECK, DuelCyan, 14.dp)
+                        DuelIcon(DuelIconKind.CHECK, DuelAccent, 14.dp)
                         Spacer(Modifier.width(10.dp))
                         Text(it, color = DuelTextMuted, fontSize = 13.sp)
                     }
@@ -184,8 +197,8 @@ private fun AspectChips(selected: AspectOption, onSelect: (AspectOption) -> Unit
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSel) DuelCyan.copy(alpha = .16f) else DuelSurface2)
-                    .border(1.dp, if (isSel) DuelCyan.copy(alpha = .5f) else DuelLine, RoundedCornerShape(10.dp))
+                    .background(if (isSel) DuelAccent.copy(alpha = .16f) else DuelSurface2)
+                    .border(1.dp, if (isSel) DuelAccent.copy(alpha = .5f) else DuelLine, RoundedCornerShape(10.dp))
                     .clickable { onSelect(opt) }
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {

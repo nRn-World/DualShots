@@ -7,35 +7,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// DuelShots palett
-val DuelBg = Color(0xFF05070D)
-val DuelBg2 = Color(0xFF0A0E1A)
-val DuelSurface = Color(0xFF141A2A)
-val DuelSurface2 = Color(0xFF1B2236)
-val DuelLine = Color(0x14FFFFFF)          // rgba(255,255,255,.08)
-val DuelLineStrong = Color(0x24FFFFFF)
+// DuelShots palett (orange studio-design)
+val DuelBg = Color(0xFF07080C)
+val DuelBg2 = Color(0xFF0E1018)
+val DuelSurface = Color(0xFF121522)
+val DuelSurface2 = Color(0xFF1C2236)
+val DuelLine = Color(0x14FFFFFF)          // white 8%
+val DuelLineStrong = Color(0x24FFFFFF)    // white 14%
 
-val DuelCyan = Color(0xFF22D3EE)
+/** Primär accent – används för val, markeringar och aktiva lägen. */
+val DuelAccent = Color(0xFFFF7700)
+val DuelOrangeDeep = Color(0xFFFF4400)
+val DuelOrange = Color(0xFFFF6600)
+val DuelOrangeLight = Color(0xFFFF8800)
 val DuelBlue = Color(0xFF2E7DFF)
 val DuelPurple = Color(0xFF7C3AED)
 val DuelMagenta = Color(0xFFE94FD0)
-val DuelGold = Color(0xFFF5C24B)
-val DuelGold2 = Color(0xFFFFB020)
-val DuelRecord = Color(0xFFFF3B4E)
+val DuelGold = Color(0xFFFF9900)
+val DuelGold2 = Color(0xFFFFAA00)
+val DuelRecord = Color(0xFFFF3300)
 val DuelGreen = Color(0xFF34D399)
 
 val DuelText = Color(0xFFFFFFFF)
-val DuelTextMuted = Color(0xFFA7B0C4)
-val DuelTextFaint = Color(0xFF6B768F)
+val DuelTextMuted = Color(0xFF94A3B8)
+val DuelTextFaint = Color(0xFF64748B)
 
-/** Brandgradient: cyan → blå → lila → magenta. */
+/** Brandgradient: orange. */
 val DuelGradient = Brush.linearGradient(
-    colors = listOf(DuelCyan, DuelBlue, DuelPurple, DuelMagenta)
+    colors = listOf(DuelOrangeDeep, DuelOrange, DuelOrangeLight)
 )
 
-/** Guldgradient för premium-ytor. */
+/** Guldgradient för premium-ytor (orange). */
 val GoldGradient = Brush.linearGradient(
-    colors = listOf(DuelGold, DuelGold2)
+    colors = listOf(DuelOrangeDeep, DuelOrangeLight, DuelGold2)
 )
 
 /** Enkel bakgrund med hela sidans mörka gradient + glöd. */
@@ -46,7 +50,7 @@ fun DuelBackground(modifier: Modifier = Modifier, content: @Composable () -> Uni
             .background(DuelBg)
             .background(
                 Brush.radialGradient(
-                    colors = listOf(Color(0xFF141B3A).copy(alpha = 0.6f), Color.Transparent),
+                    colors = listOf(Color(0xFF3A1606).copy(alpha = 0.6f), Color.Transparent),
                     center = androidx.compose.ui.geometry.Offset(200f, 0f),
                     radius = 900f
                 )

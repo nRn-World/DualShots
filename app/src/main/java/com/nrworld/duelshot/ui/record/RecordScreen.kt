@@ -42,6 +42,7 @@ import com.nrworld.duelshot.ui.AppViewModel
 import com.nrworld.duelshot.ui.components.DuelIcon
 import com.nrworld.duelshot.ui.components.DuelIconKind
 import com.nrworld.duelshot.ui.theme.DuelLine
+import com.nrworld.duelshot.ui.theme.DuelOrangeLight
 import com.nrworld.duelshot.ui.theme.DuelRecord
 import com.nrworld.duelshot.ui.theme.DuelSurface
 import com.nrworld.duelshot.ui.theme.DuelSurface2
@@ -201,14 +202,14 @@ private fun Feed(
         )
         if (label != null) {
             Text(
-                label, color = DuelText, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                label, color = DuelOrangeLight, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp,
                 modifier = Modifier.align(Alignment.TopStart).padding(10.dp)
                     .clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = .45f)).padding(horizontal = 8.dp, vertical = 3.dp)
             )
         }
         if (ratio != null) {
             Text(
-                ratio, color = Color(0xFFCFE6FF), fontSize = 11.sp,
+                ratio, color = DuelText, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp,
                 modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
                     .clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = .45f)).padding(horizontal = 6.dp, vertical = 2.dp)
             )
@@ -250,14 +251,14 @@ private fun TimerPill(seconds: Int, recording: Boolean) {
 private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Unit) {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(74.dp).clip(CircleShape)
-            .background(if (enabled) Color.White else Color.Gray.copy(alpha = .3f))
+        modifier = Modifier.size(88.dp).clip(CircleShape)
+            .border(3.dp, if (enabled) Color.White.copy(alpha = .9f) else Color.Gray.copy(alpha = .3f), CircleShape)
             .clickable(enabled = enabled, onClick = onClick)
     ) {
         Box(
-            modifier = Modifier.size(if (recording) 30.dp else 56.dp)
-                .clip(if (recording) RoundedCornerShape(6.dp) else CircleShape)
-                .background(DuelRecord)
+            modifier = Modifier.size(if (recording) 30.dp else 66.dp)
+                .clip(if (recording) RoundedCornerShape(8.dp) else CircleShape)
+                .background(if (enabled) DuelRecord else Color.Gray.copy(alpha = .5f))
         )
     }
 }
