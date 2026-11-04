@@ -120,6 +120,17 @@ ul { margin: 0; padding: 0; list-style: none; }
 .stage-brand { display: flex; align-items: center; gap: 9px; }
 .stage-brand b { color: #fff; font-weight: 650; letter-spacing: -.01em; }
 .stage-brand .dim { color: var(--text-3); }
+.stage-brand .ver {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--hair-2);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  vertical-align: 1px;
+}
 .stage-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: #34d399;

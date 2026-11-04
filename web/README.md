@@ -4,9 +4,12 @@ A dependency-free browser replica of the native Android app, so the UI and the
 whole recording flow can be tried without an Android SDK, emulator or device.
 
 ```bash
-python3 -m http.server 8000 --directory web
+python3 web/serve.py 8000
 # open http://localhost:8000
 ```
+
+`serve.py` is a thin static server that sends `Cache-Control: no-store`, so the
+preview always reflects the current build instead of a cached one.
 
 No build step, no npm packages — just `index.html`, `styles.css` and `app.js`.
 

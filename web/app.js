@@ -249,6 +249,10 @@ function showAbout() {
       design system, recording modes and premium gating come from the Kotlin/Compose source in
       <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
 
+      <h3>Build</h3>
+      <p>v2 — redesigned interface (graphite surfaces, viewfinder record screen,
+      bottom sheets, poster gallery). Last updated 2026-11-04.</p>
+
       <h3>What works here</h3>
       <ul>
         <li>All three recording modes: composed picture-in-picture, two separate files, or both.</li>

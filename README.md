@@ -65,7 +65,7 @@ Want to click through the app right away? A dependency-free browser replica live
 recording pipeline reimplemented on `getUserMedia` + `MediaRecorder`:
 
 ```bash
-python3 -m http.server 8000 --directory web
+python3 web/serve.py 8000
 # open http://localhost:8000
 ```
 
