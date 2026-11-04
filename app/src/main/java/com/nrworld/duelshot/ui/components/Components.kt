@@ -6,11 +6,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +42,7 @@ import com.nrworld.duelshot.ui.theme.DuelMagenta
 import com.nrworld.duelshot.ui.theme.DuelCyan
 import com.nrworld.duelshot.ui.theme.DuelSurface
 import com.nrworld.duelshot.ui.theme.DuelSurface2
+import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextFaint
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
 import com.nrworld.duelshot.ui.theme.GoldGradient
@@ -114,7 +119,7 @@ fun GradientButton(
             .clickable(enabled = enabled, onClick = onClick)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             content = content
         )
@@ -139,7 +144,8 @@ fun GoldButton(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("♛ ", color = Color(0xFF241703), fontSize = 16.sp)
+            DuelIcon(DuelIconKind.GEM, Color(0xFF241703), 16.dp)
+            Spacer(Modifier.width(8.dp))
             Text(text, color = Color(0xFF241703), fontWeight = FontWeight.Bold)
         }
     }
@@ -155,12 +161,42 @@ fun SurfaceCard(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
             .background(DuelSurface)
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(14.dp)
+            .padding(16.dp)
     ) { content() }
+}
+
+/** Sidrubrik med undertext. */
+@Composable
+fun ScreenHeader(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            title,
+            color = DuelText,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 32.sp,
+            letterSpacing = (-0.8).sp
+        )
+        if (subtitle != null) {
+            Text(subtitle, color = DuelTextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+/** Rund radioknapp – fylld med gradient när vald. */
+@Composable
+fun RadioDot(selected: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.size(22.dp)
+            .border(1.5.dp, if (selected) DuelCyan else DuelTextFaint, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) Box(Modifier.size(11.dp).clip(CircleShape).background(DuelGradient))
+    }
 }
 
 @Composable
@@ -215,7 +251,7 @@ fun PremiumDialog(onDismiss: () -> Unit, onUpgrade: () -> Unit, feature: String)
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = DuelSurface2,
-        title = { Text("♛  $feature", color = DuelGold, fontWeight = FontWeight.Bold) },
+        title = { Text(feature, color = DuelGold, fontWeight = FontWeight.Bold) },
         text = {
             Text(
                 "This is a Premium feature. Upgrade for 4K, 60fps, HEVC, " +

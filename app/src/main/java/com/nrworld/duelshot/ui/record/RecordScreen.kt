@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,9 +39,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nrworld.duelshot.camera.DualCameraController
 import com.nrworld.duelshot.model.RecordingMode
 import com.nrworld.duelshot.ui.AppViewModel
+import com.nrworld.duelshot.ui.components.DuelIcon
+import com.nrworld.duelshot.ui.components.DuelIconKind
 import com.nrworld.duelshot.ui.theme.DuelLine
 import com.nrworld.duelshot.ui.theme.DuelRecord
 import com.nrworld.duelshot.ui.theme.DuelSurface
+import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
 import kotlinx.coroutines.delay
@@ -107,11 +111,11 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconChip("✕") { if (isRecording) controller.stopRecording(); onExit() }
+            IconChip(DuelIconKind.CLOSE) { if (isRecording) controller.stopRecording(); onExit() }
             Spacer(Modifier.width(12.dp))
             TimerPill(elapsed, isRecording)
             Spacer(Modifier.weight(1f))
-            IconChip("⟳") { /* byt primär kamera – plats för framtida växling */ }
+            IconChip(DuelIconKind.SWITCH) { /* byt primär kamera – plats för framtida växling */ }
         }
 
         // Förhandsvisning
@@ -152,7 +156,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
 
         // Kontrollrad
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical = 22.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -213,14 +217,14 @@ private fun Feed(
 }
 
 @Composable
-private fun IconChip(symbol: String, onClick: () -> Unit) {
+private fun IconChip(kind: DuelIconKind, onClick: () -> Unit) {
     Box(
-        modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp))
-            .background(DuelSurface).border(1.dp, DuelLine, RoundedCornerShape(11.dp))
+        modifier = Modifier.size(42.dp).clip(CircleShape)
+            .background(DuelSurface2).border(1.dp, DuelLine, CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(symbol, color = DuelTextMuted, fontSize = 16.sp)
+        DuelIcon(kind, DuelText, 18.dp)
     }
 }
 

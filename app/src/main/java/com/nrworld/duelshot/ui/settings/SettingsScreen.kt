@@ -1,6 +1,7 @@
 package com.nrworld.duelshot.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,15 +35,18 @@ import com.nrworld.duelshot.model.CodecOption
 import com.nrworld.duelshot.model.QualityOption
 import com.nrworld.duelshot.model.RecordingMode
 import com.nrworld.duelshot.ui.AppViewModel
+import com.nrworld.duelshot.ui.components.DuelIcon
+import com.nrworld.duelshot.ui.components.DuelIconKind
 import com.nrworld.duelshot.ui.components.GoldButton
 import com.nrworld.duelshot.ui.components.PremiumDialog
+import com.nrworld.duelshot.ui.components.RadioDot
+import com.nrworld.duelshot.ui.components.ScreenHeader
 import com.nrworld.duelshot.ui.components.SectionLabel
 import com.nrworld.duelshot.ui.components.SegmentedControl
 import com.nrworld.duelshot.ui.components.SurfaceCard
 import com.nrworld.duelshot.ui.theme.DuelCyan
 import com.nrworld.duelshot.ui.theme.DuelGold
 import com.nrworld.duelshot.ui.theme.DuelLine
-import com.nrworld.duelshot.ui.theme.DuelPurple
 import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
@@ -53,8 +58,8 @@ fun SettingsScreen(vm: AppViewModel) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)
     ) {
-        Text("Settings", color = DuelText, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-        Spacer(Modifier.height(16.dp))
+        ScreenHeader("Settings", "Formats and quality for your recordings")
+        Spacer(Modifier.height(22.dp))
 
         SectionLabel("Recording Mode")
         RecordingMode.values().forEach { m ->
@@ -90,7 +95,7 @@ fun SettingsScreen(vm: AppViewModel) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Resolution", color = DuelText, modifier = Modifier.weight(1f))
                 SegmentedControl(
-                    options = listOf("720p", "1080p", "4K★"),
+                    options = listOf("720p", "1080p", "4K"),
                     selectedIndex = vm.quality.ordinal,
                     onSelect = { idx ->
                         val q = QualityOption.values()[idx]
@@ -107,7 +112,7 @@ fun SettingsScreen(vm: AppViewModel) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Format", color = DuelText, modifier = Modifier.weight(1f))
                 SegmentedControl(
-                    options = listOf("MP4", "HEVC★"),
+                    options = listOf("MP4", "HEVC"),
                     selectedIndex = vm.codec.ordinal,
                     onSelect = { idx ->
                         val c = CodecOption.values()[idx]
@@ -121,22 +126,27 @@ fun SettingsScreen(vm: AppViewModel) {
         Spacer(Modifier.height(16.dp))
         SurfaceCard(borderColor = DuelGold.copy(alpha = .45f)) {
             Column {
-                Text("♛  Premium", color = DuelGold, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DuelIcon(DuelIconKind.GEM, DuelGold, 20.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Premium", color = DuelGold, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+                Spacer(Modifier.height(10.dp))
                 listOf(
                     "More format options (4K, HEVC)",
                     "60fps & custom bitrate",
                     "Per-camera aspect control",
                     "No watermark"
                 ).forEach {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
-                        Text("✓ ", color = DuelCyan, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                        DuelIcon(DuelIconKind.CHECK, DuelCyan, 14.dp)
+                        Spacer(Modifier.width(10.dp))
                         Text(it, color = DuelTextMuted, fontSize = 13.sp)
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
                 if (vm.isPremium) {
-                    Text("Premium aktivt", color = DuelGold, fontWeight = FontWeight.Bold)
+                    Text("Premium active", color = DuelGold, fontWeight = FontWeight.Bold)
                 } else {
                     GoldButton(onClick = { vm.grantPremium() }, text = "Go Premium")
                 }
@@ -161,14 +171,7 @@ private fun RadioRow(title: String, subtitle: String, selected: Boolean, onClick
                 Text(title, color = DuelText, fontWeight = FontWeight.SemiBold)
                 Text(subtitle, color = DuelTextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
             }
-            Box(
-                modifier = Modifier.size(18.dp).clip(RoundedCornerShape(9.dp))
-                    .background(if (selected) DuelPurple else DuelSurface2)
-                    .padding(2.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (selected) Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White))
-            }
+            RadioDot(selected)
         }
     }
 }
@@ -181,7 +184,8 @@ private fun AspectChips(selected: AspectOption, onSelect: (AspectOption) -> Unit
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSel) DuelPurple.copy(alpha = .28f) else DuelSurface2)
+                    .background(if (isSel) DuelCyan.copy(alpha = .16f) else DuelSurface2)
+                    .border(1.dp, if (isSel) DuelCyan.copy(alpha = .5f) else DuelLine, RoundedCornerShape(10.dp))
                     .clickable { onSelect(opt) }
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
