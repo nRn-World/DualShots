@@ -279,12 +279,12 @@ function proFeatures() {
 function showPro(pending = null) {
   const body = state.premium
     ? `<p class="sheet-sub">Premium is active. 4K, HEVC and every format control are unlocked.</p>
-       <button class="btn-primary" data-close type="button">Close</button>`
+       <button class="btn-primary sole" data-close type="button">Close</button>`
     : `<p class="sheet-sub">One-time unlock. Everything below stays on this device — no account, no subscription.</p>
        <ul class="premium-list" style="margin-top:16px">
          ${proFeatures().map((f) => `<li class="premium-item">${ICONS.check}<span>${f}</span></li>`).join('')}
        </ul>
-       <button class="btn-primary" data-upgrade type="button">Unlock Premium</button>
+       <button class="btn-primary sole" data-upgrade type="button">Unlock Premium</button>
        <button class="btn-ghost" data-close type="button">Not now</button>`;
 
   openSheet(`

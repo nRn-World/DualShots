@@ -361,6 +361,10 @@ ul { margin: 0; padding: 0; list-style: none; }
 .btn-primary .chev { display: flex; opacity: .75; }
 .btn-primary .chev svg { width: 18px; height: 18px; }
 .btn-primary[disabled] { opacity: .45; }
+.btn-primary.sole { justify-content: center; }
+.btn-primary.sole .grow { flex: 0 0 auto; text-align: center; }
+.premium-card .btn-primary { justify-content: center; }
+.premium-card .btn-primary .grow { flex: 0 0 auto; text-align: center; }
 
 .btn-ghost {
   width: 100%;
