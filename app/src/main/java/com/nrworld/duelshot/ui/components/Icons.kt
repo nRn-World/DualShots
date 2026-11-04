@@ -19,7 +19,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /** Egna linjeikoner – avsiktligt inga standard-mobilikoner. */
-enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, PLAY, CAMERA, VIDEO, CROWN, INFO }
+enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, PLAY, PAUSE, CAMERA, VIDEO, CROWN, INFO, PIP, COPY, GRID, SHARE, TRASH }
 
 /** Ritar en ikon på en 24×24-yta, skalad till [size]. */
 @Composable
@@ -69,6 +69,20 @@ fun DuelIcon(kind: DuelIconKind, tint: Color, size: Dp = 22.dp, modifier: Modifi
                 arrowAt(c, r, 160f, tint, s)
             }
             DuelIconKind.PLAY -> drawPath(pathOf(listOf(p(8f, 5.5f), p(19f, 12f), p(8f, 18.5f)), close = true), tint)
+            DuelIconKind.PAUSE -> {
+                drawRoundRect(tint, topLeft = p(7.4f, 5f), size = Size(3.6f * s, 14f * s), cornerRadius = CornerRadius(1.2f * s))
+                drawRoundRect(tint, topLeft = p(13f, 5f), size = Size(3.6f * s, 14f * s), cornerRadius = CornerRadius(1.2f * s))
+            }
+            DuelIconKind.PIP -> {
+                drawRoundRect(
+                    tint, topLeft = p(3f, 5f), size = Size(18f * s, 14f * s),
+                    cornerRadius = CornerRadius(3f * s), style = stroke
+                )
+                drawRoundRect(
+                    tint, topLeft = p(11.5f, 10.5f), size = Size(7.5f * s, 6.5f * s),
+                    cornerRadius = CornerRadius(1.6f * s)
+                )
+            }
             DuelIconKind.CAMERA -> {
                 drawRoundRect(
                     tint, topLeft = p(3f, 7f), size = Size(18f * s, 13f * s),
@@ -88,6 +102,44 @@ fun DuelIcon(kind: DuelIconKind, tint: Color, size: Dp = 22.dp, modifier: Modifi
                 pathOf(listOf(p(3f, 8f), p(7.5f, 12.5f), p(12f, 5f), p(16.5f, 12.5f), p(21f, 8f), p(19f, 19f), p(5f, 19f)), close = true),
                 tint, style = stroke
             )
+            DuelIconKind.COPY -> {
+                drawRoundRect(
+                    tint, topLeft = p(9f, 3f), size = Size(12f * s, 12f * s),
+                    cornerRadius = CornerRadius(2.5f * s), style = stroke
+                )
+                drawRoundRect(
+                    tint, topLeft = p(3f, 9f), size = Size(12f * s, 12f * s),
+                    cornerRadius = CornerRadius(2.5f * s), style = stroke
+                )
+            }
+            DuelIconKind.GRID -> {
+                drawRoundRect(
+                    tint, topLeft = p(3f, 5f), size = Size(18f * s, 14f * s),
+                    cornerRadius = CornerRadius(3f * s), style = stroke
+                )
+                drawPath(pathOf(listOf(p(9f, 5f), p(9f, 19f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(15f, 5f), p(15f, 19f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(3f, 9.7f), p(21f, 9.7f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(3f, 14.3f), p(21f, 14.3f))), tint, style = stroke)
+            }
+            DuelIconKind.SHARE -> {
+                drawPath(pathOf(listOf(p(12f, 3.5f), p(12f, 14.5f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(8f, 7.5f), p(12f, 3.5f), p(16f, 7.5f))), tint, style = stroke)
+                drawPath(
+                    pathOf(listOf(p(6f, 12f), p(6f, 20f), p(18f, 20f), p(18f, 12f))),
+                    tint, style = stroke
+                )
+            }
+            DuelIconKind.TRASH -> {
+                drawPath(pathOf(listOf(p(4f, 7f), p(20f, 7f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(9.5f, 7f), p(9.5f, 4.5f), p(14.5f, 4.5f), p(14.5f, 7f))), tint, style = stroke)
+                drawPath(
+                    pathOf(listOf(p(6.5f, 7f), p(7.6f, 20f), p(16.4f, 20f), p(17.5f, 7f))),
+                    tint, style = stroke
+                )
+                drawPath(pathOf(listOf(p(10.5f, 10.5f), p(11f, 16.5f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(13.5f, 10.5f), p(13f, 16.5f))), tint, style = stroke)
+            }
             DuelIconKind.INFO -> {
                 drawCircle(tint, radius = 9f * s, center = p(12f, 12f), style = stroke)
                 drawPath(pathOf(listOf(p(12f, 11f), p(12f, 16.5f))), tint, style = stroke)

@@ -41,6 +41,11 @@ class AppPrefs(context: Context) {
         get() = sp.getBoolean(KEY_PREMIUM, false)
         set(v) = sp.edit().putBoolean(KEY_PREMIUM, v).apply()
 
+    /** Visas onboarding bara första gången. */
+    var onboarded: Boolean
+        get() = sp.getBoolean(KEY_ONBOARDED, false)
+        set(v) = sp.edit().putBoolean(KEY_ONBOARDED, v).apply()
+
     companion object {
         private const val KEY_MODE = "mode"
         private const val KEY_FRONT = "front_aspect"
@@ -48,6 +53,7 @@ class AppPrefs(context: Context) {
         private const val KEY_QUALITY = "quality"
         private const val KEY_CODEC = "codec"
         private const val KEY_PREMIUM = "premium"
+        private const val KEY_ONBOARDED = "onboarded"
     }
 }
 

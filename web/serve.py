@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static server for the DuelShots web preview.
+"""Static server for the DualShots web preview.
 
 Sends no-store headers for every response so the preview always shows the
 latest build instead of a cached one.
@@ -38,7 +38,7 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     handler = partial(Handler, directory=ROOT)
     with ThreadingHTTPServer(("0.0.0.0", PORT), handler) as httpd:
-        print(f"DuelShots web preview on http://0.0.0.0:{PORT}", flush=True)
+        print(f"DualShots web preview on http://0.0.0.0:{PORT}", flush=True)
         httpd.serve_forever()
 
 

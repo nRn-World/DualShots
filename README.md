@@ -1,8 +1,8 @@
-# ⚔️ DuelShots
+# ⚔️ DualShots
 
 **Capture more. From every angle.**
 
-DuelShots is a native Android camera app that records from the **front and back cameras simultaneously**. Choose a single composed video, two independent files, or both at once — with per-camera format controls and a freemium premium tier.
+DualShots is a native Android camera app that records from the **front and back cameras simultaneously**. Choose a single composed video, two independent files, or both at once — with per-camera format controls and a freemium premium tier.
 
 Built with **Kotlin**, **Jetpack Compose**, and the **CameraX Dual Concurrent Camera** API.
 
@@ -30,7 +30,7 @@ Built with **Kotlin**, **Jetpack Compose**, and the **CameraX Dual Concurrent Ca
   - **Both Options** — the composed video **plus** the two separate files.
 - **Per-camera format control** — set aspect ratio for the front and back camera independently (e.g. front 9:16, back 16:9).
 - **Freemium model** — core recording is free; premium unlocks higher resolutions (4K), codecs (HEVC), and advanced format control.
-- **Gallery** — recordings are saved to `Movies/DuelShots` via `MediaStore` and are immediately visible in the system gallery.
+- **Gallery** — recordings are saved to `Movies/DualShots` via `MediaStore` and are immediately visible in the system gallery.
 - **Robust fallback** — if a device does not support concurrent cameras, the app automatically degrades to a working single-camera mode so you can always record.
 - **Modern dark design system** — custom logo, gradient UI, Material 3 theming.
 
@@ -71,19 +71,19 @@ python3 web/serve.py 8000
 
 It records real (downloadable) clips into the Gallery, persists settings in
 `localStorage`, and falls back to a single camera — or an animated demo feed — when the
-browser cannot open both cameras. The web build carries its own visual identity — a poster menu with a
-split-lens mark, monospaced metadata, icon-orb rows and a viewfinder HUD — with one
-primary *Start Recording* action, cards for Gallery / Settings / Premium / About, and a
-grouped Settings screen with the premium card. The native Android app remains the
-reference implementation; see [`web/README.md`](web/README.md) for the mapping.
+browser cannot open both cameras. The preview mirrors the app's own interface: the orange
+app tile and *DualShots* wordmark, one *Start Recording* action followed by Settings,
+Premium Features and About rows, the three-tab bottom bar, the Settings studio with mode
+radios and inline quality controls, gallery rows and the PRO dialog. See
+[`web/README.md`](web/README.md) for the screen-by-screen mapping.
 
 ## 🚀 Getting started
 
 ### Build from source
 
 ```bash
-git clone https://github.com/nRn-World/DuelShots.git
-cd DuelShots
+git clone https://github.com/nRn-World/DualShots.git
+cd DualShots
 
 # Point Gradle at your SDK (or set ANDROID_HOME)
 echo "sdk.dir=/path/to/Android/sdk" > local.properties
@@ -124,7 +124,7 @@ The premium tier is a design-ready monetization layer. In this build the purchas
 ## 📂 Project structure
 
 ```
-DuelShots/
+DualShots/
 ├── app/src/main/java/com/nrworld/duelshot/
 │   ├── MainActivity.kt              # Entry point, permissions, theming
 │   ├── camera/DualCameraController.kt  # CameraX binding + 3 modes + fallback
@@ -132,7 +132,7 @@ DuelShots/
 │   ├── model/Models.kt              # Enums: modes, aspect, quality, codec
 │   └── ui/
 │       ├── AppViewModel.kt          # Observable settings state
-│       ├── DuelShotsApp.kt          # Navigation shell + bottom bar
+│       ├── DualShotsApp.kt          # Navigation shell + bottom bar
 │       ├── components/Components.kt # Logo, buttons, cards, dialogs
 │       ├── theme/                   # Color, Type, Theme
 │       ├── home/HomeScreen.kt
@@ -160,4 +160,4 @@ Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more informa
 
 ---
 
-Made by **nRn World**.
+Made by **nRnWorld** — [nrnworld.one](https://nrnworld.one) · bynrnworld@gmail.com

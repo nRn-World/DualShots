@@ -89,7 +89,7 @@ fun DuelLogoMark(size: Dp = 64.dp, modifier: Modifier = Modifier) {
 @Composable
 fun WordmarkText(fontSize: TextUnit, modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text("Duel", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = fontSize)
+        Text("Dual", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = fontSize)
         Text(
             "Shots",
             style = MaterialTheme.typography.headlineMedium.copy(
@@ -268,7 +268,7 @@ fun PremiumDialog(onDismiss: () -> Unit, onUpgrade: () -> Unit, feature: String)
                 contentAlignment = Alignment.Center
             ) { DuelIcon(DuelIconKind.CROWN, Color.Black, 30.dp) }
             Spacer(Modifier.height(14.dp))
-            Text("DuelShots PRO", color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
+            Text("DualShots PRO", color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
             Text(
                 feature.uppercase(),
                 color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp,

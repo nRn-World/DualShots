@@ -1,34 +1,60 @@
 package com.nrworld.duelshot
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nrworld.duelshot.data.AppPrefs
 import com.nrworld.duelshot.ui.AppViewModel
 import com.nrworld.duelshot.ui.DuelShotsApp
+import com.nrworld.duelshot.ui.components.DuelIcon
+import com.nrworld.duelshot.ui.components.DuelIconKind
+import com.nrworld.duelshot.ui.onboarding.OnboardingScreen
 import com.nrworld.duelshot.ui.theme.DuelBg
+import com.nrworld.duelshot.ui.theme.DuelGradient
+import com.nrworld.duelshot.ui.theme.DuelLine
 import com.nrworld.duelshot.ui.theme.DuelShotsTheme
+import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
 
 /**
- * DuelShots – inspelning med fram- och bakåtkamera samtidigt via CameraX Dual Concurrent Camera.
- * Roten innehåller designsystem, permission-hantering och navigation (Home/Record/Settings/Gallery).
+ * DualShots – inspelning med fram- och bakkamera samtidigt via CameraX Dual Concurrent Camera.
+ * Roten hanterar behörigheter, första-start-onboarding och navigation.
  */
 class MainActivity : ComponentActivity() {
 
@@ -37,58 +63,130 @@ class MainActivity : ComponentActivity() {
         Manifest.permission.RECORD_AUDIO
     )
 
-    private val permissionGranted = androidx.compose.runtime.mutableStateOf(false)
+    private val permissionGranted = mutableStateOf(false)
+    private val askedOnce = mutableStateOf(false)
 
     // Registreras som ett fält så att den är klar innan activityn startat (krav från Android).
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-            permissionGranted.value = result.values.all { it }
+            askedOnce.value = true
+            permissionGranted.value = requiredPermissions.all { permission ->
+                result[permission] == true ||
+                    ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+            }
         }
+
+    private fun allGranted(): Boolean = requiredPermissions.all {
+        ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        permissionGranted.value = requiredPermissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
-        if (!permissionGranted.value) {
-            permissionLauncher.launch(requiredPermissions)
-        }
+        permissionGranted.value = allGranted()
+        if (!permissionGranted.value) permissionLauncher.launch(requiredPermissions)
 
         setContent {
             DuelShotsTheme {
-                val granted = permissionGranted.value
-                if (granted) {
-                    val vm: AppViewModel = viewModel()
-                    DuelShotsApp(vm)
-                } else {
-                    PermissionPlaceholder(
-                        onRequest = { permissionLauncher.launch(requiredPermissions) }
+                val prefs = remember { AppPrefs(applicationContext) }
+                var onboarded by remember { mutableStateOf(prefs.onboarded) }
+
+                when {
+                    !permissionGranted.value -> PermissionsScreen(
+                        denied = askedOnce.value,
+                        onRequest = { permissionLauncher.launch(requiredPermissions) },
+                        onOpenSettings = {
+                            runCatching {
+                                startActivity(
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", packageName, null)
+                                    )
+                                )
+                            }
+                        }
                     )
+
+                    !onboarded -> OnboardingScreen(onDone = {
+                        prefs.onboarded = true
+                        onboarded = true
+                    })
+
+                    else -> {
+                        val vm: AppViewModel = viewModel()
+                        DuelShotsApp(vm)
+                    }
                 }
             }
         }
     }
+
+    // Tillbaka från systeminställningarna: plocka upp ett nyligen beviljat tillstånd.
+    override fun onResume() {
+        super.onResume()
+        permissionGranted.value = allGranted()
+    }
 }
 
 @Composable
-private fun PermissionPlaceholder(onRequest: () -> Unit) {
+private fun PermissionsScreen(denied: Boolean, onRequest: () -> Unit, onOpenSettings: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DuelBg)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxSize().background(DuelBg).padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "DuelShots needs camera and microphone permissions " +
-                "to record from both cameras at the same time.",
-            color = DuelTextMuted,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
-        Button(onClick = onRequest) {
-            Text("Request permission", color = DuelText)
+        Spacer(Modifier.weight(0.25f))
+
+        Box(
+            modifier = Modifier.size(96.dp).clip(RoundedCornerShape(28.dp)).background(DuelGradient),
+            contentAlignment = Alignment.Center
+        ) {
+            DuelIcon(DuelIconKind.CAMERA, Color(0xFF04060D), 42.dp)
         }
+
+        Spacer(Modifier.height(26.dp))
+        Text(
+            "Camera & microphone", color = DuelText, fontWeight = FontWeight.ExtraBold,
+            fontSize = 24.sp, textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            if (denied) {
+                "DualShots needs both to record two cameras at once. You can grant them in system settings and come back."
+            } else {
+                "DualShots records the front and back camera at the same time. Both permissions stay on your device."
+            },
+            color = DuelTextMuted, fontSize = 14.sp, lineHeight = 21.sp, textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.weight(0.3f))
+
+        Box(
+            modifier = Modifier.fillMaxWidth().height(54.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(DuelGradient)
+                .clickable(onClick = onRequest),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Allow camera & mic", color = Color(0xFF04060D), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        }
+
+        if (denied) {
+            Spacer(Modifier.height(8.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(DuelSurface2)
+                    .border(1.dp, DuelLine, RoundedCornerShape(18.dp))
+                    .clickable(onClick = onOpenSettings),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Open settings", color = DuelText, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+            TextButton(onClick = onOpenSettings) {
+                Text("Already allowed? Come back here", color = DuelTextMuted, fontSize = 12.sp)
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
     }
 }

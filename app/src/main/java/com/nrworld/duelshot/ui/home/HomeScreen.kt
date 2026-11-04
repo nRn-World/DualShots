@@ -81,8 +81,7 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
             LogoTile()
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Duel", color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, letterSpacing = (-0.8).sp)
-                Spacer(Modifier.width(6.dp))
+                Text("Dual", color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, letterSpacing = (-0.8).sp)
                 Text(
                     "Shots",
                     style = MaterialTheme.typography.headlineMedium.copy(
@@ -105,10 +104,7 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
             }
 
             Spacer(Modifier.height(32.dp))
-            Text(
-                "MADE BY NRN WORLD",
-                color = DuelTextFaint, fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 1.sp
-            )
+            CreditFooter()
         }
     }
 
@@ -116,7 +112,7 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
         AlertDialog(
             onDismissRequest = { showAbout = false },
             containerColor = DuelSurface2,
-            title = { Text("DuelShots", color = DuelText, fontWeight = FontWeight.Bold) },
+            title = { Text("DualShots", color = DuelText, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "Version 1.0 · Dual lens recording engine",
@@ -125,6 +121,64 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
             },
             confirmButton = { TextButton(onClick = { showAbout = false }) { Text("OK", color = DuelOrange) } }
         )
+    }
+}
+
+/** "Made by nRnWorld" med klickbar sajt och en liten kopiera-knapp för mejlen. */
+@Composable
+private fun CreditFooter() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val email = "bynrnworld@gmail.com"
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            "Made by nRnWorld",
+            color = DuelTextFaint, fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 1.sp
+        )
+        Text(
+            "nrnworld.one",
+            color = com.nrworld.duelshot.ui.theme.DuelOrangeLight, fontSize = 11.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse("https://nrnworld.one")
+                            )
+                        )
+                    }
+                }
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(email, color = DuelTextMuted, fontSize = 11.sp)
+            Box(
+                modifier = Modifier.size(24.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(com.nrworld.duelshot.ui.theme.DuelSurface2)
+                    .border(1.dp, DuelLine, androidx.compose.foundation.shape.CircleShape)
+                    .clickable {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                            as? android.content.ClipboardManager
+                        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("email", email))
+                        android.widget.Toast
+                            .makeText(context, "Email copied", android.widget.Toast.LENGTH_SHORT)
+                            .show()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                DuelIcon(DuelIconKind.COPY, DuelTextMuted, 12.dp)
+            }
+        }
     }
 }
 

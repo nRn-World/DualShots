@@ -1,5 +1,5 @@
 /* ==========================================================================
-   DuelShots — interactive web preview
+   DualShots — interactive web preview
    A browser replica of the native Android app (Kotlin + Compose + CameraX):
    same flows, same three recording modes, real encoded clips.
 
@@ -14,14 +14,17 @@ const MODE_ORDER = ['DUAL_VIEW', 'SEPARATE', 'BOTH'];
 const MODES = {
   DUAL_VIEW: {
     title: 'Dual View',
+    sub: 'Both cameras in one video',
     desc: 'Both cameras composed into one video — back feed full frame, front feed inset.',
   },
   SEPARATE: {
     title: 'Separate Videos',
+    sub: 'Two files, one for each',
     desc: 'Two files, one per camera. Trim and post each angle independently.',
   },
   BOTH: {
     title: 'Both Options',
+    sub: 'Combined + two separate files',
     desc: 'The composed video plus both individual files — three clips in one take.',
   },
 };
@@ -55,16 +58,19 @@ const STORE_KEY = 'duelshot_prefs';
 const state = {
   page: 'HOME',
   record: false,
-  mode: 'BOTH',
+  mode: 'DUAL_VIEW',
   frontAspect: 'R_9_16',
   backAspect: 'R_16_9',
   quality: 'FHD1080',
   codec: 'MP4',
   premium: false,
   audio: true,
-  zoom: 1,
+  zoom: { main: 1, inset: 1 },
   stack: 'front-first',
   pip: { cx: 0.74, cy: 0.24, scale: 0.34 },
+  pipOff: false,
+  pipPaused: false,
+  swap: false,
   clips: [],
 };
 
@@ -84,70 +90,34 @@ const svg = (d, extra = '') =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
 
 const ICONS = {
-  camera: svg('<rect x="2.7" y="7.2" width="18.6" height="12.2" rx="3.1"/><path d="M8.4 7.2 9.9 4.6h4.2l1.5 2.6"/><circle cx="12" cy="13.3" r="3.5"/>'),
-  video: svg('<rect x="2.7" y="7.2" width="18.6" height="12.2" rx="3.1"/><path d="M8.4 7.2 9.9 4.6h4.2l1.5 2.6"/><circle cx="12" cy="13.3" r="3.5"/>'),
-  gallery: svg('<rect x="3.2" y="4.4" width="17.6" height="15.2" rx="4"/><circle cx="8.6" cy="9.6" r="1.5" fill="currentColor" stroke="none"/><path d="m4.4 17.6 4.6-4.3a2 2 0 0 1 2.7 0l5 4.6"/><path d="m14.2 15.2 1.9-1.8a2 2 0 0 1 2.7 0l1.6 1.4"/>'),
-  gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.3 14.9a1.6 1.6 0 0 0 .3 1.8l.06.06a2 2 0 1 1-2.8 2.8l-.06-.06a1.6 1.6 0 0 0-1.8-.32 1.6 1.6 0 0 0-.96 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1.06-1.5 1.6 1.6 0 0 0-1.8.32l-.06.06a2 2 0 1 1-2.8-2.8l.06-.06a1.6 1.6 0 0 0 .32-1.8 1.6 1.6 0 0 0-1.5-.96H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9.1a1.6 1.6 0 0 0-.32-1.8l-.06-.06a2 2 0 1 1 2.8-2.8l.06.06a1.6 1.6 0 0 0 1.8.32H9a1.6 1.6 0 0 0 .96-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 .96 1.5 1.6 1.6 0 0 0 1.8-.32l.06-.06a2 2 0 1 1 2.8 2.8l-.06.06a1.6 1.6 0 0 0-.32 1.8V9a1.6 1.6 0 0 0 1.5.96H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.6.94z"/>'),
-  crown: svg('<path d="M3.4 18.4h17.2l1.1-11-5.4 3.4L12 4.6 7.7 10.8 2.3 7.4z"/>'),
-  info: svg('<circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.4"/><circle cx="12" cy="7.9" r="1" fill="currentColor" stroke="none"/>'),
-  film: svg('<rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2.6"/><path d="M7.4 6.2v11.6M16.6 6.2v11.6"/>'),
-  mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0"/><path d="M12 17.8V21"/>'),
-  folder: svg('<path d="M3 7.4a2 2 0 0 1 2-2h3.6l2 2.4H19a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
-  close: svg('<path d="M6.8 6.8l10.4 10.4M17.2 6.8 6.8 17.2"/>', 'stroke-width="2"'),
-  flip: svg('<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.4 4.7v5.1h-5.1"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>'),
+  home: svg('<path d="M3 10.5 12 3.5l9 7V20h-6v-5.5H9V20H3z"/>'),
+  gallery: svg('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5 15.5 12 10 14.5z" fill="currentColor" stroke="none"/>'),
+  settings: svg('<path d="M3 6h18M3 12h18M3 18h18"/><circle cx="8" cy="6" r="2.6" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="11" cy="18" r="2.6" fill="currentColor" stroke="none"/>'),
+  camera: svg('<rect x="3" y="7" width="18" height="13" rx="3"/><path d="M8 7l1.5-2.5h5L16 7"/><circle cx="12" cy="13.5" r="3.2"/>'),
+  video: svg('<rect x="2.5" y="6.5" width="13" height="11" rx="2.5"/><path d="M15.5 10.5 21.5 7v10l-6-3.5z"/>'),
+  crown: svg('<path d="M3 8l4.5 4.5L12 5l4.5 7.5L21 8l-2 11H5z"/>'),
+  info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r="1.2" fill="currentColor" stroke="none"/>'),
+  check: svg('<path d="M5 12.5 10 17.5 19 7"/>'),
+  chevron: svg('<path d="M9 5l7 7-7 7"/>'),
+  close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
+  play: svg('<path d="M8 5.5 19 12 8 18.5z" fill="currentColor" stroke="none"/>'),
+  bolt: svg('<path d="M13 2.5 5.5 13.5H11l-1 8 7.5-11H12z"/>'),
+  flipCam: svg('<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20.4 4.6v5.2h-5.2"/><circle cx="12" cy="12" r="2.4"/>'),
   swap: svg('<path d="M4.5 8.5h13l-3-3"/><path d="M19.5 15.5h-13l3 3"/>'),
-  flipCam: svg('<rect x="2.8" y="6.4" width="18.4" height="13.2" rx="3.2"/><path d="M9.5 12.6a2.8 2.8 0 0 1 4.7-1.6"/><path d="M14.6 8.9v2.4h-2.4"/><path d="M14.5 14.4a2.8 2.8 0 0 1-4.7 1.6"/><path d="M9.4 18.1v-2.4h2.4"/>'),
-  chevronRight: svg('<path d="M9.4 6.2 15.2 12l-5.8 5.8"/>', 'stroke-width="2"'),
-  chevronLeft: svg('<path d="M14.6 6.2 8.8 12l5.8 5.8"/>', 'stroke-width="2"'),
-  chevronDown: svg('<path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>', 'stroke-width="2.1"'),
-  check: svg('<path d="M4.5 12.6 9.4 17.5 19.5 6.9"/>', 'stroke-width="2.2"'),
-  play: svg('<path d="M8.4 5.6v12.8L19 12z" fill="currentColor" stroke="none"/>', 'stroke-width="0"'),
   download: svg('<path d="M12 4v11"/><path d="m7.8 11.4 4.2 4.2 4.2-4.2"/><path d="M4.8 19.4h14.4"/>'),
-  trash: svg('<path d="M5 7h14M9.5 7V5.4h5V7M6.6 7l.8 12.1A1.9 1.9 0 0 0 9.3 21h5.4a1.9 1.9 0 0 0 1.9-1.9L17.4 7"/>'),
-  bolt: svg('<path d="M13.4 2.6 5.6 13.4h5.2l-1.2 8 7.8-10.8h-5.2z"/>'),
-  aperture: svg('<path d="M4 9.2V6.6A2.6 2.6 0 0 1 6.6 4H9.2"/><path d="M14.8 4h2.6A2.6 2.6 0 0 1 20 6.6v2.6"/><path d="M20 14.8v2.6a2.6 2.6 0 0 1-2.6 2.6h-2.6"/><path d="M9.2 20H6.6A2.6 2.6 0 0 1 4 17.4v-2.6"/>'),
-  layers: svg('<path d="m12 3.6 8.2 4.3-8.2 4.3-8.2-4.3z"/><path d="m3.8 12.3 8.2 4.3 8.2-4.3"/><path d="m3.8 16.5 8.2 4.3 8.2-4.3"/>'),
+  pause: svg('<rect x="7.5" y="5" width="3.6" height="14" rx="1.2" fill="currentColor" stroke="none"/><rect x="12.9" y="5" width="3.6" height="14" rx="1.2" fill="currentColor" stroke="none"/>'),
+  pip: svg('<rect x="3" y="5" width="18" height="14" rx="3"/><rect x="11.5" y="10.5" width="7.5" height="6.5" rx="1.6" fill="currentColor" stroke="none"/>'),
+  copy: svg('<rect x="9" y="3" width="12" height="12" rx="2.5"/><rect x="3" y="9" width="12" height="12" rx="2.5"/>'),
+  grid: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>'),
+  share: svg('<path d="M12 3.5v11"/><path d="m8 7.5 4-4 4 4"/><path d="M6 12v8h12v-8"/>'),
+  trash: svg('<path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1.1 13h8.8L17.5 7"/><path d="M10.5 10.5 11 16.5M13.5 10.5 13 16.5"/>'),
 };
 
-function logoMark(size = 76, cls = 'logo-lg') {
-  return `
-    <svg class="${cls}" viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true">
-      <defs>
-        <linearGradient id="dsGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#FFC65C"/>
-          <stop offset=".52" stop-color="#FF7A1A"/>
-          <stop offset="1" stop-color="#FF4D00"/>
-        </linearGradient>
-        <radialGradient id="dsGlass" cx=".36" cy=".3" r=".8">
-          <stop offset="0" stop-color="#4a372b"/>
-          <stop offset=".48" stop-color="#171211"/>
-          <stop offset="1" stop-color="#070605"/>
-        </radialGradient>
-        <linearGradient id="dsPlay" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#FFD27A"/>
-          <stop offset="1" stop-color="#FF6A1A"/>
-        </linearGradient>
-      </defs>
-
-      <!-- orbit: broken arc, one side only -->
-      <path d="M20 44A38 38 0 0 1 58 24" fill="none" stroke="url(#dsGrad)" stroke-width="3"
-            stroke-linecap="round" opacity=".85"/>
-      <path d="M96 96A38 38 0 0 1 62 100" fill="none" stroke="url(#dsGrad)" stroke-width="2.4"
-            stroke-linecap="round" opacity=".45"/>
-
-      <!-- split lens: the two sides of the product -->
-      <circle cx="56" cy="60" r="31" fill="#0b0806" stroke="url(#dsGrad)" stroke-width="3.4"/>
-      <path d="M56 29a31 31 0 0 0 0 62z" fill="url(#dsGrad)" opacity=".13"/>
-      <path d="M56 25v70" stroke="rgba(255,227,194,.42)" stroke-width="1.2" stroke-dasharray="3 5"/>
-      <circle cx="56" cy="60" r="17" fill="url(#dsGlass)" stroke="rgba(255,227,194,.2)" stroke-width="1.2"/>
-      <circle cx="49" cy="52" r="4.6" fill="#FFC65C" opacity=".9"/>
-      <circle cx="62" cy="67" r="2.2" fill="#FF7A1A" opacity=".5"/>
-
-      <!-- play bites into the frame -->
-      <path d="M84 47.2 105 60 84 72.8z" fill="url(#dsPlay)" stroke="url(#dsPlay)" stroke-width="2.4"
-            stroke-linejoin="round"/>
-    </svg>`;
-}
+/* App icon tile from HomeScreen.LogoTile(): gradient squircle + camera. */
+const logoTile = () => `
+  <div class="logo-tile">
+    <div class="logo-tile-inner">${ICONS.camera}</div>
+  </div>`;
 
 /* -------------------------------------------------------------- utilities */
 
@@ -180,6 +150,10 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const PIP_MIN = 0.16;
 const PIP_MAX = 0.62;
 const PIP_DEFAULT = { cx: 0.74, cy: 0.24, scale: 0.34 };
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 3;
+const clampZoom = (z) => clamp(Number.isFinite(z) ? z : 1, ZOOM_MIN, ZOOM_MAX);
+const fmtZoom = (z) => `${Math.round(z * 10) / 10}×`;
 
 const currentPip = () => state.pip || PIP_DEFAULT;
 
@@ -236,6 +210,8 @@ function savePrefs() {
       premium: state.premium,
       audio: state.audio,
       pip: state.pip,
+      swap: state.swap,
+      onboarded: !!state.onboarded,
     }));
   } catch (_) { /* private mode */ }
 }
@@ -251,6 +227,8 @@ function loadPrefs() {
     if (QUALITIES[p.quality]) state.quality = p.quality;
     if (CODECS[p.codec]) state.codec = p.codec;
     state.premium = !!p.premium;
+    state.swap = !!p.swap;
+    state.onboarded = !!p.onboarded;
     if (typeof p.audio === 'boolean') state.audio = p.audio;
     if (p.pip && Number.isFinite(p.pip.cx) && Number.isFinite(p.pip.cy) && Number.isFinite(p.pip.scale)) {
       state.pip = {
@@ -260,6 +238,30 @@ function loadPrefs() {
       };
     }
   } catch (_) { /* ignore */ }
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) { /* faller tillbaka nedan */ }
+
+  try {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  } catch (_) {
+    return false;
+  }
 }
 
 let toastTimer = 0;
@@ -280,7 +282,7 @@ function closeSheet() {
 }
 
 function openSheet(html, bind) {
-  modalRoot.innerHTML = `<div class="modal"><div class="sheet">${html}</div></div>`;
+  modalRoot.innerHTML = `<div class="modal sheet-wrap"><div class="sheet">${html}</div></div>`;
   const backdrop = $('.modal', modalRoot);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
   wireSheet();
@@ -291,166 +293,66 @@ function wireSheet() {
   $$('[data-close]', modalRoot).forEach((b) => b.addEventListener('click', closeSheet));
 }
 
-function proFeatures() {
-  return ['Advanced formats', 'Custom resolution', 'HEVC encoding', 'No watermark'];
-}
+const PREMIUM_LINES = [
+  '4K Ultra HD recording',
+  'HEVC codec',
+  '60fps & custom bitrate',
+  'Per-camera aspect control',
+  'Watermark-free export',
+];
 
-function showPro(pending = null) {
-  const body = state.premium
-    ? `<p class="sheet-sub">Premium is active. 4K, HEVC and every format control are unlocked.</p>
-       <button class="btn-primary sole" data-close type="button">Close</button>`
-    : `<p class="sheet-sub">One-time unlock. Everything below stays on this device — no account, no subscription.</p>
-       <ul class="premium-list" style="margin-top:16px">
-         ${proFeatures().map((f) => `<li class="premium-item">${ICONS.check}<span>${f}</span></li>`).join('')}
-       </ul>
-       <button class="btn-primary sole" data-upgrade type="button">Unlock Premium</button>
-       <button class="btn-ghost" data-close type="button">Not now</button>`;
+/* PremiumDialog from Components.kt: crown tile, feature list, orange CTA. */
+function showPremium(pending = null) {
+  const feature = pending ? pending.label : 'DualShots Premium';
 
-  openSheet(`
-    <div class="grabber"></div>
-    <div class="pro-sheet-head">
-      <span class="pro-sheet-mark">${ICONS.crown}</span>
-      <div>
-        <div class="sheet-title">DuelShots Premium</div>
-        <div class="caption">Mock purchase in this preview</div>
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog premium-dialog">
+        <div class="dlg-mark">${ICONS.crown}</div>
+        <div class="dlg-title">DualShots PRO</div>
+        <div class="dlg-sub">${esc(String(feature).toUpperCase())}</div>
+        <div class="dlg-list">
+          ${PREMIUM_LINES.map((line) => `
+            <div class="dlg-item"><span class="dlg-check">${ICONS.check}</span><span>${line}</span></div>`).join('')}
+        </div>
+        <button class="dlg-btn" data-upgrade type="button" ${state.premium ? 'disabled' : ''}>
+          ${state.premium ? 'PRO ACTIVE' : 'UNLOCK PRO'}
+        </button>
+        <button class="dlg-close" data-close type="button">Close</button>
       </div>
-    </div>
-    ${body}`, () => {
-    const up = $('[data-upgrade]', modalRoot);
-    if (up) up.addEventListener('click', () => {
-      state.premium = true;
-      if (pending && pending.kind === 'quality' && QUALITIES[pending.key]) state.quality = pending.key;
-      if (pending && pending.kind === 'codec' && CODECS[pending.key]) state.codec = pending.key;
-      savePrefs();
-      closeSheet();
-      toast('Premium unlocked');
-      if (state.record) refreshRecord(); else render();
-    });
+    </div>`;
+
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  wireSheet();
+
+  const up = $('[data-upgrade]', modalRoot);
+  if (up) up.addEventListener('click', () => {
+    if (state.premium) return;
+    state.premium = true;
+    if (pending && pending.kind === 'quality' && QUALITIES[pending.key]) state.quality = pending.key;
+    if (pending && pending.kind === 'codec' && CODECS[pending.key]) state.codec = pending.key;
+    savePrefs();
+    closeSheet();
+    toast('Premium unlocked');
+    if (state.record) refreshRecord(); else render();
   });
 }
 
-function showFormatSheet(which) {
-  const isFront = which === 'front';
-
-  const body = () => `
-    <div class="grabber"></div>
-    <div class="sheet-title">${isFront ? 'Front' : 'Back'} Camera Format</div>
-    <p class="sheet-sub">How this camera is framed in the recording.</p>
-    <div class="chips">
-      ${ASPECT_ORDER.map((k) => `
-        <button class="chip ${k === (isFront ? state.frontAspect : state.backAspect) ? 'active' : ''}"
-                data-aspect="${k}" type="button">${ASPECTS[k].short}</button>
-      `).join('')}
-    </div>
-    <button class="btn-primary" data-close type="button">Done</button>`;
-
-  const bind = () => {
-    wireSheet();
-    $$('[data-aspect]', modalRoot).forEach((b) => b.addEventListener('click', () => {
-      if (isFront) state.frontAspect = b.dataset.aspect;
-      else state.backAspect = b.dataset.aspect;
-      savePrefs();
-      $('.sheet', modalRoot).innerHTML = body();
-      bind();
-      if (!state.record) render();
-    }));
-  };
-
-  openSheet(body(), bind);
-}
-
-function showModeSheet() {
-  const html = `
-    <div class="grabber"></div>
-    <div class="sheet-title">Save as</div>
-    <p class="sheet-sub">What each take writes to the gallery.</p>
-    <div class="option-list">
-      ${MODE_ORDER.map((m) => `
-        <button class="option ${state.mode === m ? 'active' : ''}" data-mode="${m}" type="button">
-          <span>
-            <span class="t">${MODES[m].title}</span>
-            <span class="d">${MODES[m].desc}</span>
-          </span>
-          <span class="tick">${ICONS.check}</span>
-        </button>
-      `).join('')}
-    </div>
-    <button class="btn-primary" data-close type="button">Done</button>`;
-
-  openSheet(html);
-  $$('[data-mode]', modalRoot).forEach((b) => b.addEventListener('click', () => {
-    state.mode = b.dataset.mode;
-    savePrefs();
-    $$('[data-mode]', modalRoot).forEach((x) => x.classList.toggle('active', x.dataset.mode === state.mode));
-    if (!state.record) render();
-  }));
-}
-
-function showOptionSheet({ title, sub, items, activeKey, onPick }) {
-  const html = `
-    <div class="grabber"></div>
-    <div class="sheet-title">${title}</div>
-    ${sub ? `<p class="sheet-sub">${sub}</p>` : ''}
-    <div class="option-list">
-      ${items.map((i) => `
-        <button class="option ${i.key === activeKey ? 'active' : ''}" data-opt="${i.key}" type="button">
-          <span>
-            <span class="t">${i.label}</span>
-            ${i.desc ? `<span class="d">${i.desc}</span>` : ''}
-          </span>
-          <span class="tick">${ICONS.check}</span>
-        </button>
-      `).join('')}
-    </div>
-    <button class="btn-primary" data-close type="button">Done</button>`;
-
-  openSheet(html);
-  $$('[data-opt]', modalRoot).forEach((b) => b.addEventListener('click', () => {
-    onPick(b.dataset.opt);
-  }));
-}
-
+/* AlertDialog from HomeScreen.kt. */
 function showAbout() {
-  const wrap = document.createElement('div');
-  wrap.className = 'about-modal';
-  wrap.innerHTML = `
-    <div class="about-card">
-      <h2>DuelShots · web preview</h2>
-      <p>This is a browser build of the native Android app in this repository. The screens,
-      flows, recording modes and premium gating come from the Kotlin/Compose source in
-      <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
-
-      <h3>Build</h3>
-      <p><b>3.2 · poster menu.</b> A centred lens mark and wordmark, one orange action, then
-      rounded cards for Gallery, Settings, Premium and About — each with a lit icon orb and a
-      monospaced value on the right. Technical detail stays in mono, prose in the system sans,
-      and colour is reserved for the brand gradient, the record state and premium.
-      Last updated 2026-11-04.</p>
-
-      <h3>What works here</h3>
-      <ul>
-        <li>All three recording modes: composed picture-in-picture, two separate files, or both.</li>
-        <li>Clips are encoded live in the browser, land in the Gallery, play inline and download.</li>
-        <li>Settings persist in <code>localStorage</code> (SharedPreferences in the app).</li>
-        <li>4K and HEVC sit behind the mock premium purchase, like <code>grantPremium()</code>.</li>
-        <li>In Dual View the front camera inset can be dragged, pinched and reset.</li>
-      </ul>
-
-      <h3>Cameras</h3>
-      <p>Browsers usually allow only one camera stream at a time. If both cameras open you get a
-      real dual feed; otherwise the preview falls back to single-camera mode, exactly like the
-      Android fallback. If camera access is blocked an animated demo feed keeps recording usable.</p>
-
-      <h3>The real app</h3>
-      <p>Build the APK locally with JDK 17/21 and the Android SDK:</p>
-      <p><code>./gradlew :app:assembleDebug</code></p>
-
-      <div class="close-row"><button class="about-cta" type="button">Got it</button></div>
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog about-dialog">
+        <div class="about-title">DualShots</div>
+        <div class="about-version">Version 1.0 · Dual lens recording engine</div>
+        <button class="about-ok" data-close type="button">OK</button>
+      </div>
     </div>`;
-  document.body.appendChild(wrap);
-  const close = () => wrap.remove();
-  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
-  $('.about-cta', wrap).addEventListener('click', close);
+
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  wireSheet();
 }
 
 /* =====================================================================
@@ -634,6 +536,18 @@ async function startCameras() {
   if (back) cam.feeds.back = mk(back, false);
   if (front) cam.feeds.front = mk(front, true);
 
+  // Bara en av kamerorna gick att öppna medan en simulering redan körs:
+  // behåll då den simulerade dubbelvyn istället för en halv blandning.
+  if (!(back && front) && cam.demo) {
+    [back, front].forEach((stream) => {
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+    });
+    startDemo();
+    cam.ready = true;
+    refreshRecord();
+    return;
+  }
+
   cam.ready = true;
   cam.singleFallback = !(back && front);
   cam.active = back ? 'back' : 'front';
@@ -684,45 +598,54 @@ function pointerDistance() {
   return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
 }
 
+const pipAspectKey = () => recDom.pipAspect || state.frontAspect;
+
 function onPreviewPointerDown(e) {
-  if (!recDom.pip) return;
-  const onPip = !!(e.target.closest && e.target.closest('.pip'));
-  gesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!recDom.feeds) return;
+  const onPip = !!(recDom.pip && e.target.closest && e.target.closest('.pip'));
+  gesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, onPip });
 
   if (gesture.pointers.size === 1) {
+    gesture.moved = false;
+    gesture.multi = false;
+    gesture.pinch = null;
+    gesture.drag = null;
     if (!onPip) return;
     const p = currentPip();
     gesture.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: p.cx, cy: p.cy };
-    gesture.pinch = null;
-    gesture.moved = false;
-    gesture.multi = false;
     recDom.pip.classList.add('active');
     hidePipHint();
     try { recDom.preview.setPointerCapture(e.pointerId); } catch (_) { /* unsupported */ }
   } else if (gesture.pointers.size === 2) {
-    gesture.pinch = { dist: pointerDistance(), scale: currentPip().scale };
+    // Nyp på stora bilden = stora kameran, nyp på lilla rutan = lilla kameran.
+    const target = [...gesture.pointers.values()].some((p) => p.onPip) ? 'inset' : 'main';
+    if (target === 'inset' && !recDom.pip) return;
+    gesture.pinch = { dist: pointerDistance(), zoom: state.zoom[target], target };
     gesture.drag = null;
     gesture.multi = true;
-    recDom.pip.classList.add('active');
+    if (target === 'inset') recDom.pip.classList.add('active');
     hidePipHint();
   }
 }
 
 function onPreviewPointerMove(e) {
-  if (!gesture.pointers.has(e.pointerId) || !recDom.pip) return;
+  if (!gesture.pointers.has(e.pointerId) || !recDom.feeds) return;
   gesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+  if (gesture.pointers.size >= 2 && gesture.pinch && gesture.pinch.dist > 0) {
+    const zoom = clampZoom(gesture.pinch.zoom * (pointerDistance() / gesture.pinch.dist));
+    if (Math.abs(zoom - state.zoom[gesture.pinch.target]) > 0.001) {
+      state.zoom[gesture.pinch.target] = zoom;
+      applyZoom();
+    }
+    return;
+  }
+
+  if (!recDom.pip) return;
   const tile = recDom.pip.parentElement;
   if (!tile) return;
   const rect = tile.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
-
-  if (gesture.pointers.size >= 2 && gesture.pinch && gesture.pinch.dist > 0) {
-    const scale = clamp(gesture.pinch.scale * (pointerDistance() / gesture.pinch.dist), PIP_MIN, PIP_MAX);
-    state.pip = clampPipToStage({ ...currentPip(), scale }, tile, state.frontAspect);
-    applyPipStyle();
-    return;
-  }
 
   if (gesture.drag && gesture.drag.id === e.pointerId) {
     const dx = e.clientX - gesture.drag.x;
@@ -730,7 +653,7 @@ function onPreviewPointerMove(e) {
     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) gesture.moved = true;
     const cx = gesture.drag.cx + dx / rect.width;
     const cy = gesture.drag.cy + dy / rect.height;
-    state.pip = clampPipToStage({ ...currentPip(), cx, cy }, tile, state.frontAspect);
+    state.pip = clampPipToStage({ ...currentPip(), cx, cy }, tile, pipAspectKey());
     applyPipStyle();
   }
 }
@@ -738,17 +661,21 @@ function onPreviewPointerMove(e) {
 function onPreviewPointerUp(e) {
   if (!gesture.pointers.has(e.pointerId)) return;
 
-  const onPip = !!(e.target.closest && e.target.closest('.pip'));
   const wasMulti = gesture.pointers.size > 1 || gesture.multi;
   const dragged = gesture.moved;
+  const onPip = !!(recDom.pip && e.target.closest && e.target.closest('.pip'));
 
   gesture.pointers.delete(e.pointerId);
 
   if (gesture.pointers.size === 1) {
     const [id, point] = [...gesture.pointers.entries()][0];
-    const cur = currentPip();
-    gesture.drag = { id, x: point.x, y: point.y, cx: cur.cx, cy: cur.cy };
     gesture.pinch = null;
+    if (point.onPip && recDom.pip) {
+      const cur = currentPip();
+      gesture.drag = { id, x: point.x, y: point.y, cx: cur.cx, cy: cur.cy };
+    } else {
+      gesture.drag = null;
+    }
     return;
   }
 
@@ -775,14 +702,49 @@ function onPreviewPointerUp(e) {
 }
 
 function onPreviewWheel(e) {
-  if (!recDom.pip || !(e.target.closest && e.target.closest('.pip'))) return;
+  if (!recDom.feeds) return;
+  const target = (recDom.pip && e.target.closest && e.target.closest('.pip')) ? 'inset' : 'main';
+  if (target === 'inset' && !recDom.pip) return;
   e.preventDefault();
-  const next = clamp(currentPip().scale * (1 - e.deltaY * 0.0012), PIP_MIN, PIP_MAX);
-  state.pip = { ...currentPip(), scale: next };
-  applyPipStyle();
-  savePrefs();
+  state.zoom[target] = clampZoom(state.zoom[target] * (1 - e.deltaY * 0.0012));
+  applyZoom();
 }
 
+/* Hörnhandtaget: dra utåt för större liten kamera, inåt för mindre. */
+function wirePipResize(handle) {
+  let start = null;
+
+  handle.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const tile = recDom.pip && recDom.pip.parentElement;
+    if (!tile || !tile.clientWidth) return;
+    start = { id: e.pointerId, x: e.clientX, y: e.clientY, scale: currentPip().scale, w: tile.clientWidth };
+    recDom.pip.classList.add('active', 'resizing');
+    hidePipHint();
+    try { handle.setPointerCapture(e.pointerId); } catch (_) { /* unsupported */ }
+  });
+
+  handle.addEventListener('pointermove', (e) => {
+    if (!start || e.pointerId !== start.id) return;
+    e.preventDefault();
+    const delta = ((e.clientX - start.x) + (e.clientY - start.y)) / 2;
+    const scale = clamp(start.scale + delta / start.w, PIP_MIN, PIP_MAX);
+    state.pip = clampPipToStage({ ...currentPip(), scale }, recDom.pip.parentElement, pipAspectKey());
+    applyPipStyle();
+  });
+
+  const end = (e) => {
+    if (!start || e.pointerId !== start.id) return;
+    start = null;
+    recDom.pip.classList.remove('active', 'resizing');
+    savePrefs();
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+}
+
+/* Två fingrar zoomar, ett finger flyttar, hörnet ändrar storlek. */
 function attachPreviewGestures() {
   const el = recDom.preview;
   if (!el) return;
@@ -835,7 +797,9 @@ const rec = {
 
 const recDom = {
   root: null, preview: null, feeds: null, status: null, timer: null,
-  btn: null, label: null, flip: null, thumb: null, pip: null, hint: null, zoom: null,
+  btn: null, label: null, flip: null, swap: null, thumb: null, pip: null, hint: null, zoom: null,
+  pipAspect: null,
+  pipBtn: null,
 };
 let mountedKey = null;
 let recordMessage = '';
@@ -941,16 +905,22 @@ function drawOutput(o) {
   if (!o.canvas) return;
   const ctx = o.ctx;
   const { width: w, height: h } = o.canvas;
-  const zoom = state.zoom || 1;
+  const zoom = state.zoom || { main: 1, inset: 1 };
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, w, h);
 
   if (o.key === 'composed') {
-    const back = cam.feeds.back;
-    const front = cam.feeds.front;
-    if (back) drawCover(ctx, back.el, w, h, back.mirror, zoom);
-    if (front) {
-      const aspectKey = (rec.take && rec.take.frontAspect) || state.frontAspect;
+    const swap = rec.take ? rec.take.swap : state.swap;
+    const bigKey = swap ? 'front' : 'back';
+    const smallKey = swap ? 'back' : 'front';
+    const big = cam.feeds[bigKey];
+    const small = cam.feeds[smallKey];
+
+    if (big) drawCover(ctx, big.el, w, h, big.mirror, zoom.main);
+    if (small && !state.pipOff) {
+      const aspectKey = smallKey === 'back'
+        ? ((rec.take && rec.take.backAspect) || state.backAspect)
+        : ((rec.take && rec.take.frontAspect) || state.frontAspect);
       const g = pipRect(w, h, aspectKey, currentPip());
       const radius = Math.round(Math.min(g.w, g.h) * 0.07);
       ctx.save();
@@ -959,7 +929,16 @@ function drawOutput(o) {
       ctx.clip();
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, g.w, g.h);
-      drawCover(ctx, front.el, g.w, g.h, front.mirror, zoom);
+      if (state.pipPaused) {
+        ctx.fillStyle = 'rgba(8,10,16,.94)';
+        ctx.fillRect(0, 0, g.w, g.h);
+        ctx.fillStyle = 'rgba(255,255,255,.55)';
+        ctx.font = `700 ${Math.round(g.w * 0.1)}px ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('PAUSED', g.w / 2, g.h / 2);
+      } else {
+        drawCover(ctx, small.el, g.w, g.h, small.mirror, zoom.inset);
+      }
       ctx.restore();
       ctx.strokeStyle = 'rgba(255,255,255,.55)';
       ctx.lineWidth = Math.max(2, Math.round(w / 340));
@@ -970,7 +949,7 @@ function drawOutput(o) {
   }
 
   const feed = cam.feeds[o.key];
-  if (feed) drawCover(ctx, feed.el, w, h, feed.mirror, zoom);
+  if (feed) drawCover(ctx, feed.el, w, h, feed.mirror, zoom.main);
 }
 
 function posterFor(output) {
@@ -1018,30 +997,31 @@ async function startRecording() {
     frontAspect: state.frontAspect,
     backAspect: state.backAspect,
     quality: state.quality,
+    swap: state.swap,
   };
   rec.take = take;
 
   const stamp = stampNow();
-  const single = cam.singleFallback || !cam.feeds.back || !cam.feeds.front;
+  const single = !cam.feeds.back || !cam.feeds.front;
   const outs = [];
 
   if (single) {
     const key = cam.active;
-    const o = makeOutput(key, `duelshot_${key}_${stamp}`,
+    const o = makeOutput(key, `dualshot_${key}_${stamp}`,
       key === 'back' ? take.backAspect : take.frontAspect, true);
     if (o) outs.push(o);
   } else if (take.mode === 'DUAL_VIEW') {
-    const o = makeOutput('composed', `duelshot_combined_${stamp}`, take.backAspect, true);
+    const o = makeOutput('composed', `dualshot_combined_${stamp}`, take.backAspect, true);
     if (o) outs.push(o);
   } else if (take.mode === 'SEPARATE') {
-    const b = makeOutput('back', `duelshot_back_${stamp}`, take.backAspect, true);
-    const f = makeOutput('front', `duelshot_front_${stamp}`, take.frontAspect, false);
+    const b = makeOutput('back', `dualshot_back_${stamp}`, take.backAspect, true);
+    const f = makeOutput('front', `dualshot_front_${stamp}`, take.frontAspect, false);
     if (b) outs.push(b);
     if (f) outs.push(f);
   } else {
-    const c = makeOutput('composed', `duelshot_combined_${stamp}`, take.backAspect, true);
-    const b = makeOutput('back', `duelshot_back_${stamp}`, take.backAspect, false);
-    const f = makeOutput('front', `duelshot_front_${stamp}`, take.frontAspect, false);
+    const c = makeOutput('composed', `dualshot_combined_${stamp}`, take.backAspect, true);
+    const b = makeOutput('back', `dualshot_back_${stamp}`, take.backAspect, false);
+    const f = makeOutput('front', `dualshot_front_${stamp}`, take.frontAspect, false);
     [c, b, f].forEach((o) => o && outs.push(o));
   }
 
@@ -1049,7 +1029,7 @@ async function startRecording() {
     const feed = cam.feeds[cam.active] || cam.feeds.back || cam.feeds.front;
     const src = feed && feed.el && feed.el.srcObject;
     if (src instanceof MediaStream) {
-      const o = makeOutput(cam.active, `duelshot_${cam.active}_${stamp}`,
+      const o = makeOutput(cam.active, `dualshot_${cam.active}_${stamp}`,
         cam.active === 'back' ? take.backAspect : take.frontAspect, false, src);
       if (o) outs.push(o);
     }
@@ -1065,6 +1045,9 @@ async function startRecording() {
   rec.active = true;
   rec.starting = false;
   rec.startedAt = Date.now();
+  rec.paused = false;
+  rec.pausedTotal = 0;
+  rec.pausedAt = 0;
 
   let lastDraw = 0;
   const loop = (now) => {
@@ -1078,7 +1061,7 @@ async function startRecording() {
   rec.raf = requestAnimationFrame(loop);
 
   rec.timer = setInterval(() => {
-    if (recDom.timer && rec.active) recDom.timer.textContent = shortTime(Date.now() - rec.startedAt);
+    if (recDom.timer && rec.active) recDom.timer.textContent = hms(takeElapsed());
   }, 250);
 
   recordMessage = `Recording · ${MODES[take.mode].title.toLowerCase()}${single ? ' · single camera' : ''}`;
@@ -1098,7 +1081,10 @@ async function stopRecording() {
   outs.forEach((o) => { try { o.recorder.stop(); } catch (_) { /* already stopped */ } });
   await Promise.all(outs.map((o) => o.done));
 
-  const durationMs = Date.now() - rec.startedAt;
+  const durationMs = takeElapsed();
+  rec.paused = false;
+  rec.pausedTotal = 0;
+  rec.pausedAt = 0;
   const newClips = outs.map((o) => {
     const type = o.recorder.mimeType || o.mime || 'video/webm';
     const ext = type.includes('mp4') ? 'mp4' : 'webm';
@@ -1134,6 +1120,39 @@ async function stopRecording() {
   toast(newClips.length === 1 ? 'Saved to Gallery' : `Saved ${newClips.length} clips`);
 }
 
+/* Paus/återuppta: MediaRecorder skriver vidare i samma fil. */
+function takeElapsed() {
+  if (!rec.startedAt) return 0;
+  const pausedNow = rec.pausedAt ? Date.now() - rec.pausedAt : 0;
+  return Date.now() - rec.startedAt - (rec.pausedTotal || 0) - pausedNow;
+}
+
+function pauseTake() {
+  if (!rec.active || rec.paused) return;
+  rec.paused = true;
+  rec.pausedAt = Date.now();
+  rec.outs.forEach((o) => { try { o.recorder.pause(); } catch (_) { /* unsupported */ } });
+  recordMessage = 'Paused — resume to continue the same file';
+  refreshRecord();
+  toast('Paused');
+}
+
+function resumeTake() {
+  if (!rec.active || !rec.paused) return;
+  rec.pausedTotal = (rec.pausedTotal || 0) + (Date.now() - (rec.pausedAt || Date.now()));
+  rec.pausedAt = 0;
+  rec.paused = false;
+  rec.outs.forEach((o) => { try { o.recorder.resume(); } catch (_) { /* unsupported */ } });
+  recordMessage = 'Recording · ' + MODES[rec.take ? rec.take.mode : state.mode].title.toLowerCase();
+  refreshRecord();
+  toast('Recording');
+}
+
+function applyGrid() {
+  if (recDom.gridLayer) recDom.gridLayer.classList.toggle('on', !!state.grid);
+  if (recDom.gridBtn) recDom.gridBtn.classList.toggle('on', !!state.grid);
+}
+
 function setRecordMessage(msg) {
   recordMessage = msg;
   refreshRecord();
@@ -1147,31 +1166,31 @@ function buildRecordShell() {
   screenEl.innerHTML = `
     <div class="record" id="record-root">
       <div class="rec-top">
-        <button class="icon-btn" id="rec-close" type="button" aria-label="Close">${ICONS.close}</button>
-        <span class="timer"><span class="dot"></span><span id="rec-timer">00:00</span></span>
+        <button class="icon-chip" id="rec-close" type="button" aria-label="Close">${ICONS.close}</button>
+        <span class="timer"><span class="dot"></span><span id="rec-timer">00:00:00</span></span>
+        <button class="icon-chip" id="rec-pause" type="button" aria-label="Pause recording" hidden>${ICONS.pause}</button>
         <span class="spacer"></span>
-        <button class="torch" id="rec-torch" type="button" aria-label="Torch">${ICONS.bolt}</button>
-        <button class="mode-pill" id="rec-mode" type="button" aria-label="Camera setup">
-          <span id="rec-mode-label">Both</span>
-          <span class="caret">${ICONS.chevronDown}</span>
-        </button>
+        <button class="icon-chip" id="rec-grid" type="button" aria-label="Grid">${ICONS.grid}</button>
+        <button class="icon-chip" id="rec-mode" type="button" aria-label="Camera setup">${ICONS.settings}</button>
       </div>
 
       <div class="rec-preview" id="rec-preview">
         <div class="feeds" id="rec-feeds"></div>
+        <div class="rec-grid" id="rec-grid-layer"></div>
       </div>
 
-      <div class="rec-dock">
-        <div class="rec-status" id="rec-status">
-          <span id="rec-line"></span>
-          <span class="formats" id="rec-formats"></span>
-          <span class="saved" id="rec-saved"></span>
-        </div>
-        <div class="rec-controls">
-          <button class="zoom-chip" id="rec-zoom" type="button" aria-label="Zoom">1×</button>
-          <button class="shutter" id="rec-btn" type="button" aria-label="Record"><i></i></button>
-          <button class="dock-btn" id="rec-flip" type="button" aria-label="Switch camera">${ICONS.flipCam}</button>
-        </div>
+      <div class="rec-status" id="rec-status">
+        <span id="rec-line"></span>
+        <span class="formats" id="rec-formats"></span>
+        <span class="saved" id="rec-saved"></span>
+      </div>
+
+      <div class="rec-controls">
+        <button class="zoom-chip" id="rec-zoom" type="button" aria-label="Zoom">1×</button>
+        <button class="shutter" id="rec-btn" type="button" aria-label="Record"><i></i></button>
+        <button class="dock-btn" id="rec-flip" type="button" aria-label="Switch camera">${ICONS.flipCam}</button>
+        <button class="dock-btn" id="rec-swap" type="button" aria-label="Swap large and small camera">${ICONS.swap}</button>
+        <button class="dock-btn" id="rec-pip" type="button" aria-label="Hide small camera">${ICONS.pip}</button>
       </div>
     </div>`;
 
@@ -1183,66 +1202,91 @@ function buildRecordShell() {
   recDom.formats = $('#rec-formats');
   recDom.saved = $('#rec-saved');
   recDom.timer = $('#rec-timer');
+  recDom.pauseBtn = $('#rec-pause');
+  recDom.gridBtn = $('#rec-grid');
+  recDom.gridLayer = $('#rec-grid-layer');
+  recDom.pauseBtn.addEventListener('click', () => (rec.paused ? resumeTake() : pauseTake()));
+  recDom.gridBtn.addEventListener('click', () => {
+    state.grid = !state.grid;
+    applyGrid();
+    toast(state.grid ? 'Grid on' : 'Grid off');
+  });
   recDom.btn = $('#rec-btn');
-  recDom.label = $('#rec-mode-label');
   recDom.flip = $('#rec-flip');
+  recDom.swap = $('#rec-swap');
   recDom.zoom = $('#rec-zoom');
+  recDom.pipBtn = $('#rec-pip');
+  recDom.pipBtn.addEventListener('click', () => {
+    state.pipOff = !state.pipOff;
+    if (!state.pipOff) state.pipPaused = false;
+    mountFeeds();
+    refreshRecord();
+    toast(state.pipOff ? 'Small camera off — main camera only' : 'Small camera on');
+  });
 
   $('#rec-close').addEventListener('click', async () => {
     if (rec.active) await stopRecording();
     closeRecord();
   });
   recDom.flip.addEventListener('click', switchCamera);
+  recDom.swap.addEventListener('click', () => {
+    state.swap = !state.swap;
+    savePrefs();
+    mountFeeds();
+    toast(state.swap ? 'Front camera large' : 'Back camera large');
+  });
   $('#rec-mode').addEventListener('click', mountCameraSheet);
   recDom.btn.addEventListener('click', () => {
     if (rec.active) stopRecording();
     else startRecording();
   });
   recDom.zoom.addEventListener('click', () => {
-    state.zoom = state.zoom === 1 ? 2 : state.zoom === 2 ? 3 : 1;
+    state.zoom.main = state.zoom.main >= ZOOM_MAX - 0.5
+      ? ZOOM_MIN
+      : Math.min(ZOOM_MAX, state.zoom.main + 1);
     applyZoom();
-    toast(`Zoom ${state.zoom}×`);
+    toast(`Zoom ${fmtZoom(state.zoom.main)}`);
   });
-  $('#rec-torch').addEventListener('click', toggleTorch);
 
   attachPreviewGestures();
   applyZoom();
 }
 
-let torchOn = false;
-
-async function toggleTorch() {
-  const btn = $('#rec-torch');
-  const feed = cam.feeds[cam.active] || cam.feeds.back || cam.feeds.front;
-  const stream = feed && feed.el && feed.el.srcObject;
-  const track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
-
-  torchOn = !torchOn;
-  if (btn) btn.classList.toggle('on', torchOn);
-
-  let supported = false;
-  try {
-    const caps = track && track.getCapabilities ? track.getCapabilities() : null;
-    supported = !!(caps && caps.torch);
-    if (supported) await track.applyConstraints({ advanced: [{ torch: torchOn }] });
-  } catch (_) { supported = false; }
-
-  if (supported) toast(torchOn ? 'Torch on' : 'Torch off');
-  else if (cam.demo) toast('Simulated feed — no torch');
-  else toast('This camera has no torch');
+function setZoomTag(el, value) {
+  const tag = el && el.querySelector('.zoom-tag');
+  if (!tag) return;
+  const on = value > 1.01;
+  tag.textContent = on ? fmtZoom(value) : '';
+  tag.classList.toggle('on', on);
 }
 
+/* Zoom per ruta: stora kameran ('main') och lilla rutan ('inset'). */
 function applyZoom() {
-  if (recDom.feeds) recDom.feeds.style.setProperty('--zoom', state.zoom);
+  const z = state.zoom;
+  if (recDom.feeds) {
+    $$('.tile', recDom.feeds).forEach((tile) => {
+      tile.style.setProperty('--zoom', z.main);
+      setZoomTag(tile, z.main);
+    });
+  }
+  if (recDom.pip) {
+    recDom.pip.style.setProperty('--zoom', z.inset);
+    setZoomTag(recDom.pip, z.inset);
+  }
   if (recDom.zoom) {
-    recDom.zoom.textContent = `${state.zoom}×`;
-    recDom.zoom.classList.toggle('active', state.zoom > 1);
+    recDom.zoom.textContent = fmtZoom(z.main);
+    recDom.zoom.classList.toggle('active', z.main > 1.01);
   }
 }
 
 function makeTile(label) {
   const tile = document.createElement('div');
   tile.className = 'tile';
+  tile.style.setProperty('--zoom', state.zoom.main);
+  const tag = document.createElement('span');
+  tag.className = 'zoom-tag';
+  tile.appendChild(tag);
+  setZoomTag(tile, state.zoom.main);
   if (label) {
     const badge = document.createElement('span');
     badge.className = 'badge';
@@ -1259,11 +1303,50 @@ function placeholder(text) {
   return d;
 }
 
+/* Pausa eller stäng av lilla kameran medan den stora spelar in. */
+function buildPipControls() {
+  const wrap = document.createElement('div');
+  wrap.className = 'pip-controls';
+
+  const pause = document.createElement('button');
+  pause.type = 'button';
+  pause.className = 'pip-ctl';
+  pause.setAttribute('aria-label', state.pipPaused ? 'Resume small camera' : 'Pause small camera');
+  pause.innerHTML = state.pipPaused ? ICONS.play : ICONS.pause;
+  pause.addEventListener('pointerdown', (e) => e.stopPropagation());
+  pause.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.pipPaused = !state.pipPaused;
+    mountFeeds();
+    refreshRecord();
+    toast(state.pipPaused ? 'Small camera paused' : 'Small camera running');
+  });
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'pip-ctl';
+  close.setAttribute('aria-label', 'Turn off small camera');
+  close.innerHTML = ICONS.close;
+  close.addEventListener('pointerdown', (e) => e.stopPropagation());
+  close.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.pipOff = true;
+    state.pipPaused = false;
+    mountFeeds();
+    refreshRecord();
+    toast('Small camera off — main camera only');
+  });
+
+  wrap.append(pause, close);
+  return wrap;
+}
+
 function mountFeeds() {
   const stage = recDom.feeds;
   if (!stage) return;
   stage.innerHTML = '';
   recDom.pip = null;
+  recDom.pipAspect = null;
   recDom.hint = null;
   mountedKey = layoutKey();
 
@@ -1275,7 +1358,7 @@ function mountFeeds() {
   }
 
   const hasBoth = !!(cam.feeds.back && cam.feeds.front);
-  const single = cam.singleFallback || !hasBoth;
+  const single = !hasBoth;
   const take = activeTake();
 
   if (single) {
@@ -1294,27 +1377,51 @@ function mountFeeds() {
   }
 
   if (take.mode === 'DUAL_VIEW') {
-    const tile = makeTile(null);
+    const bigKey = state.swap ? 'front' : 'back';
+    const smallKey = state.swap ? 'back' : 'front';
+    const big = cam.feeds[bigKey];
+    const small = cam.feeds[smallKey];
+
+    const tile = makeTile(bigKey.toUpperCase());
     stage.appendChild(tile);
-    const back = cam.feeds.back;
-    const front = cam.feeds.front;
-    if (back) {
-      if (back.mirror) tile.classList.add('mirror');
-      tile.appendChild(back.el);
+    if (big) {
+      if (big.mirror) tile.classList.add('mirror');
+      tile.appendChild(big.el);
     }
-    if (front) {
+
+    if (small && !state.pipOff) {
       const pip = document.createElement('div');
-      pip.className = 'pip' + (front.mirror ? ' mirror' : '');
-      const a = ASPECTS[take.frontAspect];
+      pip.className = 'pip' + (small.mirror ? ' mirror' : '') + (state.pipPaused ? ' paused' : '');
+      const a = ASPECTS[smallKey === 'back' ? take.backAspect : take.frontAspect];
       pip.style.setProperty('--pip-ratio', `${a.w} / ${a.h}`);
-      pip.appendChild(front.el);
+      pip.appendChild(small.el);
+
+      const pipTag = document.createElement('span');
+      pipTag.className = 'zoom-tag';
+      pip.appendChild(pipTag);
+
+      const handle = document.createElement('div');
+      handle.className = 'pip-resize';
+      handle.setAttribute('aria-hidden', 'true');
+      pip.appendChild(handle);
+      pip.appendChild(buildPipControls());
+      if (state.pipPaused) {
+        const note = document.createElement('span');
+        note.className = 'pip-paused';
+        note.textContent = 'Paused';
+        pip.appendChild(note);
+      }
+
       tile.appendChild(pip);
       recDom.pip = pip;
+      recDom.pipAspect = smallKey === 'back' ? take.backAspect : take.frontAspect;
       applyPipStyle();
+      wirePipResize(handle);
+      applyZoom();
 
       const hint = document.createElement('div');
       hint.className = 'pip-hint';
-      hint.textContent = 'Drag to move · pinch to resize';
+      hint.textContent = 'Drag to move · pinch to zoom · corner to resize';
       tile.appendChild(hint);
       recDom.hint = hint;
       hidePipHint(6000);
@@ -1360,7 +1467,7 @@ function activeTake() {
 
 function layoutKey() {
   const t = activeTake();
-  return [cam.ready, cam.singleFallback, cam.active, t.mode, t.frontAspect, t.backAspect, state.stack].join('|');
+  return [cam.ready, cam.singleFallback, cam.active, t.mode, t.frontAspect, t.backAspect, state.stack, state.swap].join('|');
 }
 
 function unmountFeeds() {
@@ -1371,7 +1478,7 @@ function recordStatusText() {
   if (recordMessage) return recordMessage;
   if (!cam.ready) return 'Starting cameras…';
   if (cam.demo) return 'Demo feed — camera unavailable here';
-  if (cam.singleFallback) return `Single camera · ${cam.active}`;
+  if (!cam.feeds.back || !cam.feeds.front) return `Single camera · ${cam.active}`;
   return `${MODES[activeTake().mode].title} · front + back`;
 }
 
@@ -1379,11 +1486,12 @@ function formatSummary() {
   const t = activeTake();
   const quality = QUALITIES[t.quality].label;
   const audio = state.audio ? 'audio' : 'muted';
-  if (cam.singleFallback) {
+  if (!cam.feeds.back || !cam.feeds.front) {
     const short = ASPECTS[cam.active === 'back' ? t.backAspect : t.frontAspect].short;
     return `${cam.active === 'back' ? 'Back' : 'Front'} ${short} · ${quality} · ${audio}`;
   }
-  return `Front ${ASPECTS[t.frontAspect].short} · Back ${ASPECTS[t.backAspect].short} · ${quality} · ${audio}`;
+  const pipState = state.pipOff ? ' · small off' : state.pipPaused ? ' · small paused' : '';
+  return `Front ${ASPECTS[t.frontAspect].short} · Back ${ASPECTS[t.backAspect].short} · ${quality} · ${audio}${pipState}`;
 }
 
 function refreshRecord() {
@@ -1394,13 +1502,31 @@ function refreshRecord() {
   if (recDom.label) recDom.label.textContent = MODES[activeTake().mode].title;
   if (recDom.preview) recDom.preview.classList.toggle('recording', rec.active);
   if (recDom.root) recDom.root.classList.toggle('recording', rec.active);
+  const dual = !!(cam.feeds.back && cam.feeds.front);
+  if (recDom.swap) {
+    recDom.swap.hidden = !dual;
+    recDom.swap.classList.toggle('swapped', state.swap);
+  }
+  if (recDom.flip) recDom.flip.hidden = dual;
+  if (recDom.pipBtn) {
+    recDom.pipBtn.hidden = !dual;
+    recDom.pipBtn.classList.toggle('off', state.pipOff);
+    recDom.pipBtn.setAttribute('aria-label', state.pipOff ? 'Show small camera' : 'Hide small camera');
+  }
   if (recDom.btn) {
     recDom.btn.classList.toggle('on', rec.active);
     recDom.btn.disabled = !cam.ready;
   }
   if (recDom.timer) {
-    recDom.timer.textContent = rec.active ? shortTime(Date.now() - rec.startedAt) : '00:00';
+    recDom.timer.textContent = rec.active ? hms(takeElapsed()) : '00:00:00';
   }
+  if (recDom.pauseBtn) {
+    recDom.pauseBtn.hidden = !rec.active;
+    recDom.pauseBtn.classList.toggle('on', !!rec.paused);
+    recDom.pauseBtn.innerHTML = rec.paused ? ICONS.play : ICONS.pause;
+    recDom.pauseBtn.setAttribute('aria-label', rec.paused ? 'Resume recording' : 'Pause recording');
+  }
+  applyGrid();
   if (recDom.line) recDom.line.textContent = recordStatusText();
   if (recDom.formats) recDom.formats.textContent = formatSummary();
   if (recDom.saved) {
@@ -1419,6 +1545,8 @@ function openRecord() {
   buildRecordShell();
   mountFeeds();
   refreshRecord();
+
+  renderNav();
 
   if (!cam.started) startCameras();
 }
@@ -1444,7 +1572,7 @@ function cameraSheetHTML() {
     <div class="grabber"></div>
     <div class="sheet-title">Camera setup</div>
     <p class="sheet-sub">Frame each camera the way you want it. Both formats are used for the take.</p>
-    ${locked ? '<div class="sheet-note">Recording — new formats start with the next take</div>' : ''}
+    ${locked ? '<div class="sheet-note">One take = one file · changes apply to the next take</div>' : ''}
 
     <div class="section-title">Mode</div>
     <div class="option-list">
@@ -1493,11 +1621,11 @@ function wireCameraSheet() {
   wireSheet();
 
   $$('[data-recmode]', modalRoot).forEach((b) => b.addEventListener('click', () => {
-    if (rec.active) { toast('Mode is locked while recording'); return; }
     state.mode = b.dataset.recmode;
     savePrefs();
     mountCameraSheet();
-    refreshRecord();
+    if (rec.active) toast('Mode applies to the next take');
+    else refreshRecord();
   }));
 
   const pick = (which, key) => {
@@ -1537,243 +1665,222 @@ function wireCameraSheet() {
    ===================================================================== */
 
 function render() {
-  if (state.record) return;
+  if (state.record) { renderNav(); return; }
   document.body.dataset.screen = 'page';
+  if (!state.onboarded) { renderOnboarding(); renderNav(); return; }
   if (state.page === 'SETTINGS') renderSettings();
   else if (state.page === 'GALLERY') renderGallery();
   else renderHome();
+  renderNav();
 }
 
+/* Bottom navigation from DualShotsApp.BottomBar(). */
+function renderNav() {
+  const nav = $('#nav');
+  if (!nav) return;
+  nav.hidden = state.record || !state.onboarded;
+  const tabs = [
+    ['HOME', 'Home', ICONS.home],
+    ['GALLERY', 'Gallery', ICONS.gallery],
+    ['SETTINGS', 'Settings', ICONS.settings],
+  ];
+  nav.innerHTML = tabs.map(([key, label, icon]) => `
+    <button class="tab ${state.page === key ? 'active' : ''}" data-tab="${key}" type="button">
+      <span class="tab-icon">${icon}</span>
+      <span class="tab-label">${label}</span>
+    </button>`).join('');
+  $$('[data-tab]', nav).forEach((b) => b.addEventListener('click', () => go(b.dataset.tab)));
+}
+
+/* HomeScreen.kt: logo tile, wordmark, tagline, then the four menu rows. */
 function renderHome() {
-  const clipCount = state.clips.length;
   screenEl.innerHTML = `
-    <div class="menu">
-      <div class="menu-top">
-        <span class="menu-brand">
-          <span class="stage-dot"></span>DuelShots<span class="brand-slash">/</span><span class="brand-dim">Web</span>
-        </span>
-        <button class="icon-btn" id="home-settings" type="button" aria-label="Settings">${ICONS.gear}</button>
-      </div>
+    <div class="home">
+      ${logoTile()}
+      <h1 class="wordmark">Dual<span>Shots</span></h1>
+      <p class="tagline">RECORD BOTH SIDES. AT ONCE.</p>
 
-      <div class="lockup">
-        <div class="lockup-mark">${logoMark(100)}</div>
-        <h1 class="wordmark">Duel<span>Shots</span></h1>
-        <p class="tagline">Record both sides. At once.</p>
-      </div>
-
-      <button class="btn-primary" id="start-btn" type="button">
-        ${ICONS.camera}
-        <span class="grow">Start Recording</span>
-        <span class="chev">${ICONS.chevronRight}</span>
-      </button>
-      <p class="cta-meta">${MODES[state.mode].title} · ${outputCount()} file${outputCount() === 1 ? '' : 's'} · ${QUALITIES[state.quality].label}</p>
-
-      <div class="menu-list">
-        <button class="menu-row" data-go="GALLERY" type="button">
-          <span class="menu-ico">${ICONS.gallery}</span>
-          <span class="label">Gallery</span>
-          <span class="meta">${clipCount} clip${clipCount === 1 ? '' : 's'}</span>
-          <span class="chev">${ICONS.chevronRight}</span>
+      <div class="menu-stack">
+        <button class="btn-start" id="start-btn" type="button">
+          <span class="start-ico">${ICONS.video}</span>
+          <span class="start-label">START RECORDING</span>
+          <span class="start-chev">${ICONS.chevron}</span>
         </button>
-        <button class="menu-row" data-go="SETTINGS" type="button">
-          <span class="menu-ico">${ICONS.gear}</span>
-          <span class="label">Settings</span>
-          <span class="meta">${ASPECTS[state.frontAspect].short} + ${ASPECTS[state.backAspect].short}</span>
-          <span class="chev">${ICONS.chevronRight}</span>
+
+        <button class="menu-btn" id="home-settings" type="button">
+          <span class="menu-ico">${ICONS.settings}</span>
+          <span class="menu-label">Settings</span>
+          <span class="menu-chev">${ICONS.chevron}</span>
         </button>
-        <button class="menu-row gold" id="menu-premium" type="button">
+
+        <button class="menu-btn premium" id="menu-premium" type="button">
           <span class="menu-ico">${ICONS.crown}</span>
-          <span class="label">${state.premium ? 'Premium active' : 'Premium'}</span>
-          ${state.premium ? '<span class="meta">Active</span>' : '<span class="pro-tag">Pro</span>'}
-          <span class="chev">${ICONS.chevronRight}</span>
+          <span class="menu-label">${state.premium ? 'Premium active' : 'Premium Features'}</span>
+          <span class="menu-chev">${ICONS.chevron}</span>
         </button>
-        <button class="menu-row" id="menu-about" type="button">
+
+        <button class="menu-btn" id="menu-about" type="button">
           <span class="menu-ico">${ICONS.info}</span>
-          <span class="label">About</span>
-          <span class="meta">v3.2</span>
-          <span class="chev">${ICONS.chevronRight}</span>
+          <span class="menu-label">About</span>
+          <span class="menu-chev">${ICONS.chevron}</span>
         </button>
       </div>
 
-      <div class="menu-foot">
-        <span>Build 3.2</span>
-        <i class="foot-line"></i>
-        <span>On this device</span>
+      <div class="made-by">
+        <span class="credit-name">Made by nRnWorld</span>
+        <a class="credit-link" href="https://nrnworld.one" target="_blank" rel="noopener noreferrer">nrnworld.one</a>
+        <span class="credit-mail">
+          <a href="mailto:bynrnworld@gmail.com">bynrnworld@gmail.com</a>
+          <button class="copy-mail" id="copy-mail" type="button" aria-label="Copy email address">${ICONS.copy}</button>
+        </span>
       </div>
     </div>`;
 
   $('#start-btn').addEventListener('click', openRecord);
   $('#home-settings').addEventListener('click', () => go('SETTINGS'));
-  $('#menu-premium').addEventListener('click', () => showPro());
+  $('#menu-premium').addEventListener('click', () => showPremium());
   $('#menu-about').addEventListener('click', showAbout);
-  $$('[data-go]', screenEl).forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
+
+  const copyMail = $('#copy-mail');
+  if (copyMail) {
+    copyMail.addEventListener('click', async () => {
+      const ok = await copyText('bynrnworld@gmail.com');
+      toast(ok ? 'Email copied' : 'bynrnworld@gmail.com');
+    });
+  }
 }
 
-function outputCount() {
-  if (state.mode === 'DUAL_VIEW') return 1;
-  return state.mode === 'SEPARATE' ? 2 : 3;
-}
-
-function backHead(title) {
-  return `
-    <div class="page-head">
-      <button class="icon-btn" data-back type="button" aria-label="Back">${ICONS.chevronLeft}</button>
-      <span class="page-title">${title}</span>
-    </div>`;
-}
-
+/* SettingsScreen.kt: mode radios, per-camera aspect chips, inline
+   segmented quality/codec and the premium card. */
 function renderSettings() {
   screenEl.innerHTML = `
-    <div class="page enter">
-      ${backHead('Settings')}
-
-      <div class="section-title">Camera Settings</div>
-      <div class="group">
-        <button class="row" data-front-row type="button">
-          <span class="row-ico">${ICONS.camera}</span>
-          <span class="label">Front Camera Format</span>
-          <span class="val">${ASPECTS[state.frontAspect].short}</span>
-          <span class="chev">${ICONS.chevronRight}</span>
-        </button>
-        <button class="row" data-back-row type="button">
-          <span class="row-ico">${ICONS.camera}</span>
-          <span class="label">Back Camera Format</span>
-          <span class="val">${ASPECTS[state.backAspect].short}</span>
-          <span class="chev">${ICONS.chevronRight}</span>
-        </button>
+    <div class="page settings">
+      <div class="studio-head">
+        <span class="studio-ico">${ICONS.settings}</span>
+        <span class="studio-title">SETTINGS STUDIO</span>
       </div>
 
-      <div class="section-title">Recording Options</div>
-      <div class="group">
-        <button class="row" data-mode-row type="button">
-          <span class="row-ico">${ICONS.film}</span>
-          <span class="label">Save as</span>
-          <span class="val">${MODES[state.mode].title}</span>
-          <span class="chev">${ICONS.chevronRight}</span>
-        </button>
-        <div class="row">
-          <span class="row-ico">${ICONS.mic}</span>
-          <span class="label">Enable Audio</span>
-          <button class="switch" id="audio-switch" type="button" role="switch"
-                  aria-checked="${state.audio}" aria-label="Enable audio"></button>
+      <div class="section-label">RECORDING MODE</div>
+      <div class="card-stack">
+        ${MODE_ORDER.map((m) => `
+          <button class="card radio-row ${state.mode === m ? 'selected' : ''}" data-mode="${m}" type="button">
+            <span class="radio-text">
+              <span class="radio-title">${MODES[m].title}</span>
+              <span class="radio-sub">${MODES[m].sub}</span>
+            </span>
+            <span class="radio-dot"></span>
+          </button>`).join('')}
+      </div>
+
+      <div class="section-label">CAMERA FORMATS</div>
+      <div class="card-stack">
+        <div class="card">
+          <div class="card-title">Front Camera</div>
+          <div class="chips">
+            ${ASPECT_ORDER.map((k) => `
+              <button class="chip ${state.frontAspect === k ? 'active' : ''}" data-front="${k}" type="button">${ASPECTS[k].label}</button>`).join('')}
+          </div>
         </div>
-        <div class="row">
-          <span class="row-ico">${ICONS.folder}</span>
-          <span class="label">Save Location</span>
-          <span class="val">Phone Storage</span>
+        <div class="card">
+          <div class="card-title">Back Camera</div>
+          <div class="chips">
+            ${ASPECT_ORDER.map((k) => `
+              <button class="chip ${state.backAspect === k ? 'active' : ''}" data-back="${k}" type="button">${ASPECTS[k].label}</button>`).join('')}
+          </div>
         </div>
       </div>
 
-      <div class="section-title">Video</div>
-      <div class="group">
-        <button class="row" data-quality-row type="button">
-          <span class="row-ico">${ICONS.aperture}</span>
-          <span class="label">Resolution</span>
-          <span class="val">${QUALITIES[state.quality].label}</span>
-          <span class="chev">${ICONS.chevronRight}</span>
-        </button>
-        <button class="row" data-codec-row type="button">
-          <span class="row-ico">${ICONS.layers}</span>
-          <span class="label">Container</span>
-          <span class="val">${CODECS[state.codec].label}</span>
-          <span class="chev">${ICONS.chevronRight}</span>
-        </button>
+      <div class="section-label">VIDEO QUALITY</div>
+      <div class="card row-between">
+        <span class="row-label">Resolution</span>
+        <div class="seg">
+          ${QUALITY_ORDER.map((k) => `
+            <button class="seg-btn ${state.quality === k ? 'active' : ''}" data-quality="${k}" type="button">${QUALITIES[k].label}</button>`).join('')}
+        </div>
       </div>
 
-      <div class="premium-card">
-        <div class="premium-head">${ICONS.crown}Premium Features</div>
+      <div class="section-label">CONTAINER / CODEC</div>
+      <div class="card row-between">
+        <span class="row-label">Format</span>
+        <div class="seg">
+          ${CODEC_ORDER.map((k) => `
+            <button class="seg-btn ${state.codec === k ? 'active' : ''}" data-codec="${k}" type="button">${CODECS[k].label}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="card premium-card">
+        <div class="premium-head">${ICONS.crown}<span>PREMIUM FEATURES</span></div>
         <div class="premium-list">
-          ${proFeatures().map((f) => `<div class="premium-item">${ICONS.check}<span>${f}</span></div>`).join('')}
+          ${['More format options (4K, HEVC)', '60fps & custom bitrate', 'Per-camera aspect control', 'No watermark']
+            .map((f) => `<div class="premium-item">${ICONS.check}<span>${f}</span></div>`).join('')}
         </div>
         ${state.premium
-      ? `<div class="premium-active">${ICONS.check}<span>Premium is active</span></div>`
-      : `<button class="btn-primary" id="settings-premium" type="button" style="margin-top:16px">
-             ${ICONS.crown}<span class="grow">Go Premium</span>
-           </button>`}
+          ? '<div class="premium-active">Premium active</div>'
+          : `<button class="gold-btn" id="settings-premium" type="button">${ICONS.crown}<span>GO PREMIUM</span></button>`}
       </div>
     </div>`;
 
-  $('[data-back]').addEventListener('click', () => go('HOME'));
-  $('[data-front-row]').addEventListener('click', () => showFormatSheet('front'));
-  $('[data-back-row]').addEventListener('click', () => showFormatSheet('back'));
-  $('[data-mode-row]').addEventListener('click', showModeSheet);
-
-  $('#audio-switch').addEventListener('click', (e) => {
-    state.audio = !state.audio;
-    e.currentTarget.setAttribute('aria-checked', String(state.audio));
+  $$('[data-mode]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    state.mode = b.dataset.mode;
     savePrefs();
-    toast(state.audio ? 'Audio on' : 'Audio off');
-  });
+    renderSettings();
+  }));
 
-  $('[data-quality-row]').addEventListener('click', () => {
-    showOptionSheet({
-      title: 'Resolution',
-      sub: '4K needs Premium.',
-      activeKey: state.quality,
-      items: QUALITY_ORDER.map((k) => ({
-        key: k,
-        label: QUALITIES[k].label,
-        desc: QUALITIES[k].premium ? 'Premium' : '',
-      })),
-      onPick: (key) => {
-        if (QUALITIES[key].premium && !state.premium) { closeSheet(); showPro({ kind: 'quality', key }); return; }
-        state.quality = key;
-        savePrefs();
-        closeSheet();
-        renderSettings();
-      },
-    });
-  });
+  $$('[data-front]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    state.frontAspect = b.dataset.front;
+    savePrefs();
+    renderSettings();
+  }));
 
-  $('[data-codec-row]').addEventListener('click', () => {
-    showOptionSheet({
-      title: 'Container',
-      sub: 'HEVC needs Premium.',
-      activeKey: state.codec,
-      items: CODEC_ORDER.map((k) => ({
-        key: k,
-        label: CODECS[k].label,
-        desc: CODECS[k].premium ? 'Premium' : '',
-      })),
-      onPick: (key) => {
-        if (CODECS[key].premium && !state.premium) { closeSheet(); showPro({ kind: 'codec', key }); return; }
-        state.codec = key;
-        savePrefs();
-        closeSheet();
-        renderSettings();
-      },
-    });
-  });
+  $$('[data-back]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    state.backAspect = b.dataset.back;
+    savePrefs();
+    renderSettings();
+  }));
+
+  $$('[data-quality]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    const key = b.dataset.quality;
+    if (QUALITIES[key].premium && !state.premium) {
+      showPremium({ kind: 'quality', key, label: QUALITIES[key].label });
+      return;
+    }
+    state.quality = key;
+    savePrefs();
+    renderSettings();
+  }));
+
+  $$('[data-codec]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    const key = b.dataset.codec;
+    if (CODECS[key].premium && !state.premium) {
+      showPremium({ kind: 'codec', key, label: CODECS[key].label });
+      return;
+    }
+    state.codec = key;
+    savePrefs();
+    renderSettings();
+  }));
 
   const premiumBtn = $('#settings-premium');
-  if (premiumBtn) premiumBtn.addEventListener('click', () => showPro());
+  if (premiumBtn) premiumBtn.addEventListener('click', () => showPremium());
 }
 
+/* GalleryScreen.kt: large title, clip rows with the gradient play tile. */
 function renderGallery() {
   screenEl.innerHTML = `
-    <div class="page enter">
-      ${backHead('Gallery')}
-      <p class="sub">
-        ${state.clips.length
-      ? `${state.clips.length} clip${state.clips.length === 1 ? '' : 's'} this session · Movies/DuelShots`
-      : 'Recordings are saved to Movies/DuelShots'}
-      </p>
+    <div class="page gallery">
+      <header class="screen-header">
+        <h1>Gallery</h1>
+        <p>Saved to Movies/DualShots</p>
+      </header>
 
-      ${state.clips.length ? `<div class="gallery-grid">${state.clips.map(clipCardHTML).join('')}</div>
-        <p class="gallery-hint">Tap a clip to play, download or delete.<br>Files are held in this tab until you reload.</p>` : `
-        <div class="empty">
-          <div class="empty-ico">${ICONS.camera}</div>
-          <h3>No recordings yet</h3>
-          <p>Your first take lands here — composed, separate, or both.</p>
-          <button class="btn-primary" id="empty-start" type="button">
-            ${ICONS.camera}<span class="grow">Start recording</span><span class="chev">${ICONS.chevronRight}</span>
-          </button>
-        </div>`}
+      ${state.clips.length
+        ? `<div class="clip-list">${state.clips.map(clipCardHTML).join('')}</div>`
+        : `<div class="empty">
+             <span class="empty-ico">${ICONS.gallery}</span>
+             <span class="empty-title">No recordings yet</span>
+             <span class="empty-sub">Start a recording from Home</span>
+           </div>`}
     </div>`;
-
-  $('[data-back]').addEventListener('click', () => go('HOME'));
-  const empty = $('#empty-start');
-  if (empty) empty.addEventListener('click', openRecord);
 
   $$('.clip', screenEl).forEach((el) => el.addEventListener('click', () => {
     const clip = state.clips.find((c) => c.id === el.dataset.clip);
@@ -1781,42 +1888,152 @@ function renderGallery() {
   }));
 }
 
+function clipMetaLine(c) {
+  const when = c.when instanceof Date && !Number.isNaN(c.when.getTime())
+    ? c.when.toLocaleString(undefined, {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
+    : '';
+  return `${c.sizeMb} MB${when ? ` · ${when}` : ''}`;
+}
+
 function clipCardHTML(c) {
   return `
     <button class="clip" data-clip="${c.id}" type="button">
-      <div class="thumb" style="${c.poster ? `background-image:url(${c.poster})` : ''}">
-        <span class="play">${ICONS.play}</span>
-        <span class="dur">${c.duration.replace(/^00:/, '')}</span>
-      </div>
-      <div class="clip-body">
-        <div class="clip-name">${esc(c.name)}</div>
-        <div class="clip-meta">${c.sizeMb} MB · ${MODES[c.mode] ? MODES[c.mode].title : 'Clip'}</div>
-      </div>
-      <span class="clip-arrow">${ICONS.chevronRight}</span>
+      <span class="clip-tile">${c.poster ? `<img src="${c.poster}" alt="" />` : ICONS.play}</span>
+      <span class="clip-body">
+        <span class="clip-name">${esc(c.name)}</span>
+        <span class="clip-meta">${esc(clipMetaLine(c))}</span>
+      </span>
+      <span class="clip-chev">${ICONS.chevron}</span>
     </button>`;
 }
 
+/* GalleryScreen.kt: spelare i dialog med Share / Delete / Close. */
 function playClip(clip) {
-  openSheet(`
-    <div class="grabber"></div>
-    <div class="player">
-      <video src="${clip.url}" controls autoplay playsinline></video>
-      <div class="player-meta">${esc(clip.name)}<br>${clip.sizeMb} MB · ${clip.duration} · ${esc(clip.mime)}</div>
-      <div class="player-actions">
-        <a class="btn-primary" href="${clip.url}" download="${esc(clip.name)}">${ICONS.download} Download</a>
-        <button class="btn-secondary btn-danger" data-delete type="button">Delete</button>
-        <button class="btn-secondary" data-close type="button">Close</button>
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog clip-dialog">
+        <div class="clip-dialog-name">${esc(clip.name)}</div>
+        <video class="clip-video" src="${clip.url}" controls autoplay playsinline></video>
+        <div class="clip-dialog-meta">${esc(clipMetaLine(clip))} · ${esc(clip.duration || '')}</div>
+        <div class="pill-row">
+          <button class="pill" data-share type="button">${ICONS.share}<span>Share</span></button>
+          <button class="pill danger" data-delete type="button">${ICONS.trash}<span>Delete</span></button>
+          <button class="pill" data-close type="button">${ICONS.close}<span>Close</span></button>
+        </div>
       </div>
-    </div>`, () => {
-    const del = $('[data-delete]', modalRoot);
-    if (del) del.addEventListener('click', () => {
-      URL.revokeObjectURL(clip.url);
-      state.clips = state.clips.filter((c) => c.id !== clip.id);
-      closeSheet();
-      toast('Clip deleted');
-      if (state.page === 'GALLERY') renderGallery();
-    });
+    </div>`;
+
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  wireSheet();
+  $('[data-share]', modalRoot).addEventListener('click', () => shareClip(clip));
+  $('[data-delete]', modalRoot).addEventListener('click', () => confirmDeleteClip(clip));
+}
+
+/* Samma bekräftelsedialog som GalleryScreen.kt. */
+function confirmDeleteClip(clip) {
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog confirm-dialog">
+        <div class="confirm-title">Delete clip?</div>
+        <p class="confirm-text">${esc(clip.name)} is removed from Movies/DualShots.</p>
+        <div class="confirm-actions">
+          <button class="confirm-delete" data-confirm type="button">Delete</button>
+          <button class="confirm-cancel" data-close type="button">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  wireSheet();
+  $('[data-confirm]', modalRoot).addEventListener('click', () => {
+    URL.revokeObjectURL(clip.url);
+    state.clips = state.clips.filter((c) => c.id !== clip.id);
+    closeSheet();
+    toast('Clip deleted');
+    if (state.page === 'GALLERY') renderGallery();
   });
+}
+
+/* Delar filen via systemets delningsark; nedladdning om det inte stöds. */
+async function shareClip(clip) {
+  try {
+    if (navigator.share) {
+      const blob = await (await fetch(clip.url)).blob();
+      const file = new File([blob], clip.name, { type: clip.mime || blob.type || 'video/webm' });
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: clip.name });
+        return;
+      }
+    }
+  } catch (_) { /* avbruten eller ostödd – faller tillbaka */ }
+
+  const a = document.createElement('a');
+  a.href = clip.url;
+  a.download = clip.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('Downloaded ' + clip.name);
+}
+
+/* OnboardingScreen.kt: tre steg, logotyp, prickar och gradient-CTA. */
+const ONBOARD_STEPS = [
+  {
+    icon: 'camera',
+    title: 'Two cameras, one take',
+    body: 'Record the front and back camera at the same time – one composed video, two files, or both.',
+  },
+  {
+    icon: 'pip',
+    title: 'Make the shot yours',
+    body: 'Drag, resize, pause or hide the small camera while you film. Pinch to zoom either camera.',
+  },
+  {
+    icon: 'gallery',
+    title: 'Ready to share',
+    body: 'Clips land in Movies/DualShots. Preview, share or delete them without leaving the app.',
+  },
+];
+
+function renderOnboarding() {
+  const step = ONBOARD_STEPS[state.onboardStep || 0];
+  const last = (state.onboardStep || 0) === ONBOARD_STEPS.length - 1;
+
+  screenEl.innerHTML = `
+    <div class="onboarding">
+      <div class="onb-top">
+        <div class="onb-tile">${ICONS[step.icon]}</div>
+        <h1 class="onb-title">${step.title}</h1>
+        <p class="onb-body">${step.body}</p>
+      </div>
+      <div class="onb-foot">
+        <div class="onb-dots">
+          ${ONBOARD_STEPS.map((_, n) => `<span class="onb-dot ${n === (state.onboardStep || 0) ? 'active' : ''}"></span>`).join('')}
+        </div>
+        <button class="onb-cta" id="onb-next" type="button">${last ? 'Start recording' : 'Next'}</button>
+        <button class="onb-skip" id="onb-skip" type="button">Skip</button>
+      </div>
+    </div>`;
+
+  $('#onb-next').addEventListener('click', () => {
+    if (last) { finishOnboarding(); return; }
+    state.onboardStep = (state.onboardStep || 0) + 1;
+    renderOnboarding();
+  });
+  $('#onb-skip').addEventListener('click', finishOnboarding);
+}
+
+function finishOnboarding() {
+  state.onboarded = true;
+  state.onboardStep = 0;
+  state.page = 'HOME';
+  savePrefs();
+  render();
+  toast('Welcome to DualShots');
 }
 
 /* ------------------------------------------------------------------ nav */
@@ -1839,7 +2056,6 @@ function init() {
   loadPrefs();
   tickClock();
   setInterval(tickClock, 15000);
-  $('#about-btn').addEventListener('click', showAbout);
   render();
 }
 

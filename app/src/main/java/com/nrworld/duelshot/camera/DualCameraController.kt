@@ -3,7 +3,9 @@ package com.nrworld.duelshot.camera
 import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.CompositionSettings
 import androidx.camera.core.ConcurrentCamera
 import androidx.camera.core.Preview
@@ -28,10 +30,27 @@ import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.QualityOption
 import com.nrworld.duelshot.model.RecordingMode
 import java.io.File
+import java.util.concurrent.TimeUnit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.os.Environment
+
+/**
+ * Bild-i-bild-placering för Dual View. [cx] och [cy] är mitten av den lilla
+ * rutan som andel av bildytan (0..1), [scale] är dess bredd som andel av ytan,
+ * och [swapCameras] gör frontkameran stor och bakkameran liten.
+ */
+data class PipLayout(
+    val cx: Float = 0.68f,
+    val cy: Float = 0.34f,
+    val scale: Float = 0.34f,
+    val swapCameras: Boolean = false,
+    /** false = lilla kameran avstängd; bara stora kameran syns i inspelningen. */
+    val visible: Boolean = true,
+    /** true = lilla kameran pausad; dess ruta blir genomskinlig i inspelningen. */
+    val paused: Boolean = false
+)
 
 /**
  * Styr dubbla kameror (fram + bak) och inspelning i tre lägen.
@@ -54,6 +73,43 @@ class DualCameraController(private val context: Context) {
 
     /** Beskärning per kamera via ViewPort; stängs av om enheten inte klarar den. */
     private var cropEnabled = true
+
+    // Zoom per kamera (1× = av). Gäller både förhandsvisning och inspelning.
+    private var backCamera: Camera? = null
+    private var frontCamera: Camera? = null
+    private var backZoom = 1f
+    private var frontZoom = 1f
+
+    /** Sätter zoom på bak-/frontkameran och returnerar värdena som faktiskt gick igenom. */
+    fun setZoom(back: Float? = null, front: Float? = null): Pair<Float, Float> {
+        if (back != null) backZoom = back
+        if (front != null) frontZoom = front
+        backZoom = applyZoom(backCamera, backZoom)
+        frontZoom = applyZoom(frontCamera, frontZoom)
+        return backZoom to frontZoom
+    }
+
+    private fun applyZoom(camera: Camera?, ratio: Float): Float {
+        if (camera == null) return ratio
+        val state = camera.cameraInfo.zoomState.value ?: return ratio
+        val target = ratio.coerceIn(state.minZoomRatio, state.maxZoomRatio)
+        runCatching { camera.cameraControl.setZoomRatio(target) }
+        return target
+    }
+
+    private fun rememberCameras(cameras: List<Camera>) {
+        backCamera = null
+        frontCamera = null
+        cameras.forEach { cam ->
+            when (cam.cameraInfo.lensFacing) {
+                CameraSelector.LENS_FACING_BACK -> backCamera = cam
+                CameraSelector.LENS_FACING_FRONT -> frontCamera = cam
+            }
+        }
+        // Behåll zoomen över ombindningar (t.ex. när den lilla rutan flyttas).
+        backZoom = applyZoom(backCamera, backZoom)
+        frontZoom = applyZoom(frontCamera, frontZoom)
+    }
 
     /** Vilket läge som faktiskt band (kan skilja sig från önskat pga fallback). */
     var activeMode = RecordingMode.SEPARATE
@@ -111,12 +167,14 @@ class DualCameraController(private val context: Context) {
         lifecycleOwner: LifecycleOwner,
         backView: PreviewView?,
         frontView: PreviewView?,
-        composedView: PreviewView?
+        composedView: PreviewView?,
+        pip: PipLayout = PipLayout()
     ): String {
         val p = provider ?: return "Camera is not ready yet."
 
         p.unbindAll()
         backVideo = null; frontVideo = null; composedVideo = null
+        backCamera = null; frontCamera = null
         singleFallback = false
 
         val qs = qualitySelector(quality)
@@ -131,15 +189,21 @@ class DualCameraController(private val context: Context) {
         return try {
             when (wanted) {
                 RecordingMode.SEPARATE -> bindSeparate(p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner, backView, frontView)
-                RecordingMode.DUAL_VIEW -> bindComposed(p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner, composedView ?: backView)
-                RecordingMode.BOTH -> bindBoth(p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner, backView, frontView, composedView)
+                RecordingMode.DUAL_VIEW -> bindComposed(
+                    p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner,
+                    backView, frontView, composedView ?: backView, pip
+                )
+                RecordingMode.BOTH -> bindBoth(
+                    p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner,
+                    backView, frontView, composedView, pip
+                )
             }
             activeMode = wanted
             "Camera ready – ${wanted.title}."
         } catch (e: Exception) {
             if (cropEnabled) {
                 cropEnabled = false
-                return bind(wanted, frontAspect, backAspect, quality, lifecycleOwner, backView, frontView, composedView)
+                return bind(wanted, frontAspect, backAspect, quality, lifecycleOwner, backView, frontView, composedView, pip)
             }
             // Fallback: försök enklare läge så användaren alltid kan spela in.
             try {
@@ -167,7 +231,7 @@ class DualCameraController(private val context: Context) {
             val aspect = if (useFront) frontAspect else backAspect
             val (prev, vc) = previewAndCapture(view, aspect, qs)
             // Enskild kamera binds via vanliga (icke-koncurrenta) bindToLifecycle.
-            p.bindToLifecycle(owner, sel, groupOf(aspect, prev, vc))
+            rememberCameras(listOf(p.bindToLifecycle(owner, sel, groupOf(aspect, prev, vc))))
             if (useFront) frontVideo = vc else backVideo = vc
             activeMode = RecordingMode.SEPARATE
             singleFallback = true
@@ -190,43 +254,48 @@ class DualCameraController(private val context: Context) {
         backVideo = backVc; frontVideo = frontVc
         val backGroup = groupOf(backAspect, backPrev, backVc)
         val frontGroup = groupOf(frontAspect, frontPrev, frontVc)
-        p.bindToLifecycle(
-            listOf(
-                ConcurrentCamera.SingleCameraConfig(bs, backGroup, owner),
-                ConcurrentCamera.SingleCameraConfig(fs, frontGroup, owner)
-            )
+        rememberCameras(
+            p.bindToLifecycle(
+                listOf(
+                    ConcurrentCamera.SingleCameraConfig(bs, backGroup, owner),
+                    ConcurrentCamera.SingleCameraConfig(fs, frontGroup, owner)
+                )
+            ).cameras
         )
     }
 
     private fun bindComposed(
         p: ProcessCameraProvider, bs: CameraSelector, fs: CameraSelector,
         frontAspect: AspectOption, backAspect: AspectOption, qs: QualitySelector,
-        owner: LifecycleOwner, composedView: PreviewView?
+        owner: LifecycleOwner, backView: PreviewView?, frontView: PreviewView?,
+        composedView: PreviewView?, pip: PipLayout
     ) {
-        val preview = Preview.Builder().build().apply {
-            composedView?.let { setSurfaceProvider(it.surfaceProvider) }
-        }
+        val composedPreview = previewFor(composedView)
         val composed = VideoCapture.withOutput(Recorder.Builder().setQualitySelector(qs).build())
         composedVideo = composed
-        val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(composed).build()
-        // Back fyller hela bilden, front blir bild-i-bild uppe till höger.
-        val backCfg = ConcurrentCamera.SingleCameraConfig(
-            bs, group,
-            CompositionSettings.Builder().setAlpha(1f).setOffset(0f, 0f).setScale(1f, 1f).build(),
-            owner
+        // Egna previews per kamera så att den stora rutan står still och den lilla
+        // kan flyttas med fingret. Composition-settings styr den inspelade filen.
+        val group = UseCaseGroup.Builder()
+            .addUseCase(composedPreview).addUseCase(composed)
+            .addUseCase(previewFor(backView)).addUseCase(previewFor(frontView))
+            .build()
+        val largeSel = if (pip.swapCameras) fs else bs
+        val smallSel = if (pip.swapCameras) bs else fs
+        rememberCameras(
+            p.bindToLifecycle(
+                listOf(
+                    ConcurrentCamera.SingleCameraConfig(largeSel, group, fullComposition(), owner),
+                    ConcurrentCamera.SingleCameraConfig(smallSel, group, insetComposition(pip), owner)
+                )
+            ).cameras
         )
-        val frontCfg = ConcurrentCamera.SingleCameraConfig(
-            fs, group,
-            CompositionSettings.Builder().setAlpha(1f).setOffset(0.33f, -0.33f).setScale(0.34f, 0.34f).build(),
-            owner
-        )
-        p.bindToLifecycle(listOf(backCfg, frontCfg))
     }
 
     private fun bindBoth(
         p: ProcessCameraProvider, bs: CameraSelector, fs: CameraSelector,
         frontAspect: AspectOption, backAspect: AspectOption, qs: QualitySelector,
-        owner: LifecycleOwner, backView: PreviewView?, frontView: PreviewView?, composedView: PreviewView?
+        owner: LifecycleOwner, backView: PreviewView?, frontView: PreviewView?, composedView: PreviewView?,
+        pip: PipLayout
     ) {
         // Delad composition-output (en fil) + egna VideoCapture per kamera (två filer).
         val composedPreview = Preview.Builder().build().apply {
@@ -242,14 +311,33 @@ class DualCameraController(private val context: Context) {
         val frontGroup = UseCaseGroup.Builder()
             .addUseCase(composedPreview).addUseCase(composed).addUseCase(frontPrev).addUseCase(frontVc).build()
 
-        p.bindToLifecycle(
-            listOf(
-                ConcurrentCamera.SingleCameraConfig(bs, backGroup,
-                    CompositionSettings.Builder().setAlpha(1f).setOffset(0f, 0f).setScale(1f, 1f).build(), owner),
-                ConcurrentCamera.SingleCameraConfig(fs, frontGroup,
-                    CompositionSettings.Builder().setAlpha(1f).setOffset(0.33f, -0.33f).setScale(0.34f, 0.34f).build(), owner)
-            )
+        val largeSel = if (pip.swapCameras) fs else bs
+        val smallSel = if (pip.swapCameras) bs else fs
+        rememberCameras(
+            p.bindToLifecycle(
+                listOf(
+                    ConcurrentCamera.SingleCameraConfig(largeSel, backGroup, fullComposition(), owner),
+                    ConcurrentCamera.SingleCameraConfig(smallSel, frontGroup, insetComposition(pip), owner)
+                )
+            ).cameras
         )
+    }
+
+    private fun fullComposition(): CompositionSettings =
+        CompositionSettings.Builder().setAlpha(1f).setOffset(0f, 0f).setScale(1f, 1f).build()
+
+    /**
+     * CameraX-offset är normaliserad (-1..1, 0 = mitten) och får max vara 1 - skala,
+     * annars hamnar den lilla rutan utanför bilden.
+     */
+    private fun insetComposition(pip: PipLayout): CompositionSettings {
+        val scale = pip.scale.coerceIn(0.18f, 0.6f)
+        val limit = 1f - scale
+        val ox = (2f * pip.cx - 1f).coerceIn(-limit, limit)
+        val oy = (2f * pip.cy - 1f).coerceIn(-limit, limit)
+        // Avstängd eller pausad liten kamera: alpha 0 så att stora kameran fyller rutan.
+        val alpha = if (pip.visible && !pip.paused) 1f else 0f
+        return CompositionSettings.Builder().setAlpha(alpha).setOffset(ox, oy).setScale(scale, scale).build()
     }
 
     private fun groupOf(aspect: AspectOption, vararg useCases: androidx.camera.core.UseCase): UseCaseGroup {
@@ -271,12 +359,13 @@ class DualCameraController(private val context: Context) {
         return ViewPort.Builder(ratio, Surface.ROTATION_0).setScaleType(ViewPort.FILL_CENTER).build()
     }
 
+    private fun previewFor(view: PreviewView?): Preview =
+        Preview.Builder().build().apply { view?.let { setSurfaceProvider(it.surfaceProvider) } }
+
     private fun previewAndCapture(
         view: PreviewView?, aspect: AspectOption, qs: QualitySelector
     ): Pair<Preview, VideoCapture<Recorder>> {
-        val preview = Preview.Builder().build().apply {
-            view?.let { setSurfaceProvider(it.surfaceProvider) }
-        }
+        val preview = previewFor(view)
         // OBS: I concurrent (dubbel-kamera) läge får man INTE sätta setTargetAspectRatio –
         // CameraX kastar då "setTargetAspectRatio is not supported". Upplösning styrs av
         // QualitySelector + enhetens samtidiga ström-konfiguration.
@@ -297,20 +386,20 @@ class DualCameraController(private val context: Context) {
                     if (singleFallback) {
                         val isBack = backVideo != null
                         val v = backVideo ?: frontVideo
-                        val n = if (isBack) "duelshot_back_$stamp" else "duelshot_front_$stamp"
+                        val n = if (isBack) "dualshot_back_$stamp" else "dualshot_front_$stamp"
                         v?.let { started += it.record(context, n, audio = true, executor); names += "$n.mp4" }
                     } else {
-                        backVideo?.let { started += it.record(context, "duelshot_back_$stamp", audio = true, executor); names += "duelshot_back_$stamp.mp4" }
-                        frontVideo?.let { started += it.record(context, "duelshot_front_$stamp", audio = false, executor); names += "duelshot_front_$stamp.mp4" }
+                        backVideo?.let { started += it.record(context, "dualshot_back_$stamp", audio = true, executor); names += "dualshot_back_$stamp.mp4" }
+                        frontVideo?.let { started += it.record(context, "dualshot_front_$stamp", audio = false, executor); names += "dualshot_front_$stamp.mp4" }
                     }
                 }
                 RecordingMode.DUAL_VIEW -> {
-                    composedVideo?.let { started += it.record(context, "duelshot_combined_$stamp", audio = true, executor); names += "duelshot_combined_$stamp.mp4" }
+                    composedVideo?.let { started += it.record(context, "dualshot_combined_$stamp", audio = true, executor); names += "dualshot_combined_$stamp.mp4" }
                 }
                 RecordingMode.BOTH -> {
-                    composedVideo?.let { started += it.record(context, "duelshot_combined_$stamp", audio = true, executor); names += "duelshot_combined_$stamp.mp4" }
-                    backVideo?.let { started += it.record(context, "duelshot_back_$stamp", audio = false, executor); names += "duelshot_back_$stamp.mp4" }
-                    frontVideo?.let { started += it.record(context, "duelshot_front_$stamp", audio = false, executor); names += "duelshot_front_$stamp.mp4" }
+                    composedVideo?.let { started += it.record(context, "dualshot_combined_$stamp", audio = true, executor); names += "dualshot_combined_$stamp.mp4" }
+                    backVideo?.let { started += it.record(context, "dualshot_back_$stamp", audio = false, executor); names += "dualshot_back_$stamp.mp4" }
+                    frontVideo?.let { started += it.record(context, "dualshot_front_$stamp", audio = false, executor); names += "dualshot_front_$stamp.mp4" }
                 }
             }
             activeRecordings += started
@@ -318,6 +407,37 @@ class DualCameraController(private val context: Context) {
         } catch (e: Exception) {
             started.forEach { runCatching { it.stop() } }
             onError("Recording did not start: ${e.localizedMessage}")
+        }
+    }
+
+    /** Pausar pågående inspelning – samma fil fortsätter när man återupptar. */
+    fun pauseRecording(): Boolean {
+        if (activeRecordings.isEmpty()) return false
+        activeRecordings.forEach { runCatching { it.pause() } }
+        return true
+    }
+
+    /** Återupptar en pausad inspelning i samma fil. */
+    fun resumeRecording(): Boolean {
+        if (activeRecordings.isEmpty()) return false
+        activeRecordings.forEach { runCatching { it.resume() } }
+        return true
+    }
+
+    /** Tryck-för-fokus och exponering. [nx]/[ny] är 0..1 i förhandsvisningen. */
+    fun focusAt(isFront: Boolean, nx: Float, ny: Float, view: PreviewView?) {
+        if (view == null) return
+        val camera = (if (isFront) frontCamera else backCamera) ?: return
+        runCatching {
+            val point = view.meteringPointFactory.createPoint(
+                nx.coerceIn(0f, 1f) * view.width,
+                ny.coerceIn(0f, 1f) * view.height
+            )
+            val action = FocusMeteringAction.Builder(
+                point,
+                FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+            ).setAutoCancelDuration(3, TimeUnit.SECONDS).build()
+            camera.cameraControl.startFocusAndMetering(action)
         }
     }
 
@@ -363,7 +483,7 @@ class DualCameraController(private val context: Context) {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, "$displayName.mp4")
             put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/DuelShots")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/DualShots")
         }
         return MediaStoreOutputOptions.Builder(
             context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI

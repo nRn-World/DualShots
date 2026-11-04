@@ -3,31 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0a0908" />
-  <!-- build: v3.2 · 2026-11-04 · poster menu -->
-  <title>DuelShots</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23080605'/%3E%3Ccircle cx='27' cy='32' r='11' fill='none' stroke='%23ff7a1a' stroke-width='4'/%3E%3Cpath d='M42 24v16l11-8z' fill='%23ff7a1a'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <meta name="theme-color" content="#07080c" />
+  <!-- build: v3.3 · native studio design -->
+  <title>DualShots</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23ff6600'/%3E%3Crect x='14' y='22' width='36' height='26' rx='7' fill='none' stroke='%2304060d' stroke-width='4'/%3E%3Cpath d='M24 22l3-5h10l3 5' fill='none' stroke='%2304060d' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='35' r='7' fill='none' stroke='%2304060d' stroke-width='4'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
-  <div class="backdrop" aria-hidden="true">
-    <span class="glow g1"></span>
-    <span class="glow g2"></span>
-  </div>
-
   <main class="stage">
-    <header class="stage-head">
-      <div class="stage-brand">
-        <span class="stage-dot"></span>
-        <span><b>DuelShots</b> <span class="dim">web preview</span> <span class="ver">v3.2</span></span>
-      </div>
-      <button class="about-btn" id="about-btn" type="button" title="About this preview" aria-label="About this preview">i</button>
-    </header>
-
     <div class="device" id="device">
       <div class="device-inner">
-        <div class="island" aria-hidden="true"></div>
-
         <div class="statusbar">
           <span class="sb-time" id="clock">9:41</span>
           <span class="sb-icons">
@@ -39,20 +24,15 @@
 
         <div class="app">
           <div class="screen" id="screen"></div>
+          <nav class="bottom-nav" id="nav" aria-label="Main"></nav>
         </div>
 
-        <div class="home-indicator" aria-hidden="true"></div>
         <div class="modal-root" id="modal-root"></div>
       </div>
     </div>
-
-    <footer class="stage-foot">
-      <span class="badge">web preview</span>
-      <span>Same flows and recording modes as the Android app</span>
-    </footer>
   </main>
 
   <div class="media-sink" id="media-sink" aria-hidden="true"></div>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

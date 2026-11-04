@@ -1,4 +1,4 @@
-# DuelShots — Web Preview
+# DualShots — Web Preview
 
 A dependency-free browser replica of the native Android app, so the UI and the
 whole recording flow can be tried without an Android SDK, emulator or device.
@@ -29,21 +29,24 @@ No build step, no npm packages — just `index.html`, `styles.css` and `app.js`.
 
 ## Design
 
-The interface is built like an analog camera manual rather than a dashboard.
+The preview mirrors the native interface instead of inventing its own.
 
-- **Poster menu.** The home screen is a single column: the split-lens mark and the
-  DuelShots wordmark, the tagline in tracked mono, one full-width *Start Recording*
-  action, then rounded cards for Gallery, Settings, Premium and About — each with a lit
-  icon orb and a monospaced value (clip count, formats, Pro, build) on the right.
-- **One accent, used sparingly.** Orange appears on the brand gradient, the icon orbs,
-  the record state and premium. Everything else is warm near-black, paper white and
-  hairline rules.
-- **Monospaced metadata.** Every technical value (formats, resolution, durations,
-  filenames, section labels) is set in mono with wide tracking; prose stays in the system
-  sans. Settings and the gallery are hairline lists, not stacks of shadowed cards.
-- **Viewfinder HUD.** The record screen frames the preview with corner brackets, a
-  red-dot timer, a torch control in the top bar, a white-ring shutter and mono status
-  lines. A fine film grain sits over the whole device.
+- **Bottom navigation, like the app.** Home, Gallery and Settings share the three-tab
+  bar from `DualShotsApp.BottomBar()`: a rounded icon pill behind the active tab, white
+  icon, orange label, faint slate for the rest.
+- **Studio palette.** Near-black canvas with a warm orange glow, `#121522` cards with
+  hairline borders, white/slate text and one orange gradient reserved for primary
+  actions and selections (`ui/theme/Color.kt`).
+- **Home is the app poster.** A gradient squircle with the camera glyph, the
+  `Duel`/`Shots` wordmark, the mono tagline, one full-width *Start Recording* action,
+  then Settings / Premium Features / About rows and the *Made by nRnWorld* credit
+  with a clickable site link and an email copy button.
+- **Mono metadata.** Section labels (RECORDING MODE, CAMERA FORMATS, VIDEO QUALITY,
+  CONTAINER / CODEC) are tracked mono caps; prose and values stay in the system sans.
+- **Inline settings.** Recording-mode radios, per-camera aspect chips and segmented
+  resolution/codec controls live in cards, with the gold premium card underneath.
+- **Same dialogs.** About is the compact `AlertDialog`, premium is the `DualShots PRO`
+  card with the crown tile, feature checklist and orange CTA.
 
 Colour tokens live in `:root` in `styles.css`; the type stacks are `--font` and `--mono`.
 
@@ -56,7 +59,7 @@ Colour tokens live in `:root` in `styles.css`; the type stacks are `--font` and 
 - **Real files.** Recording is done with canvas composition + `MediaRecorder`;
   finished clips appear in the Gallery as poster thumbnails, play inline and can
   be downloaded or deleted. Filenames follow the Android scheme:
-  `duelshot_combined_YYYYMMDD_HHMMSS.mp4`.
+  `dualshot_combined_YYYYMMDD_HHMMSS.mp4`.
 - **Camera handling.** Both cameras are requested at once. If the browser refuses
   the second stream the preview degrades to the same single-camera fallback the
   app uses. If camera access is blocked entirely (permissions, iframe policy,
@@ -67,11 +70,14 @@ Colour tokens live in `:root` in `styles.css`; the type stacks are `--font` and 
   the formats it started with (a file cannot change resolution mid-stream), so
   changes made while recording start with the next take; the dock always shows the
   formats currently in use.
-- **Zoom chip.** The 1×/2×/3× chip on the record dock crops the preview and the
-  recorded frame together, so what you frame is what you get.
-- **Movable overlay.** In Dual View the front camera sits in an inset you can drag
-  around and pinch to resize (double-tap resets). The position and size are used for
-  the composed recording, not just the preview.
+- **Zoom chip + pinch.** The 1×/2×/3× chip cycles the large camera, and a two-finger
+  pinch on either image zooms just that camera (1×–3×). The zoom is drawn into the
+  recorded frame too, so what you frame is what you get.
+- **Movable, resizable overlay.** In Dual View the front camera sits in an inset you
+  can drag around. Its bottom-right corner is a grab handle: drag it outwards to make
+  the inset bigger, inwards to shrink it (double-tap resets). Pinching inside the
+  inset zooms the small camera. Position, size and zoom are used for the composed
+  recording, not just the preview.
 - **Settings persistence** and the freemium gating (4K, HEVC) behave like the app:
   picking a locked option opens the Pro sheet, and unlocking applies that option.
 
@@ -85,7 +91,7 @@ Colour tokens live in `:root` in `styles.css`; the type stacks are `--font` and 
 - The 4K option caps the composition at 1600 px on the long edge to keep the
   browser responsive; the native app records real 4K.
 - Clips live in memory for the session — reloading the page clears the gallery
-  (the app writes to `Movies/DuelShots` via `MediaStore`).
+  (the app writes to `Movies/DualShots` via `MediaStore`).
 
 The real app is still the Android module in `../app` — see the root README for the
 `./gradlew :app:assembleDebug` build.

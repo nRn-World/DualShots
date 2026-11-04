@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,11 +63,37 @@ import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.QualityOption
 import com.nrworld.duelshot.ui.components.PremiumDialog
 import com.nrworld.duelshot.ui.components.SegmentedControl
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.nrworld.duelshot.ui.theme.DuelGold
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import com.nrworld.duelshot.camera.PipLayout
+import kotlin.math.roundToInt
 
 @Composable
 fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val haptic = LocalHapticFeedback.current
+    val localView = LocalView.current
     val controller = remember { DualCameraController(context) }
 
     var backView by remember { mutableStateOf<PreviewView?>(null) }
@@ -81,10 +111,24 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     var part by remember { mutableStateOf(1) }
     var showTune by remember { mutableStateOf(false) }
     var stacked by remember { mutableStateOf(false) }
+    var showGrid by remember { mutableStateOf(false) }
+    var paused by remember { mutableStateOf(false) }
     var premiumFeature by remember { mutableStateOf<String?>(null) }
+    // Bild-i-bild: [pip] är sparad placering, [pipLive] följer fingret.
+    var pip by remember { mutableStateOf(PipLayout()) }
+    var pipLive by remember { mutableStateOf(PipLayout()) }
+    // Zoom per kamera; två fingrar ändrar och inspelningen följer med.
+    var backZoom by remember { mutableFloatStateOf(1f) }
+    var frontZoom by remember { mutableFloatStateOf(1f) }
 
     // Visat läge: önskat läge tills bindningen skett, därefter det som faktiskt band (fallback).
     val displayMode = if (boundFor == vm.mode) renderedMode else vm.mode
+
+    // Skärmen ska inte slockna mitt i en inspelning.
+    DisposableEffect(isRecording) {
+        localView.keepScreenOn = isRecording
+        onDispose { localView.keepScreenOn = false }
+    }
 
     LaunchedEffect(Unit) {
         status = controller.init()
@@ -93,22 +137,18 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
 
     // Bind när förhandsvisningarna finns. Ändras något under inspelning avslutas klippet,
     // kameran binds om och nästa del (_p2, _p3 …) startar direkt.
-    LaunchedEffect(camReady, ready, backView, frontView, composedView, vm.mode, vm.frontAspect, vm.backAspect, vm.quality) {
+    LaunchedEffect(camReady, ready, backView, frontView, composedView, vm.mode, vm.frontAspect, vm.backAspect, vm.quality, pip, isRecording) {
         if (!camReady) return@LaunchedEffect
+        // En take = en fil: ändringar under inspelning väntar till nästa take.
+        if (isRecording) return@LaunchedEffect
         if (controller.supported) {
             when (vm.mode) {
-                RecordingMode.DUAL_VIEW -> if (composedView == null) return@LaunchedEffect
+                RecordingMode.DUAL_VIEW -> if (composedView == null || backView == null || frontView == null) return@LaunchedEffect
                 RecordingMode.SEPARATE -> if (backView == null || frontView == null) return@LaunchedEffect
                 RecordingMode.BOTH -> if (backView == null || frontView == null || composedView == null) return@LaunchedEffect
             }
         } else if (backView == null && frontView == null) return@LaunchedEffect
 
-        val resume = isRecording
-        if (resume) {
-            withTimeoutOrNull(4000) {
-                suspendCancellableCoroutine<Unit> { c -> controller.stopRecording { if (c.isActive) c.resume(Unit) } }
-            }
-        }
         status = controller.bind(
             wanted = vm.mode,
             frontAspect = vm.frontAspect,
@@ -117,26 +157,22 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             lifecycleOwner = lifecycleOwner,
             backView = backView,
             frontView = frontView,
-            composedView = composedView
+            composedView = composedView,
+            pip = pip
         )
         renderedMode = controller.activeMode
         boundFor = vm.mode
         ready = true
-        if (resume) {
-            part++
-            controller.startRecording(
-                part = part,
-                onStarted = { names -> savedNames = savedNames + names },
-                onError = { status = it; isRecording = false }
-            )
-        }
     }
 
-    // Timer.
+    // Timer: nollställs vid start och står still när man pausar.
     LaunchedEffect(isRecording) {
-        if (isRecording) {
-            elapsed = 0
-            while (isRecording) { delay(1000); elapsed++ }
+        if (isRecording) elapsed = 0
+    }
+    LaunchedEffect(isRecording, paused) {
+        while (isRecording && !paused) {
+            delay(1000)
+            elapsed++
         }
     }
 
@@ -146,10 +182,34 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconChip(DuelIconKind.CLOSE) { if (isRecording) controller.stopRecording(); onExit() }
+            IconChip(DuelIconKind.CLOSE) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                if (isRecording) controller.stopRecording()
+                onExit()
+            }
             Spacer(Modifier.width(12.dp))
-            TimerPill(elapsed, isRecording)
+            TimerPill(elapsed, isRecording && !paused)
+            if (isRecording) {
+                Spacer(Modifier.width(8.dp))
+                IconChip(if (paused) DuelIconKind.PLAY else DuelIconKind.PAUSE, active = paused) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (paused) {
+                        if (controller.resumeRecording()) {
+                            paused = false
+                            status = "Recording resumed – same file"
+                        }
+                    } else if (controller.pauseRecording()) {
+                        paused = true
+                        status = "Paused – resume to continue the same file"
+                    }
+                }
+            }
             Spacer(Modifier.weight(1f))
+            IconChip(DuelIconKind.GRID, active = showGrid) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showGrid = !showGrid
+            }
+            Spacer(Modifier.width(8.dp))
             IconChip(DuelIconKind.SETTINGS, active = showTune) { showTune = !showTune }
         }
 
@@ -159,14 +219,95 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 // Enskild kamera: en fullmatad förhandsvisning i valt format.
                 FramedFeed(
                     backView, vm.backAspect, label = "CAMERA", modifier = Modifier.fillMaxSize(),
+                    zoom = backZoom,
+                    onZoom = { f ->
+                        val (bz, _) = controller.setZoom(back = backZoom * f)
+                        backZoom = bz
+                    },
+                    onFocus = { nx, ny -> controller.focusAt(isFront = false, nx = nx, ny = ny, view = backView) },
                     onRelease = { if (backView === it) backView = null }
                 ) { backView = it }
             } else {
                 if (displayMode == RecordingMode.DUAL_VIEW) {
-                    Feed(
-                        composedView, modifier = Modifier.fillMaxSize(),
-                        onRelease = { if (composedView === it) composedView = null }
-                    ) { composedView = it }
+                    Box(Modifier.fillMaxSize()) {
+                        val swap = pipLive.swapCameras
+                        // Stor bild: fast. Liten bild: flyttbar med fingret.
+                        FramedFeed(
+                            if (swap) frontView else backView,
+                            if (swap) vm.frontAspect else vm.backAspect,
+                            label = if (swap) "FRONT" else "BACK",
+                            modifier = Modifier.fillMaxSize().padding(3.dp),
+                            zoom = if (swap) frontZoom else backZoom,
+                            onZoom = { f ->
+                                if (swap) {
+                                    val (_, fz) = controller.setZoom(front = frontZoom * f)
+                                    frontZoom = fz
+                                } else {
+                                    val (bz, _) = controller.setZoom(back = backZoom * f)
+                                    backZoom = bz
+                                }
+                            },
+                            onFocus = { nx, ny ->
+                                if (swap) controller.focusAt(isFront = true, nx = nx, ny = ny, view = frontView)
+                                else controller.focusAt(isFront = false, nx = nx, ny = ny, view = backView)
+                            },
+                            onRelease = { v ->
+                                if (swap) { if (frontView === v) frontView = null }
+                                else if (backView === v) backView = null
+                            }
+                        ) { v -> if (swap) frontView = v else backView = v }
+
+                        if (pipLive.visible) PipInset(
+                            view = if (swap) backView else frontView,
+                            aspect = if (swap) vm.backAspect else vm.frontAspect,
+                            label = if (swap) "BACK" else "FRONT",
+                            layout = pipLive,
+                            zoom = if (swap) backZoom else frontZoom,
+                            onZoom = { f ->
+                                if (swap) {
+                                    val (bz, _) = controller.setZoom(back = backZoom * f)
+                                    backZoom = bz
+                                } else {
+                                    val (_, fz) = controller.setZoom(front = frontZoom * f)
+                                    frontZoom = fz
+                                }
+                            },
+                            onResize = { size -> pipLive = pipLive.copy(scale = size) },
+                            onDrag = { dx, dy ->
+                                pipLive = pipLive.copy(
+                                    cx = (pipLive.cx + dx).coerceIn(0.12f, 0.88f),
+                                    cy = (pipLive.cy + dy).coerceIn(0.12f, 0.88f)
+                                )
+                            },
+                            paused = pipLive.paused,
+                            onTogglePause = {
+                                pipLive = pipLive.copy(paused = !pipLive.paused)
+                                pip = pipLive
+                                if (isRecording) {
+                                    status = if (pipLive.paused) "Small camera paused – next clip part"
+                                    else "Small camera running – next clip part"
+                                }
+                            },
+                            onClose = {
+                                pipLive = pipLive.copy(visible = false, paused = false)
+                                pip = pipLive
+                                if (isRecording) status = "Small camera off – next clip part"
+                            },
+                            onCommit = { pip = pipLive },
+                            onRelease = { v ->
+                                if (swap) { if (backView === v) backView = null }
+                                else if (frontView === v) frontView = null
+                            },
+                            onView = { v -> if (swap) backView = v else frontView = v }
+                        )
+
+                        // Dold yta som behövs för den sammansatta inspelningen.
+                        AndroidView(
+                            modifier = Modifier.size(1.dp),
+                            factory = { ctx -> PreviewView(ctx).also { composedView = it } },
+                            onRelease = { if (composedView === it) composedView = null }
+                        )
+                    }
                 } else {
                     // Samma två vyer oavsett layout – bara storlek/placering ändras (ingen omstart).
                     val cellA = if (stacked) Modifier.fillMaxWidth().fillMaxHeight(0.5f).align(Alignment.TopCenter)
@@ -175,10 +316,20 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     else Modifier.fillMaxHeight().fillMaxWidth(0.5f).align(Alignment.CenterEnd)
                     FramedFeed(
                         backView, vm.backAspect, label = "BACK", modifier = cellA.padding(3.dp),
+                        zoom = backZoom,
+                        onZoom = { f ->
+                            val (bz, _) = controller.setZoom(back = backZoom * f)
+                            backZoom = bz
+                        },
                         onRelease = { if (backView === it) backView = null }
                     ) { backView = it }
                     FramedFeed(
                         frontView, vm.frontAspect, label = "FRONT", modifier = cellB.padding(3.dp),
+                        zoom = frontZoom,
+                        onZoom = { f ->
+                            val (_, fz) = controller.setZoom(front = frontZoom * f)
+                            frontZoom = fz
+                        },
                         onRelease = { if (frontView === it) frontView = null }
                     ) { frontView = it }
                 }
@@ -191,6 +342,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     )
                 }
             }
+            if (showGrid) GridOverlay(Modifier.fillMaxSize().padding(11.dp))
         }
 
         // Ändra live: läge, kvalitet, format och layout.
@@ -201,7 +353,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (isRecording) {
-                    Text("Changes start a new clip part (_p2, _p3 …)", color = DuelOrangeLight, fontSize = 11.sp)
+                    Text("One take = one file · changes apply to the next take", color = DuelOrangeLight, fontSize = 11.sp)
                 }
                 if (dual) TuneRow("MODE") {
                     SegmentedControl(
@@ -259,28 +411,63 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         }
 
         // Kontrollrad
-        Row(
+        Box(
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical = 22.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+            contentAlignment = Alignment.Center
         ) {
             RecordButton(
                 recording = isRecording,
                 enabled = ready && controller.canBind,
                 onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (!isRecording) {
-                        part = 1
-                        controller.startRecording(
-                            onStarted = { names -> savedNames = names; isRecording = true },
-                            onError = { status = it }
-                        )
+                        val freeMb = runCatching { context.filesDir.usableSpace / (1024 * 1024) }.getOrDefault(0L)
+                        if (freeMb in 1..299) {
+                            status = "Low storage: ${freeMb} MB free – free up space first"
+                        } else {
+                            controller.startRecording(
+                                onStarted = { names ->
+                                    savedNames = names
+                                    isRecording = true
+                                    paused = false
+                                    status = "Recording – one continuous file"
+                                },
+                                onError = { status = it }
+                            )
+                        }
                     } else {
                         controller.stopRecording()
                         isRecording = false
-                        status = "Stopped. Saved to Gallery → Movies/DuelShots"
+                        paused = false
+                        status = "Stopped. Saved to Gallery → Movies/DualShots"
                     }
                 }
             )
+            if (displayMode == RecordingMode.DUAL_VIEW && controller.supported) {
+                SwapButton(
+                    swapped = pipLive.swapCameras,
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 20.dp),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        pipLive = pipLive.copy(swapCameras = !pipLive.swapCameras)
+                        pip = pipLive
+                        if (isRecording) status = "Camera swap – applies to the next take"
+                    }
+                )
+                PipToggleButton(
+                    off = !pipLive.visible,
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 20.dp),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        pipLive = pipLive.copy(visible = !pipLive.visible, paused = false)
+                        pip = pipLive
+                        if (isRecording) {
+                            status = if (pipLive.visible) "Small camera on – applies to the next take"
+                            else "Small camera off – applies to the next take"
+                        }
+                    }
+                )
+            }
         }
     }
 
@@ -305,6 +492,21 @@ private fun TuneRow(label: String, content: @Composable () -> Unit) {
     }
 }
 
+/** Klassiska 3×3-hjälplinjer över förhandsvisningen. */
+@Composable
+private fun GridOverlay(modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val line = Color.White.copy(alpha = .22f)
+        val width = 1.dp.toPx()
+        for (i in 1..2) {
+            val x = size.width * i / 3f
+            drawLine(line, Offset(x, 0f), Offset(x, size.height), width)
+            val y = size.height * i / 3f
+            drawLine(line, Offset(0f, y), Offset(size.width, y), width)
+        }
+    }
+}
+
 private fun AspectOption.ratio(): Float = when (this) {
     AspectOption.R_9_16 -> 9f / 16f
     AspectOption.R_16_9 -> 16f / 9f
@@ -319,6 +521,9 @@ private fun FramedFeed(
     aspect: AspectOption,
     label: String,
     modifier: Modifier = Modifier,
+    zoom: Float = 1f,
+    onZoom: ((Float) -> Unit)? = null,
+    onFocus: ((Float, Float) -> Unit)? = null,
     onRelease: (PreviewView) -> Unit,
     onView: (PreviewView) -> Unit
 ) {
@@ -326,6 +531,9 @@ private fun FramedFeed(
         Feed(
             view, label = label, ratio = aspect.label,
             modifier = Modifier.aspectRatio(aspect.ratio()),
+            zoom = zoom,
+            onZoom = onZoom,
+            onFocus = onFocus,
             onRelease = onRelease, onView = onView
         )
     }
@@ -337,6 +545,9 @@ private fun Feed(
     label: String? = null,
     ratio: String? = null,
     modifier: Modifier = Modifier,
+    zoom: Float = 1f,
+    onZoom: ((Float) -> Unit)? = null,
+    onFocus: ((Float, Float) -> Unit)? = null,
     onRelease: (PreviewView) -> Unit = {},
     onView: (PreviewView) -> Unit
 ) {
@@ -352,6 +563,44 @@ private fun Feed(
             },
             onRelease = onRelease
         )
+        if (onZoom != null || onFocus != null) {
+            // Genomskinligt lager: två fingrar zoomar, ett tryck fokuserar.
+            var focusPoint by remember { mutableStateOf<Offset?>(null) }
+            val haptic = LocalHapticFeedback.current
+            Box(
+                modifier = Modifier.fillMaxSize().pointerInput(onZoom, onFocus) {
+                    coroutineScope {
+                        launch {
+                            detectTransformGestures { _, _, factor, _ ->
+                                if (factor != 1f) onZoom?.invoke(factor)
+                            }
+                        }
+                        launch {
+                            detectTapGestures { pos ->
+                                focusPoint = pos
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onFocus?.invoke(pos.x / size.width, pos.y / size.height)
+                            }
+                        }
+                    }
+                }
+            )
+            val ring = focusPoint
+            if (ring != null) {
+                LaunchedEffect(ring) {
+                    delay(1100)
+                    focusPoint = null
+                }
+                Canvas(Modifier.fillMaxSize()) {
+                    drawCircle(
+                        color = DuelGold,
+                        radius = 24.dp.toPx(),
+                        center = ring,
+                        style = Stroke(width = 1.6.dp.toPx())
+                    )
+                }
+            }
+        }
         if (label != null) {
             Text(
                 label, color = DuelOrangeLight, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp,
@@ -364,6 +613,15 @@ private fun Feed(
                 ratio, color = DuelText, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp,
                 modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
                     .clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = .45f)).padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+        if (zoom > 1.01f) {
+            Text(
+                "${(zoom * 10).roundToInt() / 10f}×", color = DuelText,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp,
+                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp)
+                    .clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = .45f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
     }
@@ -411,6 +669,201 @@ private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Un
             modifier = Modifier.size(if (recording) 30.dp else 66.dp)
                 .clip(if (recording) RoundedCornerShape(8.dp) else CircleShape)
                 .background(if (enabled) DuelRecord else Color.Gray.copy(alpha = .5f))
+        )
+    }
+}
+/** Liten, flyttbar kamera ovanpå den stora bilden i Dual View. */
+@Composable
+private fun PipInset(
+    view: PreviewView?,
+    aspect: AspectOption,
+    label: String,
+    layout: PipLayout,
+    zoom: Float,
+    paused: Boolean,
+    onTogglePause: () -> Unit,
+    onClose: () -> Unit,
+    onDrag: (Float, Float) -> Unit,
+    onZoom: (Float) -> Unit,
+    onResize: (Float) -> Unit,
+    onCommit: () -> Unit,
+    onRelease: (PreviewView) -> Unit,
+    onView: (PreviewView) -> Unit
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val w = constraints.maxWidth.toFloat()
+        val h = constraints.maxHeight.toFloat()
+        val scale = layout.scale.coerceIn(0.18f, 0.6f)
+        val pipW = w * scale
+        val pipH = pipW / aspect.ratio()
+        val left = (layout.cx * w - pipW / 2f).coerceIn(0f, (w - pipW).coerceAtLeast(0f))
+        val top = (layout.cy * h - pipH / 2f).coerceIn(0f, (h - pipH).coerceAtLeast(0f))
+        val liveScale = rememberUpdatedState(scale)
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
+                .size(with(density) { pipW.toDp() }, with(density) { pipH.toDp() })
+        ) {
+            // Ett finger flyttar rutan, två fingrar zoomar kameran.
+            Box(
+                modifier = Modifier.fillMaxSize().pointerInput(aspect) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var pinching = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val factor = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            if (factor != 1f) {
+                                pinching = true
+                                onZoom(factor)
+                            } else if (!pinching && pan != Offset.Zero) {
+                                onDrag(pan.x / w, pan.y / h)
+                            }
+                            event.changes.forEach { it.consume() }
+                            if (event.changes.none { it.pressed }) break
+                        }
+                        onCommit()
+                    }
+                }
+            ) {
+                FramedFeed(
+                    view = view,
+                    aspect = aspect,
+                    label = label,
+                    modifier = Modifier.fillMaxSize(),
+                    onRelease = onRelease,
+                    onView = onView
+                )
+                if (paused) {
+                    Box(
+                        Modifier.fillMaxSize().background(Color.Black.copy(alpha = .62f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "PAUSED", color = Color.White.copy(alpha = .82f),
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 9.sp, letterSpacing = 1.sp
+                        )
+                    }
+                }
+                if (zoom > 1.01f) {
+                    Text(
+                        "${(zoom * 10).roundToInt() / 10f}×", color = DuelText,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 9.sp,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 6.dp, bottom = 34.dp)
+                            .clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = .45f))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // Pausa eller stäng av lilla kameran.
+            Row(
+                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                PipChip(if (paused) DuelIconKind.PLAY else DuelIconKind.PAUSE, onClick = onTogglePause)
+                PipChip(DuelIconKind.CLOSE, onClick = onClose)
+            }
+
+            // Hörnhandtag: dra utåt för större ruta, inåt för mindre.
+            Box(
+                modifier = Modifier.align(Alignment.BottomEnd).size(30.dp)
+                    .clip(RoundedCornerShape(topStart = 10.dp))
+                    .background(Color.Black.copy(alpha = .4f))
+                    .pointerInput(aspect) {
+                        var start = liveScale.value
+                        detectDragGestures(
+                            onDragStart = { start = liveScale.value },
+                            onDragEnd = { onCommit() },
+                            onDragCancel = { onCommit() }
+                        ) { change, drag ->
+                            change.consume()
+                            onResize((start + drag.x / w).coerceIn(0.18f, 0.6f))
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(Modifier.fillMaxSize().padding(8.dp)) {
+                    val stroke = 1.6.dp.toPx()
+                    drawLine(
+                        color = Color.White.copy(alpha = .85f),
+                        start = Offset(size.width, size.height * 0.42f),
+                        end = Offset(size.width * 0.42f, size.height),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round
+                    )
+                    drawLine(
+                        color = Color.White.copy(alpha = .55f),
+                        start = Offset(size.width, size.height * 0.78f),
+                        end = Offset(size.width * 0.78f, size.height),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PipChip(kind: DuelIconKind, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(24.dp).clip(CircleShape)
+            .background(Color.Black.copy(alpha = .55f))
+            .border(1.dp, Color.White.copy(alpha = .28f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        DuelIcon(kind, Color.White, 12.dp)
+    }
+}
+
+/** Slår på/av den lilla kameran i Dual View. */
+@Composable
+private fun PipToggleButton(off: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(DuelSurface2)
+            .border(1.dp, if (off) DuelLine else DuelOrange, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DuelIcon(DuelIconKind.PIP, if (off) DuelTextMuted else DuelOrangeLight, 18.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            if (off) "OFF" else "PIP",
+            color = DuelText, fontWeight = FontWeight.Bold,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontSize = 10.sp, letterSpacing = 1.sp
+        )
+    }
+}
+
+/** Byter vilken kamera som är stor respektive liten i Dual View. */
+@Composable
+private fun SwapButton(swapped: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(DuelSurface2)
+            .border(1.dp, if (swapped) DuelOrange else DuelLine, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DuelIcon(DuelIconKind.SWITCH, DuelOrangeLight, 18.dp, Modifier.rotate(if (swapped) 180f else 0f))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "SWAP",
+            color = DuelText, fontWeight = FontWeight.Bold,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontSize = 10.sp, letterSpacing = 1.sp
         )
     }
 }
