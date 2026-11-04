@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+app/build/
+
+# Kotlin / Gradle caches
+.kotlin/
+build/
+
+# Throwaway emulator test captures (design poster HTML is kept)
+design/*.png
+design/ui.xml

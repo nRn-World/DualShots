@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DuelShots — Design Poster & UI Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#05070D; --bg2:#0A0E1A; --card:#141A2A; --card2:#1B2236;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --cyan:#22D3EE; --blue:#2E7DFF; --purple:#7C3AED; --magenta:#E94FD0;
+    --gold:#F5C24B; --gold2:#FFB020; --rec:#FF3B4E; --green:#34D399;
+    --text:#FFFFFF; --muted:#A7B0C4; --muted2:#6B768F;
+    --grad:linear-gradient(90deg,var(--cyan),var(--blue) 35%,var(--purple) 70%,var(--magenta));
+    --radius:22px;
+    --font-display:"Space Grotesk",system-ui,sans-serif;
+    --font-ui:"Inter",system-ui,sans-serif;
+    --font-mono:"JetBrains Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1200px 700px at 20% -10%,#141b3a 0%,transparent 60%),
+       radial-gradient(1000px 700px at 110% 10%,#2a1440 0%,transparent 55%),var(--bg);
+       color:var(--text);font-family:var(--font-ui);padding:36px;-webkit-font-smoothing:antialiased}
+
+  /* ---------- Poster frame ---------- */
+  .poster{max-width:1560px;margin:0 auto;border:1px solid var(--line);border-radius:32px;
+    background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 30%),var(--bg2);
+    padding:34px 38px 40px;position:relative;overflow:hidden}
+  .poster::before{content:"";position:absolute;inset:-40% -10% auto auto;width:60%;height:80%;
+    background:radial-gradient(circle,rgba(124,58,237,.25),transparent 60%);filter:blur(20px)}
+
+  /* ---------- Header ---------- */
+  .top{display:flex;align-items:center;gap:22px;position:relative;z-index:2}
+  .brand{display:flex;flex-direction:column;gap:6px}
+  .wordmark{font-family:var(--font-display);font-weight:700;font-size:64px;letter-spacing:-1px;line-height:1}
+  .wordmark .d{color:#fff}
+  .wordmark .s{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tagline{font-family:var(--font-display);font-weight:600;letter-spacing:5px;font-size:15px;color:var(--muted)}
+  .logo-badge{margin-left:auto;text-align:right;color:var(--muted);font-size:13px;line-height:1.5}
+
+  /* ---------- Screens row ---------- */
+  .screens{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;margin-top:34px;position:relative;z-index:2}
+  .phone{background:#000;border:2px solid var(--line2);border-radius:34px;padding:10px;
+    box-shadow:0 30px 60px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.03);aspect-ratio:9/19;position:relative}
+  .phone .notch{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:96px;height:22px;background:#000;border-radius:14px;z-index:9}
+  .screen{width:100%;height:100%;border-radius:26px;overflow:hidden;position:relative;
+    background:linear-gradient(180deg,#0b1024,#070a16);display:flex;flex-direction:column}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 4px;font-size:11px;color:#dfe4f0;font-weight:600}
+  .caption{margin-top:12px;text-align:center;color:var(--muted);font-size:12px;letter-spacing:2px;text-transform:uppercase;font-family:var(--font-display)}
+
+  .pad{padding:14px 16px;display:flex;flex-direction:column;gap:12px;flex:1}
+  .appbar{display:flex;align-items:center;justify-content:space-between}
+  .appbar .title{font-family:var(--font-display);font-weight:700;font-size:20px}
+  .appbar .title b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .iconbtn{width:30px;height:30px;border-radius:9px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;font-size:14px;color:var(--muted)}
+
+  /* splash */
+  .splash{align-items:center;justify-content:center;text-align:center;
+    background:radial-gradient(120% 80% at 50% 0%,#2a1150 0%,transparent 55%),linear-gradient(180deg,#0a0f22,#05070d)}
+  .splash .wm{font-family:var(--font-display);font-weight:700;font-size:34px;margin-top:14px}
+  .splash .wm b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .splash .sub{color:var(--muted);margin-top:6px;font-size:14px}
+
+  /* buttons */
+  .btn{border-radius:16px;padding:16px;font-weight:700;font-family:var(--font-display);display:flex;align-items:center;gap:12px;justify-content:center}
+  .btn-primary{background:var(--grad);color:#04060d;box-shadow:0 12px 30px rgba(124,58,237,.4)}
+  .btn-primary .cam{font-size:18px}
+  .btn small{display:block;font-weight:500;font-size:11px;opacity:.7;font-family:var(--font-ui)}
+  .btn-gold{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#241703}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:12px}
+  .card .ic{width:34px;height:34px;border-radius:10px;background:var(--card2);border:1px solid var(--line);display:grid;place-items:center;font-size:16px}
+  .card .tx{flex:1}
+  .card .tx .t{font-weight:600;font-size:14px}
+  .card .tx .s{color:var(--muted);font-size:11px;margin-top:2px}
+  .card .chev{color:var(--muted2)}
+
+  .nav{display:flex;justify-content:space-around;border-top:1px solid var(--line);padding:10px 0 4px;margin-top:auto}
+  .nav .item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted2)}
+  .nav .item.active{color:var(--cyan)}
+
+  /* recording */
+  .rec-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
+  .timer{display:flex;align-items:center;gap:7px;background:rgba(255,59,78,.14);border:1px solid rgba(255,59,78,.4);
+    color:#ffd7db;font-family:var(--font-mono);font-weight:700;font-size:12px;padding:5px 10px;border-radius:20px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--rec);box-shadow:0 0 8px var(--rec);animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .preview{flex:1;display:flex;flex-direction:column;gap:6px;padding:0 12px;position:relative}
+  .feed{flex:1;border-radius:14px;position:relative;overflow:hidden;border:1px solid var(--line)}
+  .feed.selfie{background:linear-gradient(135deg,#f0a67a,#c56b8f 55%,#7b4b8f)}
+  .feed.city{background:linear-gradient(160deg,#2b6cb0,#1a3a6b 55%,#0d1830)}
+  .feed .tag{position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;background:rgba(0,0,0,.5);
+    border:1px solid var(--line2);padding:3px 8px;border-radius:8px;backdrop-filter:blur(4px)}
+  .feed .ratio{position:absolute;bottom:8px;left:8px;font-size:10px;color:#cfe;font-family:var(--font-mono);background:rgba(0,0,0,.45);padding:2px 6px;border-radius:6px}
+  .rec-bottom{display:flex;align-items:center;justify-content:center;gap:26px;padding:14px}
+  .record{width:62px;height:62px;border-radius:50%;border:4px solid #fff;background:transparent;display:grid;place-items:center}
+  .record span{width:40px;height:40px;border-radius:50%;background:var(--rec);box-shadow:0 0 18px rgba(255,59,78,.7)}
+  .mini{width:38px;height:38px;border-radius:12px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);font-size:14px}
+  .zoom{position:absolute;left:22px;bottom:92px;background:rgba(0,0,0,.5);border:1px solid var(--line2);font-size:11px;padding:4px 9px;border-radius:14px;font-family:var(--font-mono)}
+
+  /* settings */
+  .grp{margin-bottom:6px}
+  .grp .lbl{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin:2px 0 8px}
+  .row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:8px}
+  .row .ri{width:26px;height:26px;border-radius:8px;background:var(--card2);display:grid;place-items:center;font-size:13px}
+  .row .rt{flex:1;font-size:13px}
+  .row .rt small{display:block;color:var(--muted);font-size:10px}
+  .seg{display:flex;background:var(--card2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg span{padding:5px 10px;font-size:11px;color:var(--muted)}
+  .seg span.on{background:var(--grad);color:#04060d;font-weight:700}
+  .radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--line2)}
+  .radio.on{border-color:var(--purple);background:radial-gradient(circle,var(--magenta) 40%,transparent 45%)}
+  .sel{font-size:11px;color:var(--muted);border:1px solid var(--line2);border-radius:8px;padding:4px 8px}
+  .prem{background:linear-gradient(180deg,rgba(245,194,75,.12),transparent);border:1px solid rgba(245,194,75,.4);border-radius:14px;padding:12px}
+
+  /* ---------- Feature panels ---------- */
+  .features{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:22px;margin-top:34px;position:relative;z-index:2}
+  .panel{border:1px solid var(--line);border-radius:20px;padding:18px 20px;background:linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
+  .panel.gold{border-color:rgba(245,194,75,.45);box-shadow:0 0 40px rgba(245,194,75,.08)}
+  .panel h3{font-family:var(--font-display);font-size:18px;margin-bottom:14px}
+  .panel .crown{color:var(--gold)}
+  .modes{display:flex;gap:14px;align-items:flex-end}
+  .mode{flex:1;text-align:center}
+  .mode .box{border:1px solid var(--line2);border-radius:12px;overflow:hidden;aspect-ratio:9/16;background:linear-gradient(160deg,#1a2440,#0b1024);position:relative}
+  .mode .box .half{position:absolute;left:0;right:0;height:50%}
+  .mode .box .half.a{top:0;background:linear-gradient(135deg,#f0a67a,#7b4b8f)}
+  .mode .box .half.b{bottom:0;background:linear-gradient(160deg,#2b6cb0,#0d1830)}
+  .mode .box.pip .big{position:absolute;inset:0;background:linear-gradient(160deg,#2b6cb0,#0d1830)}
+  .mode .box.pip .small{position:absolute;right:6px;bottom:6px;width:40%;aspect-ratio:9/16;border-radius:8px;border:1px solid var(--line2);background:linear-gradient(135deg,#f0a67a,#7b4b8f)}
+  .mode .name{font-size:12px;margin-top:8px;font-weight:600}
+  .mode .name small{display:block;color:var(--muted);font-weight:400;font-size:10px}
+  .ratios{display:flex;flex-direction:column;gap:10px}
+  .ratios .r{display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+  .ratios .r i{display:inline-block;border:1px solid var(--line2);border-radius:4px}
+  .r.a1 i{width:14px;height:24px} .r.a2 i{width:26px;height:15px} .r.a3 i{width:20px;height:20px}
+  .list{display:flex;flex-direction:column;gap:10px}
+  .list .li{display:flex;align-items:center;gap:10px;font-size:14px}
+  .list .li .ck{color:var(--green);font-weight:800}
+
+  /* ---------- Design tokens ---------- */
+  .section-title{margin:44px 0 16px;font-family:var(--font-display);font-size:22px;letter-spacing:.5px;position:relative;z-index:2}
+  .swatches{display:flex;gap:14px;flex-wrap:wrap;position:relative;z-index:2}
+  .sw{width:150px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:56px}
+  .sw .meta{padding:8px 10px;font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+  .sw .meta b{color:#fff;display:block;font-size:12px}
+  .type{display:flex;gap:30px;flex-wrap:wrap;position:relative;z-index:2}
+  .type .t{border:1px solid var(--line);border-radius:14px;padding:16px 20px;background:var(--card);min-width:280px}
+  .type .t .big{font-size:30px}
+  .type .t .cap{font-size:11px;color:var(--muted2);margin-top:6px;font-family:var(--font-mono)}
+  .note{margin-top:20px;color:var(--muted);font-size:13px;line-height:1.7;max-width:1000px;position:relative;z-index:2}
+  .footer{margin-top:26px;text-align:right;font-family:var(--font-display);font-style:italic;font-size:26px;position:relative;z-index:2}
+  .footer b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+</style>
+</head>
+<body>
+  <div class="poster">
+    <!-- Header -->
+    <div class="top">
+      <svg width="118" height="118" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#22D3EE"/><stop offset=".35" stop-color="#2E7DFF"/>
+            <stop offset=".7" stop-color="#7C3AED"/><stop offset="1" stop-color="#E94FD0"/>
+          </linearGradient>
+          <radialGradient id="lens" cx=".35" cy=".3" r=".8">
+            <stop stop-color="#9fd8ff"/><stop offset=".5" stop-color="#1b3a6b"/><stop offset="1" stop-color="#05070d"/>
+          </radialGradient>
+        </defs>
+        <path d="M60 6 C88 6 108 24 108 52 C108 84 84 108 60 114 C36 108 12 84 12 52 C12 24 32 6 60 6Z"
+              stroke="url(#g)" stroke-width="4" fill="rgba(124,58,237,.08)"/>
+        <ellipse cx="60" cy="60" rx="50" ry="22" stroke="url(#g)" stroke-width="3" opacity=".55" transform="rotate(-24 60 60)"/>
+        <circle cx="43" cy="60" r="17" fill="url(#lens)" stroke="url(#g)" stroke-width="3"/>
+        <circle cx="77" cy="60" r="17" fill="url(#lens)" stroke="url(#g)" stroke-width="3"/>
+        <circle cx="38" cy="55" r="4" fill="#eaf6ff" opacity=".9"/>
+        <circle cx="72" cy="55" r="4" fill="#eaf6ff" opacity=".9"/>
+      </svg>
+      <div class="brand">
+        <div class="wordmark"><span class="d">Duel</span><span class="s">Shots</span></div>
+        <div class="tagline">RECORD BOTH. YOUR WAY.</div>
+      </div>
+      <div class="logo-badge">Dual-lens mark inside an orbital shield.<br/>Gradient: cyan → blue → purple → magenta.</div>
+    </div>
+
+    <!-- Screens -->
+    <div class="screens">
+      <!-- Splash -->
+      <div>
+        <div class="phone"><div class="notch"></div>
+          <div class="screen splash">
+            <svg width="80" height="80" viewBox="0 0 120 120"><use href="#"/></svg>
+            <svg width="88" height="88" viewBox="0 0 120 120" fill="none">
+              <path d="M60 6 C88 6 108 24 108 52 C108 84 84 108 60 114 C36 108 12 84 12 52 C12 24 32 6 60 6Z" stroke="#7C3AED" stroke-width="4" fill="rgba(124,58,237,.12)"/>
+              <circle cx="43" cy="60" r="16" fill="#0b1024" stroke="#22D3EE" stroke-width="3"/><circle cx="77" cy="60" r="16" fill="#0b1024" stroke="#E94FD0" stroke-width="3"/>
+            </svg>
+            <div class="wm">Duel<b>Shots</b></div>
+            <div class="sub">Capture More.<br/>From Every Angle.</div>
+          </div>
+        </div>
+        <div class="caption">Splash</div>
+      </div>
+
+      <!-- Home -->
+      <div>
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><span>▮▮  ▰</span></div>
+            <div class="pad">
+              <div class="appbar"><div class="title">Duel<b>Shots</b></div><div class="iconbtn">⚙</div></div>
+              <div class="btn btn-primary"><span class="cam">🎥</span><div style="text-align:left">Start Recording<small>Choose your mode</small></div></div>
+              <div class="card"><div class="ic">▢▢</div><div class="tx"><div class="t">Dual View</div><div class="s">Both cameras in one video</div></div><div class="chev">›</div></div>
+              <div class="card"><div class="ic">▯▯</div><div class="tx"><div class="t">Separate Videos</div><div class="s">Two files, one for each</div></div><div class="chev">›</div></div>
+              <div class="card"><div class="ic">⇄</div><div class="tx"><div class="t">Both Options</div><div class="s">Record both ways</div></div><div class="chev">›</div></div>
+              <div class="card"><div class="ic" style="color:var(--gold)">⚡</div><div class="tx"><div class="t">Quick Settings</div><div class="s">9:16 · 16:9 · 1080p</div></div><div class="chev">›</div></div>
+              <div class="nav">
+                <div class="item active">⌂<span>Home</span></div>
+                <div class="item">▶<span>Gallery</span></div>
+                <div class="item">⚙<span>Settings</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">Home · Mode select</div>
+      </div>
+
+      <!-- Recording -->
+      <div>
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="rec-top">
+              <div class="iconbtn">✕</div>
+              <div class="timer"><span class="dot"></span>00:00:12</div>
+              <div class="iconbtn">⟳</div>
+            </div>
+            <div class="preview">
+              <div class="feed selfie"><span class="tag">FRONT</span><span class="ratio">9:16</span></div>
+              <div class="feed city"><span class="tag">BACK</span><span class="ratio">16:9</span></div>
+              <div class="zoom">1.0x</div>
+            </div>
+            <div class="rec-bottom">
+              <div class="mini">⟲</div>
+              <div class="record"><span></span></div>
+              <div class="mini">▭</div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">Recording · Dual preview</div>
+      </div>
+
+      <!-- Settings -->
+      <div>
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="statusbar"><span>‹ Settings</span><span>▮▮ ⌾ ▰</span></div>
+            <div class="pad" style="gap:6px">
+              <div class="grp"><div class="lbl">Recording Mode</div>
+                <div class="row"><div class="ri" style="color:var(--cyan)">▢▢</div><div class="rt">Dual View</div><div class="radio on"></div></div>
+                <div class="row"><div class="ri">▯▯</div><div class="rt">Separate Videos</div><div class="radio"></div></div>
+                <div class="row"><div class="ri">⇄</div><div class="rt">Both Options</div><div class="radio"></div></div>
+              </div>
+              <div class="grp"><div class="lbl">Camera Formats</div>
+                <div class="row"><div class="ri">👤</div><div class="rt">Front Camera<small>Portrait</small></div><div class="sel">9:16 ▾</div></div>
+                <div class="row"><div class="ri">🏙</div><div class="rt">Back Camera<small>Landscape</small></div><div class="sel">16:9 ▾</div></div>
+              </div>
+              <div class="grp"><div class="lbl">Quality · Codec</div>
+                <div class="row"><div class="ri">HD</div><div class="rt">Resolution</div><div class="seg"><span class="on">1080p</span><span>4K★</span></div></div>
+                <div class="row"><div class="ri">▸</div><div class="rt">Video Format</div><div class="seg"><span class="on">MP4</span><span>HEVC★</span></div></div>
+              </div>
+              <div class="prem"><div class="btn btn-gold" style="padding:11px">♛ Go Premium</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">Settings · ★ = premium</div>
+      </div>
+    </div>
+
+    <!-- Feature panels -->
+    <div class="features">
+      <div class="panel">
+        <h3>Flexible Recording Modes</h3>
+        <div class="modes">
+          <div class="mode"><div class="box"><div class="half a"></div><div class="half b"></div></div><div class="name">Dual View<small>One file</small></div></div>
+          <div class="mode"><div class="box" style="display:flex;gap:3px;background:transparent;border:none"><div style="flex:1;border:1px solid var(--line2);border-radius:8px;background:linear-gradient(135deg,#f0a67a,#7b4b8f)"></div><div style="flex:1;border:1px solid var(--line2);border-radius:8px;background:linear-gradient(160deg,#2b6cb0,#0d1830)"></div></div><div class="name">Separate<small>Two files</small></div></div>
+          <div class="mode"><div class="box pip"><div class="big"></div><div class="small"></div></div><div class="name">Both<small>Your choice</small></div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Custom Formats</h3>
+        <div class="ratios">
+          <div class="r a1"><i></i>9:16 &nbsp; Portrait</div>
+          <div class="r a2"><i></i>16:9 &nbsp; Landscape</div>
+          <div class="r a3"><i></i>1:1 &nbsp; Square</div>
+        </div>
+        <div style="margin-top:12px;color:var(--muted);font-size:12px">Mix &amp; match per camera:<br/>Front 9:16 + Back 16:9 — or any combo.</div>
+      </div>
+      <div class="panel gold">
+        <h3><span class="crown">♛</span> Premium Upgrade</h3>
+        <div class="list">
+          <div class="li"><span class="ck">✓</span> More format options (4K, HEVC)</div>
+          <div class="li"><span class="ck">✓</span> 60fps &amp; custom bitrate</div>
+          <div class="li"><span class="ck">✓</span> Per-camera aspect control</div>
+          <div class="li"><span class="ck">✓</span> No watermark</div>
+        </div>
+        <div class="btn btn-gold" style="margin-top:14px">Go Premium</div>
+      </div>
+    </div>
+
+    <!-- Design tokens -->
+    <div class="section-title">Design tokens</div>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:var(--grad)"></div><div class="meta"><b>Brand Gradient</b>#22D3EE→#2E7DFF→#7C3AED→#E94FD0</div></div>
+      <div class="sw"><div class="chip" style="background:var(--bg2)"></div><div class="meta"><b>Background</b>#0A0E1A / #05070D</div></div>
+      <div class="sw"><div class="chip" style="background:var(--card)"></div><div class="meta"><b>Surface</b>#141A2A · line rgba(255,255,255,.08)</div></div>
+      <div class="sw"><div class="chip" style="background:var(--gold)"></div><div class="meta"><b>Premium Gold</b>#F5C24B / #FFB020</div></div>
+      <div class="sw"><div class="chip" style="background:var(--rec)"></div><div class="meta"><b>Record Red</b>#FF3B4E</div></div>
+      <div class="sw"><div class="chip" style="background:var(--muted)"></div><div class="meta"><b>Secondary text</b>#A7B0C4</div></div>
+    </div>
+    <div class="section-title" style="font-size:18px">Typography</div>
+    <div class="type">
+      <div class="t"><div class="big" style="font-family:var(--font-display);font-weight:700">DuelShots</div><div class="cap">Display · Space Grotesk 700 (logo, headings)</div></div>
+      <div class="t"><div class="big" style="font-family:var(--font-ui);font-weight:600">Start Recording</div><div class="cap">UI · Inter 600 (buttons, body)</div></div>
+      <div class="t"><div class="big" style="font-family:var(--font-mono);font-weight:700">00:00:12</div><div class="cap">Mono · JetBrains Mono (timer, ratios)</div></div>
+    </div>
+
+    <div class="note">
+      <b style="color:#fff">Byggnad för AI-agenten:</b> Kotlin + Jetpack Compose + CameraX (befintligt projekt).
+      Concurrent camera via <code>ProcessCameraProvider.bindToLifecycle(listOf(SingleCameraConfig, SingleCameraConfig))</code>.
+      <b>Dual View</b> = komposition till en fil (CameraX CompositionSettings eller klipp två feeds → en MediaCodec-yta).
+      <b>Separate</b> = två MP4 via MediaStore. <b>Both</b> = kör båda parallellt. Per-kamera crop till 9:16 / 16:9 / 1:1.
+      Gratis: 1080p · 30fps · MP4 · watermark. Premium (Play Billing): 4K · 60fps · HEVC · fri aspect-kontroll · utan watermark.
+    </div>
+    <div class="footer">Your World. <b>Two Perspectives.</b></div>
+  </div>
+</body>
+</html>
