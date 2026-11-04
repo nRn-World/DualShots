@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,6 +44,7 @@ import com.nrworld.duelshot.ui.AppViewModel
 import com.nrworld.duelshot.ui.components.DuelIcon
 import com.nrworld.duelshot.ui.components.DuelIconKind
 import com.nrworld.duelshot.ui.theme.DuelLine
+import com.nrworld.duelshot.ui.theme.DuelOrange
 import com.nrworld.duelshot.ui.theme.DuelOrangeLight
 import com.nrworld.duelshot.ui.theme.DuelRecord
 import com.nrworld.duelshot.ui.theme.DuelSurface
@@ -49,6 +52,13 @@ import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
+import com.nrworld.duelshot.model.AspectOption
+import com.nrworld.duelshot.model.QualityOption
+import com.nrworld.duelshot.ui.components.PremiumDialog
+import com.nrworld.duelshot.ui.components.SegmentedControl
 
 @Composable
 fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
@@ -64,26 +74,41 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     var camReady by remember { mutableStateOf(false) }
     var ready by remember { mutableStateOf(false) }
     var renderedMode by remember { mutableStateOf(vm.mode) }
+    var boundFor by remember { mutableStateOf<RecordingMode?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var elapsed by remember { mutableStateOf(0) }
     var savedNames by remember { mutableStateOf<List<String>>(emptyList()) }
+    var part by remember { mutableStateOf(1) }
+    var showTune by remember { mutableStateOf(false) }
+    var stacked by remember { mutableStateOf(false) }
+    var premiumFeature by remember { mutableStateOf<String?>(null) }
+
+    // Visat läge: önskat läge tills bindningen skett, därefter det som faktiskt band (fallback).
+    val displayMode = if (boundFor == vm.mode) renderedMode else vm.mode
 
     LaunchedEffect(Unit) {
         status = controller.init()
         camReady = controller.canBind
     }
 
-    // Bind när förhandsvisningarna finns (kör om vid inställningsändring).
+    // Bind när förhandsvisningarna finns. Ändras något under inspelning avslutas klippet,
+    // kameran binds om och nästa del (_p2, _p3 …) startar direkt.
     LaunchedEffect(camReady, ready, backView, frontView, composedView, vm.mode, vm.frontAspect, vm.backAspect, vm.quality) {
         if (!camReady) return@LaunchedEffect
         if (controller.supported) {
-            if (vm.mode == RecordingMode.DUAL_VIEW) {
-                if (composedView == null) return@LaunchedEffect
-            } else if (backView == null || frontView == null) return@LaunchedEffect
-        } else {
-            if (backView == null && frontView == null) return@LaunchedEffect
-        }
+            when (vm.mode) {
+                RecordingMode.DUAL_VIEW -> if (composedView == null) return@LaunchedEffect
+                RecordingMode.SEPARATE -> if (backView == null || frontView == null) return@LaunchedEffect
+                RecordingMode.BOTH -> if (backView == null || frontView == null || composedView == null) return@LaunchedEffect
+            }
+        } else if (backView == null && frontView == null) return@LaunchedEffect
 
+        val resume = isRecording
+        if (resume) {
+            withTimeoutOrNull(4000) {
+                suspendCancellableCoroutine<Unit> { c -> controller.stopRecording { if (c.isActive) c.resume(Unit) } }
+            }
+        }
         status = controller.bind(
             wanted = vm.mode,
             frontAspect = vm.frontAspect,
@@ -95,7 +120,16 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             composedView = composedView
         )
         renderedMode = controller.activeMode
+        boundFor = vm.mode
         ready = true
+        if (resume) {
+            part++
+            controller.startRecording(
+                part = part,
+                onStarted = { names -> savedNames = savedNames + names },
+                onError = { status = it; isRecording = false }
+            )
+        }
     }
 
     // Timer.
@@ -116,29 +150,98 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             TimerPill(elapsed, isRecording)
             Spacer(Modifier.weight(1f))
-            IconChip(DuelIconKind.SWITCH) { /* byt primär kamera – plats för framtida växling */ }
+            IconChip(DuelIconKind.SETTINGS, active = showTune) { showTune = !showTune }
         }
 
         // Förhandsvisning
         Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp)) {
             if (!controller.supported) {
-                // Enskild kamera: en fullmatad förhandsvisning.
-                Feed(backView, label = "CAMERA", ratio = vm.backAspect.label, modifier = Modifier.fillMaxSize()) { backView = it }
+                // Enskild kamera: en fullmatad förhandsvisning i valt format.
+                FramedFeed(
+                    backView, vm.backAspect, label = "CAMERA", modifier = Modifier.fillMaxSize(),
+                    onRelease = { if (backView === it) backView = null }
+                ) { backView = it }
             } else {
-                when (renderedMode) {
-                    RecordingMode.DUAL_VIEW -> Feed(composedView) { composedView = it }
-                    else -> Row(modifier = Modifier.fillMaxSize()) {
-                        Feed(backView, label = "BACK", ratio = vm.backAspect.label, modifier = Modifier.weight(1f)) { backView = it }
-                        Spacer(Modifier.width(6.dp))
-                        Feed(frontView, label = "FRONT", ratio = vm.frontAspect.label, modifier = Modifier.weight(1f)) { frontView = it }
-                    }
+                if (displayMode == RecordingMode.DUAL_VIEW) {
+                    Feed(
+                        composedView, modifier = Modifier.fillMaxSize(),
+                        onRelease = { if (composedView === it) composedView = null }
+                    ) { composedView = it }
+                } else {
+                    // Samma två vyer oavsett layout – bara storlek/placering ändras (ingen omstart).
+                    val cellA = if (stacked) Modifier.fillMaxWidth().fillMaxHeight(0.5f).align(Alignment.TopCenter)
+                    else Modifier.fillMaxHeight().fillMaxWidth(0.5f).align(Alignment.CenterStart)
+                    val cellB = if (stacked) Modifier.fillMaxWidth().fillMaxHeight(0.5f).align(Alignment.BottomCenter)
+                    else Modifier.fillMaxHeight().fillMaxWidth(0.5f).align(Alignment.CenterEnd)
+                    FramedFeed(
+                        backView, vm.backAspect, label = "BACK", modifier = cellA.padding(3.dp),
+                        onRelease = { if (backView === it) backView = null }
+                    ) { backView = it }
+                    FramedFeed(
+                        frontView, vm.frontAspect, label = "FRONT", modifier = cellB.padding(3.dp),
+                        onRelease = { if (frontView === it) frontView = null }
+                    ) { frontView = it }
                 }
                 // Dold yta som behövs för composition i BOTH-läget.
-                if (renderedMode == RecordingMode.BOTH) {
+                if (displayMode == RecordingMode.BOTH) {
                     AndroidView(
                         modifier = Modifier.size(1.dp),
-                        factory = { ctx -> PreviewView(ctx).also { composedView = it } }
+                        factory = { ctx -> PreviewView(ctx).also { composedView = it } },
+                        onRelease = { if (composedView === it) composedView = null }
                     )
+                }
+            }
+        }
+
+        // Ändra live: läge, kvalitet, format och layout.
+        if (showTune) {
+            val dual = controller.supported
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (isRecording) {
+                    Text("Changes start a new clip part (_p2, _p3 …)", color = DuelOrangeLight, fontSize = 11.sp)
+                }
+                if (dual) TuneRow("MODE") {
+                    SegmentedControl(
+                        options = listOf("Dual", "Separate", "Both"),
+                        selectedIndex = vm.mode.ordinal,
+                        onSelect = { vm.mode = RecordingMode.values()[it] }
+                    )
+                }
+                TuneRow("QUALITY") {
+                    SegmentedControl(
+                        options = listOf("720p", "1080p", "4K"),
+                        selectedIndex = vm.quality.ordinal,
+                        onSelect = { idx ->
+                            val q = QualityOption.values()[idx]
+                            if (q.premium && !vm.isPremium) premiumFeature = q.label else vm.quality = q
+                        }
+                    )
+                }
+                TuneRow("BACK") {
+                    SegmentedControl(
+                        options = AspectOption.values().map { it.label.substringBefore(' ') },
+                        selectedIndex = vm.backAspect.ordinal,
+                        onSelect = { vm.backAspect = AspectOption.values()[it] }
+                    )
+                }
+                if (dual) {
+                    TuneRow("FRONT") {
+                        SegmentedControl(
+                            options = AspectOption.values().map { it.label.substringBefore(' ') },
+                            selectedIndex = vm.frontAspect.ordinal,
+                            onSelect = { vm.frontAspect = AspectOption.values()[it] }
+                        )
+                    }
+                    if (displayMode != RecordingMode.DUAL_VIEW) TuneRow("LAYOUT") {
+                        SegmentedControl(
+                            options = listOf("Side", "Stack"),
+                            selectedIndex = if (stacked) 1 else 0,
+                            onSelect = { stacked = it == 1 }
+                        )
+                    }
                 }
             }
         }
@@ -166,6 +269,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 enabled = ready && controller.canBind,
                 onClick = {
                     if (!isRecording) {
+                        part = 1
                         controller.startRecording(
                             onStarted = { names -> savedNames = names; isRecording = true },
                             onError = { status = it }
@@ -179,6 +283,52 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             )
         }
     }
+
+    premiumFeature?.let { feature ->
+        PremiumDialog(
+            feature = feature,
+            onDismiss = { premiumFeature = null },
+            onUpgrade = { vm.grantPremium(); premiumFeature = null }
+        )
+    }
+}
+
+@Composable
+private fun TuneRow(label: String, content: @Composable () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label, color = DuelTextMuted, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 1.sp,
+            modifier = Modifier.width(64.dp)
+        )
+        content()
+    }
+}
+
+private fun AspectOption.ratio(): Float = when (this) {
+    AspectOption.R_9_16 -> 9f / 16f
+    AspectOption.R_16_9 -> 16f / 9f
+    AspectOption.R_1_1 -> 1f
+    AspectOption.R_4_3 -> 4f / 3f
+}
+
+/** Förhandsvisning i exakt valt bildformat, centrerad i sin cell. */
+@Composable
+private fun FramedFeed(
+    view: PreviewView?,
+    aspect: AspectOption,
+    label: String,
+    modifier: Modifier = Modifier,
+    onRelease: (PreviewView) -> Unit,
+    onView: (PreviewView) -> Unit
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Feed(
+            view, label = label, ratio = aspect.label,
+            modifier = Modifier.aspectRatio(aspect.ratio()),
+            onRelease = onRelease, onView = onView
+        )
+    }
 }
 
 @Composable
@@ -187,6 +337,7 @@ private fun Feed(
     label: String? = null,
     ratio: String? = null,
     modifier: Modifier = Modifier,
+    onRelease: (PreviewView) -> Unit = {},
     onView: (PreviewView) -> Unit
 ) {
     Box(modifier = modifier.clip(RoundedCornerShape(14.dp)).background(DuelSurface).border(1.dp, DuelLine, RoundedCornerShape(14.dp))) {
@@ -198,7 +349,8 @@ private fun Feed(
                     scaleType = PreviewView.ScaleType.FILL_CENTER
                     onView(this)
                 }
-            }
+            },
+            onRelease = onRelease
         )
         if (label != null) {
             Text(
@@ -218,10 +370,10 @@ private fun Feed(
 }
 
 @Composable
-private fun IconChip(kind: DuelIconKind, onClick: () -> Unit) {
+private fun IconChip(kind: DuelIconKind, active: Boolean = false, onClick: () -> Unit) {
     Box(
         modifier = Modifier.size(42.dp).clip(CircleShape)
-            .background(DuelSurface2).border(1.dp, DuelLine, CircleShape)
+            .background(DuelSurface2).border(1.dp, if (active) DuelOrange else DuelLine, CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

@@ -8,6 +8,10 @@ import androidx.camera.core.CompositionSettings
 import androidx.camera.core.ConcurrentCamera
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.ViewPort
+import android.util.Rational
+import android.view.Surface
+import androidx.camera.video.VideoRecordEvent
 import androidx.camera.core.AspectRatio
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FileOutputOptions
@@ -46,6 +50,10 @@ class DualCameraController(private val context: Context) {
     private var composedVideo: VideoCapture<Recorder>? = null
 
     private val activeRecordings = mutableListOf<Recording>()
+    private val stopWaiters = mutableListOf<() -> Unit>()
+
+    /** Beskärning per kamera via ViewPort; stängs av om enheten inte klarar den. */
+    private var cropEnabled = true
 
     /** Vilket läge som faktiskt band (kan skilja sig från önskat pga fallback). */
     var activeMode = RecordingMode.SEPARATE
@@ -129,6 +137,10 @@ class DualCameraController(private val context: Context) {
             activeMode = wanted
             "Camera ready – ${wanted.title}."
         } catch (e: Exception) {
+            if (cropEnabled) {
+                cropEnabled = false
+                return bind(wanted, frontAspect, backAspect, quality, lifecycleOwner, backView, frontView, composedView)
+            }
             // Fallback: försök enklare läge så användaren alltid kan spela in.
             try {
                 p.unbindAll()
@@ -155,13 +167,16 @@ class DualCameraController(private val context: Context) {
             val aspect = if (useFront) frontAspect else backAspect
             val (prev, vc) = previewAndCapture(view, aspect, qs)
             // Enskild kamera binds via vanliga (icke-koncurrenta) bindToLifecycle.
-            p.bindToLifecycle(owner, sel, *arrayOf<androidx.camera.core.UseCase>(prev, vc))
+            p.bindToLifecycle(owner, sel, groupOf(aspect, prev, vc))
             if (useFront) frontVideo = vc else backVideo = vc
             activeMode = RecordingMode.SEPARATE
             singleFallback = true
             "Single camera (${if (useFront) "FRONT" else "BACK"}) – recording one file."
         } catch (e: Exception) {
-            "Could not bind camera: ${e.localizedMessage}"
+            if (cropEnabled) {
+                cropEnabled = false
+                bindSingle(p, frontAspect, backAspect, qs, owner, backView, frontView)
+            } else "Could not bind camera: ${e.localizedMessage}"
         }
     }
 
@@ -173,8 +188,8 @@ class DualCameraController(private val context: Context) {
         val (backPrev, backVc) = previewAndCapture(backView, backAspect, qs)
         val (frontPrev, frontVc) = previewAndCapture(frontView, frontAspect, qs)
         backVideo = backVc; frontVideo = frontVc
-        val backGroup = UseCaseGroup.Builder().addUseCase(backPrev).addUseCase(backVc).build()
-        val frontGroup = UseCaseGroup.Builder().addUseCase(frontPrev).addUseCase(frontVc).build()
+        val backGroup = groupOf(backAspect, backPrev, backVc)
+        val frontGroup = groupOf(frontAspect, frontPrev, frontVc)
         p.bindToLifecycle(
             listOf(
                 ConcurrentCamera.SingleCameraConfig(bs, backGroup, owner),
@@ -237,6 +252,25 @@ class DualCameraController(private val context: Context) {
         )
     }
 
+    private fun groupOf(aspect: AspectOption, vararg useCases: androidx.camera.core.UseCase): UseCaseGroup {
+        val b = UseCaseGroup.Builder()
+        useCases.forEach { b.addUseCase(it) }
+        viewPortFor(aspect)?.let { b.setViewPort(it) }
+        return b.build()
+    }
+
+    /** Beskär både förhandsvisning och inspelning till valt format (appen är låst i porträtt). */
+    private fun viewPortFor(a: AspectOption): ViewPort? {
+        if (!cropEnabled) return null
+        val ratio = when (a) {
+            AspectOption.R_9_16 -> Rational(9, 16)
+            AspectOption.R_16_9 -> Rational(16, 9)
+            AspectOption.R_1_1 -> Rational(1, 1)
+            AspectOption.R_4_3 -> Rational(4, 3)
+        }
+        return ViewPort.Builder(ratio, Surface.ROTATION_0).setScaleType(ViewPort.FILL_CENTER).build()
+    }
+
     private fun previewAndCapture(
         view: PreviewView?, aspect: AspectOption, qs: QualitySelector
     ): Pair<Preview, VideoCapture<Recorder>> {
@@ -252,9 +286,9 @@ class DualCameraController(private val context: Context) {
         return preview to video
     }
 
-    fun startRecording(onStarted: (List<String>) -> Unit, onError: (String) -> Unit) {
+    fun startRecording(part: Int = 1, onStarted: (List<String>) -> Unit, onError: (String) -> Unit) {
         val executor = ContextCompat.getMainExecutor(context)
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + (if (part > 1) "_p$part" else "")
         val started = mutableListOf<Recording>()
         val names = mutableListOf<String>()
         try {
@@ -287,9 +321,20 @@ class DualCameraController(private val context: Context) {
         }
     }
 
-    fun stopRecording() {
-        activeRecordings.forEach { runCatching { it.stop() } }
-        activeRecordings.clear()
+    /** Stoppar alla inspelningar; [then] körs när alla filer är färdigskrivna. */
+    fun stopRecording(then: (() -> Unit)? = null) {
+        if (activeRecordings.isEmpty()) { then?.invoke(); return }
+        then?.let { stopWaiters += it }
+        activeRecordings.toList().forEach { runCatching { it.stop() } }
+    }
+
+    private fun onFinalized(rec: Recording?) {
+        activeRecordings.remove(rec)
+        if (activeRecordings.isEmpty()) {
+            val waiting = stopWaiters.toList()
+            stopWaiters.clear()
+            waiting.forEach { it() }
+        }
     }
 
     private fun VideoCapture<Recorder>.record(
@@ -297,7 +342,10 @@ class DualCameraController(private val context: Context) {
     ): Recording {
         val pending = output.prepareRecording(ctx, mediaStoreOutput(ctx, name))
         if (audio) pending.withAudioEnabled()
-        return pending.start(executor) { /* VideoRecordEvent */ }
+        val ref = arrayOfNulls<Recording>(1)
+        val rec = pending.start(executor) { ev -> if (ev is VideoRecordEvent.Finalize) onFinalized(ref[0]) }
+        ref[0] = rec
+        return rec
     }
 
     private fun qualitySelector(q: QualityOption): QualitySelector = when (q) {
