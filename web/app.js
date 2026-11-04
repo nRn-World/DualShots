@@ -65,6 +65,8 @@ const state = {
   codec: 'MP4',
   premium: false,
   clips: [],
+  // front-camera overlay inside the Dual View frame (cx/cy = centre, scale = width)
+  pip: { cx: 0.74, cy: 0.24, scale: 0.34 },
 };
 
 /* --------------------------------------------------------------- elements */
@@ -146,6 +148,50 @@ function shortTime(ms) {
 
 const mb = (bytes) => Math.max(1, Math.round(bytes / (1024 * 1024)));
 
+/* --------------------------------------------------- overlay (PiP) layout */
+
+const PIP_MIN = 0.16;
+const PIP_MAX = 0.62;
+const PIP_DEFAULT = { cx: 0.74, cy: 0.24, scale: 0.34 };
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+const currentPip = () => state.pip || PIP_DEFAULT;
+
+/** Pixel rect of the front-camera overlay inside a w x h frame. */
+function pipRect(w, h, aspectKey, pip) {
+  const a = ASPECTS[aspectKey];
+  let pw = w * clamp(pip.scale, PIP_MIN, PIP_MAX);
+  let ph = pw * (a.h / a.w);
+  const maxH = h * 0.82;
+  if (ph > maxH) {
+    ph = maxH;
+    pw = ph * (a.w / a.h);
+  }
+  let x = pip.cx * w - pw / 2;
+  let y = pip.cy * h - ph / 2;
+  x = clamp(x, 0, Math.max(0, w - pw));
+  y = clamp(y, 0, Math.max(0, h - ph));
+  return { x, y, w: pw, h: ph };
+}
+
+/** Keep the overlay centre inside the frame so it can never be dragged away. */
+function clampPipToStage(pip, el, aspectKey) {
+  const w = el.clientWidth;
+  const h = el.clientHeight;
+  if (!w || !h) return pip;
+  const a = ASPECTS[aspectKey];
+  const pw = w * pip.scale;
+  const ph = pw * (a.h / a.w);
+  const halfX = Math.min(0.5, (pw / 2) / w);
+  const halfY = Math.min(0.5, (ph / 2) / h);
+  return {
+    ...pip,
+    cx: clamp(pip.cx, halfX, 1 - halfX),
+    cy: clamp(pip.cy, halfY, 1 - halfY),
+  };
+}
+
 function savePrefs() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
@@ -155,6 +201,7 @@ function savePrefs() {
       quality: state.quality,
       codec: state.codec,
       premium: state.premium,
+      pip: state.pip,
     }));
   } catch (_) { /* private mode */ }
 }
@@ -170,6 +217,13 @@ function loadPrefs() {
     if (QUALITIES[p.quality]) state.quality = p.quality;
     if (CODECS[p.codec]) state.codec = p.codec;
     state.premium = !!p.premium;
+    if (p.pip && Number.isFinite(p.pip.cx) && Number.isFinite(p.pip.cy) && Number.isFinite(p.pip.scale)) {
+      state.pip = {
+        cx: clamp(p.pip.cx, 0, 1),
+        cy: clamp(p.pip.cy, 0, 1),
+        scale: clamp(p.pip.scale, PIP_MIN, PIP_MAX),
+      };
+    }
   } catch (_) { /* ignore */ }
 }
 
@@ -251,9 +305,9 @@ function showAbout() {
       <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
 
       <h3>Build</h3>
-      <p>v2.1 — redesigned interface plus a camera setup sheet on the record screen:
-      pick the format for the front and the back camera (and swap them) without
-      leaving the viewfinder. Last updated 2026-11-04.</p>
+      <p>v2.2 — redesigned interface, a camera setup sheet on the record screen
+      (format per camera, swap, mode) and a front-camera overlay you can drag,
+      pinch and reset while filming. Last updated 2026-11-04.</p>
 
       <h3>What works here</h3>
       <ul>
@@ -261,6 +315,8 @@ function showAbout() {
         <li>Clips are encoded live in the browser and land in the Gallery tab, playable and downloadable.</li>
         <li>Settings persist in <code>localStorage</code> (SharedPreferences in the app).</li>
         <li>Tap the mode pill on the record screen to set a format per camera while you film.</li>
+        <li>In Dual View, drag the front-camera inset to move it, pinch (or scroll) to resize it,
+        double-tap to reset. The layout is baked into the recorded video.</li>
         <li>4K and HEVC are gated behind the mock Pro purchase — same as <code>grantPremium()</code>.</li>
       </ul>
 
@@ -503,6 +559,154 @@ async function switchCamera() {
 }
 
 /* =====================================================================
+   OVERLAY GESTURES (drag + pinch the front camera inside Dual View)
+   ===================================================================== */
+
+const gesture = { pointers: new Map(), drag: null, pinch: null, lastTap: 0, moved: false, multi: false };
+let pipHintTimer = 0;
+
+function pointerDistance() {
+  const pts = [...gesture.pointers.values()];
+  if (pts.length < 2) return 0;
+  return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+}
+
+function onPreviewPointerDown(e) {
+  if (!recDom.pip) return;
+  const onPip = !!(e.target.closest && e.target.closest('.pip'));
+  gesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (gesture.pointers.size === 1) {
+    if (!onPip) return; // only start a drag when the overlay itself is grabbed
+    const p = currentPip();
+    gesture.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: p.cx, cy: p.cy };
+    gesture.pinch = null;
+    gesture.moved = false;
+    gesture.multi = false;
+    recDom.pip.classList.add('active');
+    hidePipHint();
+    try { recDom.preview.setPointerCapture(e.pointerId); } catch (_) { /* not supported */ }
+  } else if (gesture.pointers.size === 2) {
+    gesture.pinch = { dist: pointerDistance(), scale: currentPip().scale };
+    gesture.drag = null;
+    gesture.multi = true;
+    recDom.pip.classList.add('active');
+    hidePipHint();
+  }
+}
+
+function onPreviewPointerMove(e) {
+  if (!gesture.pointers.has(e.pointerId) || !recDom.pip) return;
+  gesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  const tile = recDom.pip.parentElement;
+  if (!tile) return;
+  const rect = tile.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  if (gesture.pointers.size >= 2 && gesture.pinch && gesture.pinch.dist > 0) {
+    const scale = clamp(gesture.pinch.scale * (pointerDistance() / gesture.pinch.dist), PIP_MIN, PIP_MAX);
+    state.pip = clampPipToStage({ ...currentPip(), scale }, tile, state.frontAspect);
+    applyPipStyle();
+    return;
+  }
+
+  if (gesture.drag && gesture.drag.id === e.pointerId) {
+    const dx = e.clientX - gesture.drag.x;
+    const dy = e.clientY - gesture.drag.y;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) gesture.moved = true;
+    const cx = gesture.drag.cx + dx / rect.width;
+    const cy = gesture.drag.cy + dy / rect.height;
+    state.pip = clampPipToStage({ ...currentPip(), cx, cy }, tile, state.frontAspect);
+    applyPipStyle();
+  }
+}
+
+function onPreviewPointerUp(e) {
+  if (!gesture.pointers.has(e.pointerId)) return;
+
+  const onPip = !!(e.target.closest && e.target.closest('.pip'));
+  const wasMulti = gesture.pointers.size > 1 || gesture.multi;
+  const dragged = gesture.moved;
+
+  gesture.pointers.delete(e.pointerId);
+
+  if (gesture.pointers.size === 1) {
+    const [id, point] = [...gesture.pointers.entries()][0];
+    const cur = currentPip();
+    gesture.drag = { id, x: point.x, y: point.y, cx: cur.cx, cy: cur.cy };
+    gesture.pinch = null;
+    return;
+  }
+
+  if (gesture.pointers.size === 0) {
+    gesture.drag = null;
+    gesture.pinch = null;
+    gesture.moved = false;
+    gesture.multi = false;
+    if (recDom.pip) recDom.pip.classList.remove('active');
+    savePrefs();
+  }
+
+  // double tap only when it was a clean, single-finger tap on the overlay
+  if (onPip && !wasMulti && !dragged) {
+    const now = Date.now();
+    if (now - gesture.lastTap < 320) {
+      resetPip();
+      gesture.lastTap = 0;
+    } else {
+      gesture.lastTap = now;
+    }
+  } else {
+    gesture.lastTap = 0;
+  }
+}
+
+function onPreviewWheel(e) {
+  if (!recDom.pip || !(e.target.closest && e.target.closest('.pip'))) return;
+  e.preventDefault();
+  const next = clamp(currentPip().scale * (1 - e.deltaY * 0.0012), PIP_MIN, PIP_MAX);
+  state.pip = { ...currentPip(), scale: next };
+  applyPipStyle();
+  savePrefs();
+}
+
+function attachPreviewGestures() {
+  const el = recDom.preview;
+  if (!el) return;
+  el.addEventListener('pointerdown', onPreviewPointerDown);
+  el.addEventListener('pointermove', onPreviewPointerMove);
+  el.addEventListener('pointerup', onPreviewPointerUp);
+  el.addEventListener('pointercancel', onPreviewPointerUp);
+  el.addEventListener('wheel', onPreviewWheel, { passive: false });
+  el.addEventListener('dblclick', (e) => {
+    if (e.target.closest && e.target.closest('.pip')) resetPip();
+  });
+}
+
+function applyPipStyle() {
+  if (!recDom.pip) return;
+  const p = currentPip();
+  recDom.pip.style.width = `${(p.scale * 100).toFixed(2)}%`;
+  recDom.pip.style.left = `${(p.cx * 100).toFixed(2)}%`;
+  recDom.pip.style.top = `${(p.cy * 100).toFixed(2)}%`;
+}
+
+function hidePipHint(delay = 0) {
+  clearTimeout(pipHintTimer);
+  const hide = () => { if (recDom.hint) recDom.hint.classList.add('hide'); };
+  if (delay) pipHintTimer = setTimeout(hide, delay);
+  else hide();
+}
+
+function resetPip() {
+  state.pip = { ...PIP_DEFAULT };
+  savePrefs();
+  applyPipStyle();
+  toast('Overlay reset');
+}
+
+/* =====================================================================
    RECORDING
    ===================================================================== */
 
@@ -634,22 +838,19 @@ function drawOutput(o) {
     const front = cam.feeds.front;
     if (back) drawCover(ctx, back.el, w, h, back.mirror);
     if (front) {
-      const pipW = Math.round(w * 0.34);
-      const fa = ASPECTS[(rec.take && rec.take.frontAspect) || state.frontAspect];
-      const pipH = Math.round(pipW * (fa.h / fa.w));
-      const margin = Math.round(w * 0.04);
-      const x = w - pipW - margin;
-      const y = margin;
+      const aspectKey = (rec.take && rec.take.frontAspect) || state.frontAspect;
+      const g = pipRect(w, h, aspectKey, currentPip());
+      const radius = Math.round(Math.min(g.w, g.h) * 0.07);
       ctx.save();
-      roundRect(ctx, x, y, pipW, pipH, Math.round(w * 0.022));
+      roundRect(ctx, g.x, g.y, g.w, g.h, radius);
       ctx.clip();
       ctx.fillStyle = '#000';
-      ctx.fillRect(x, y, pipW, pipH);
-      drawCover(ctx, front.el, pipW, pipH, front.mirror);
+      ctx.fillRect(g.x, g.y, g.w, g.h);
+      drawCover(ctx, front.el, g.w, g.h, front.mirror);
       ctx.restore();
       ctx.strokeStyle = 'rgba(255,255,255,.55)';
       ctx.lineWidth = Math.max(2, Math.round(w / 340));
-      roundRect(ctx, x, y, pipW, pipH, Math.round(w * 0.022));
+      roundRect(ctx, g.x, g.y, g.w, g.h, radius);
       ctx.stroke();
     }
     return;
@@ -874,6 +1075,8 @@ function buildRecordShell() {
   recDom.flip = $('#rec-flip');
   recDom.thumb = $('#rec-thumb');
 
+  attachPreviewGestures();
+
   $('#rec-close').addEventListener('click', async () => {
     if (rec.active) await stopRecording();
     closeRecord();
@@ -914,6 +1117,8 @@ function mountFeeds() {
   const stage = recDom.feeds;
   if (!stage) return;
   stage.innerHTML = '';
+  recDom.pip = null;
+  recDom.hint = null;
   mountedKey = layoutKey();
 
   if (!cam.ready) {
@@ -958,6 +1163,15 @@ function mountFeeds() {
       pip.style.setProperty('--pip-ratio', `${a.w} / ${a.h}`);
       pip.appendChild(front.el);
       tile.appendChild(pip);
+      recDom.pip = pip;
+      applyPipStyle();
+
+      const hint = document.createElement('div');
+      hint.className = 'pip-hint';
+      hint.textContent = 'Drag to move · pinch to resize';
+      tile.appendChild(hint);
+      recDom.hint = hint;
+      hidePipHint(6000);
     }
     return;
   }
@@ -1114,6 +1328,9 @@ function cameraSheetHTML() {
     </div>
 
     <button class="mini-btn" data-swap type="button">Swap front and back</button>
+    ${state.mode === 'DUAL_VIEW'
+      ? '<button class="mini-btn" data-reset-pip type="button">Reset overlay position</button>'
+      : ''}
 
     <button class="btn-primary" data-close type="button">Done</button>`;
 }
@@ -1150,6 +1367,12 @@ function wireCameraSheet() {
 
   $$('[data-recfront]', modalRoot).forEach((b) => b.addEventListener('click', () => pick('front', b.dataset.recfront)));
   $$('[data-recback]', modalRoot).forEach((b) => b.addEventListener('click', () => pick('back', b.dataset.recback)));
+
+  const resetBtn = $('[data-reset-pip]', modalRoot);
+  if (resetBtn) resetBtn.addEventListener('click', () => {
+    resetPip();
+    mountCameraSheet();
+  });
 
   const swap = $('[data-swap]', modalRoot);
   if (swap) swap.addEventListener('click', () => {

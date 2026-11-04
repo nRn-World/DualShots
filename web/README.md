@@ -54,6 +54,9 @@ same components used in the native Compose UI.
   the formats it started with (a file cannot change resolution mid-stream), so
   changes made while recording start with the next take; the dock always shows the
   formats currently in use.
+- **Movable overlay.** In Dual View the front camera sits in an inset you can drag
+  around and pinch to resize (double-tap resets). The position and size are used for
+  the composed recording, not just the preview.
 - **Settings persistence** and the freemium gating (4K, HEVC) behave like the app:
   picking a locked option opens the Pro sheet, and unlocking applies that option.
 
