@@ -1,9 +1,9 @@
 /* ==========================================================================
    DuelShots — interactive web preview
-   Mirrors the native Android app (Kotlin + Compose + CameraX) in the browser:
-   same screens, same design tokens, same three recording modes.
+   A browser replica of the native Android app (Kotlin + Compose + CameraX):
+   same screens, same three recording modes, real encoded clips.
 
-   The real app lives in app/src/main/java/com/nrworld/duelshot/.
+   The Kotlin implementation lives in app/src/main/java/com/nrworld/duelshot/.
    ========================================================================== */
 'use strict';
 
@@ -12,33 +12,45 @@
 const MODE_ORDER = ['DUAL_VIEW', 'SEPARATE', 'BOTH'];
 
 const MODES = {
-  DUAL_VIEW: { title: 'Dual View', subtitle: 'Both cameras in one video', icon: '▢' },
-  SEPARATE: { title: 'Separate Videos', subtitle: 'Two files, one for each', icon: '▯' },
-  BOTH: { title: 'Both Options', subtitle: 'Combined + two separate files', icon: '⇄' },
+  DUAL_VIEW: {
+    title: 'Dual View',
+    short: 'Dual',
+    desc: 'Both cameras composed into one video — back feed full frame, front feed inset.',
+  },
+  SEPARATE: {
+    title: 'Separate',
+    short: 'Separate',
+    desc: 'Two files, one per camera. Trim and post each angle independently.',
+  },
+  BOTH: {
+    title: 'Both',
+    short: 'Both',
+    desc: 'The composed video plus both individual files — three clips in one take.',
+  },
 };
 
 const ASPECT_ORDER = ['R_9_16', 'R_16_9', 'R_1_1', 'R_4_3'];
 
 const ASPECTS = {
-  R_9_16: { label: '9:16 Portrait', w: 9, h: 16 },
-  R_16_9: { label: '16:9 Landscape', w: 16, h: 9 },
-  R_1_1: { label: '1:1 Square', w: 1, h: 1 },
-  R_4_3: { label: '4:3', w: 4, h: 3 },
+  R_9_16: { label: '9:16 Portrait', short: '9:16', w: 9, h: 16 },
+  R_16_9: { label: '16:9 Landscape', short: '16:9', w: 16, h: 9 },
+  R_1_1: { label: '1:1 Square', short: '1:1', w: 1, h: 1 },
+  R_4_3: { label: '4:3', short: '4:3', w: 4, h: 3 },
 };
 
 const QUALITY_ORDER = ['HD720', 'FHD1080', 'UHD4K'];
 
 const QUALITIES = {
   HD720: { label: '720p', seg: '720p', premium: false, long: 1280 },
-  FHD1080: { label: '1080p Full HD', seg: '1080p', premium: false, long: 1920 },
-  UHD4K: { label: '4K Ultra HD', seg: '4K★', premium: true, long: 3840 },
+  FHD1080: { label: '1080p', seg: '1080p', premium: false, long: 1920 },
+  UHD4K: { label: '4K', seg: '4K', premium: true, long: 3840 },
 };
 
 const CODEC_ORDER = ['MP4', 'HEVC'];
 
 const CODECS = {
   MP4: { label: 'MP4', seg: 'MP4', premium: false },
-  HEVC: { label: 'HEVC', seg: 'HEVC★', premium: true },
+  HEVC: { label: 'HEVC', seg: 'HEVC', premium: true },
 };
 
 const STORE_KEY = 'duelshot_prefs';
@@ -68,43 +80,52 @@ const deviceEl = $('#device');
 
 /* ------------------------------------------------------------------ icons */
 
+const svg = (d, extra = '') =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
+
 const ICONS = {
-  home: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M3 10.6 12 3.2l9 7.4"/><path d="M5.4 9.6V20.8h13.2V9.6"/></svg>`,
-  gallery: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="M10.4 8.9v6.2l5.4-3.1z" fill="currentColor" stroke="none"/></svg>`,
-  settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v.09a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>`,
-  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>`,
-  switch: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 12a8.2 8.2 0 1 1-2.4-5.8"/><path d="M20.6 4.6v5.2h-5.2"/></svg>`,
-  play: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>`,
-  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M10 7V5.5h4V7M6.5 7l.8 12.2A1.8 1.8 0 0 0 9.1 21h5.8a1.8 1.8 0 0 0 1.8-1.8L17.5 7"/></svg>`,
+  home: svg('<path d="M3.5 10.7 12 3.6l8.5 7.1"/><path d="M5.8 9.7v10.2h12.4V9.7"/>'),
+  gallery: svg('<rect x="3.2" y="4.2" width="17.6" height="15.6" rx="4"/><path d="M10.4 9.1v5.8l4.9-2.9z" fill="currentColor" stroke="none"/>'),
+  settings: svg('<circle cx="12" cy="12" r="3"/><path d="M19.3 14.9a1.6 1.6 0 0 0 .3 1.8l.06.06a2 2 0 1 1-2.8 2.8l-.06-.06a1.6 1.6 0 0 0-1.8-.32 1.6 1.6 0 0 0-.96 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1.06-1.5 1.6 1.6 0 0 0-1.8.32l-.06.06a2 2 0 1 1-2.8-2.8l.06-.06a1.6 1.6 0 0 0 .32-1.8 1.6 1.6 0 0 0-1.5-.96H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9.1a1.6 1.6 0 0 0-.32-1.8l-.06-.06a2 2 0 1 1 2.8-2.8l.06.06a1.6 1.6 0 0 0 1.8.32H9a1.6 1.6 0 0 0 .96-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 .96 1.5 1.6 1.6 0 0 0 1.8-.32l.06-.06a2 2 0 1 1 2.8 2.8l-.06.06a1.6 1.6 0 0 0-.32 1.8V9a1.6 1.6 0 0 0 1.5.96H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.6.94z"/>'),
+  close: svg('<path d="M6.8 6.8l10.4 10.4M17.2 6.8 6.8 17.2"/>'),
+  flip: svg('<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.4 4.7v5.1h-5.1"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>'),
+  chevron: svg('<path d="M9.5 6.5 15 12l-5.5 5.5"/>', 'stroke-width="2"'),
+  check: svg('<path d="M4.5 12.6 9.4 17.5 19.5 6.9"/>', 'stroke-width="2.1"'),
+  play: svg('<path d="M8.4 5.6v12.8L19 12z" fill="currentColor" stroke="none"/>', 'stroke-width="0"'),
+  download: svg('<path d="M12 4v11"/><path d="m7.8 11.4 4.2 4.2 4.2-4.2"/><path d="M4.8 19.4h14.4"/>'),
+  trash: svg('<path d="M5 7h14M9.5 7V5.4h5V7M6.6 7l.8 12.1A1.9 1.9 0 0 0 9.3 21h5.4a1.9 1.9 0 0 0 1.9-1.9L17.4 7"/>'),
+  camera: svg('<rect x="2.8" y="6.4" width="12.8" height="11.2" rx="3.2"/><path d="m15.6 12 5.6-3.4v6.8L15.6 12z"/>'),
+  crown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 18.2h16l1-10.5-5 3.2L12 4.3 8 10.9l-5-3.2z"/></svg>',
 };
 
-function logoMark(size = 44) {
+function logoMark(size = 26, cls = 'brand-mark') {
   return `
-  <svg class="logomark" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">
-    <defs>
-      <linearGradient id="duelGrad" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#22D3EE"/>
-        <stop offset=".38" stop-color="#2E7DFF"/>
-        <stop offset=".7" stop-color="#7C3AED"/>
-        <stop offset="1" stop-color="#E94FD0"/>
-      </linearGradient>
-    </defs>
-    <ellipse cx="50" cy="50" rx="44" ry="29" fill="none" stroke="url(#duelGrad)" stroke-width="3"
-             stroke-linecap="round" stroke-dasharray="205 40" stroke-dashoffset="-13"/>
-    <circle cx="30" cy="50" r="23" fill="#05070D"/>
-    <circle cx="30" cy="50" r="17.5" fill="none" stroke="url(#duelGrad)" stroke-width="3.4"/>
-    <circle cx="30" cy="50" r="15" fill="#0B1024"/>
-    <circle cx="26.5" cy="46.5" r="6" fill="#22D3EE"/>
-    <circle cx="70" cy="50" r="23" fill="#05070D"/>
-    <circle cx="70" cy="50" r="17.5" fill="none" stroke="url(#duelGrad)" stroke-width="3.4"/>
-    <circle cx="70" cy="50" r="15" fill="#0B1024"/>
-    <circle cx="66.5" cy="46.5" r="6" fill="#E94FD0"/>
-  </svg>`;
+    <svg class="${cls}" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">
+      <defs>
+        <linearGradient id="duelGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#22D3EE"/>
+          <stop offset=".45" stop-color="#6366F1"/>
+          <stop offset="1" stop-color="#D946EF"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="50" cy="50" rx="44" ry="29" fill="none" stroke="url(#duelGrad)" stroke-width="3"
+               stroke-linecap="round" stroke-dasharray="205 40" stroke-dashoffset="-13" opacity=".9"/>
+      <circle cx="30" cy="50" r="23" fill="#08090c"/>
+      <circle cx="30" cy="50" r="17.5" fill="none" stroke="url(#duelGrad)" stroke-width="3.4"/>
+      <circle cx="30" cy="50" r="15" fill="#0b1024"/>
+      <circle cx="26.5" cy="46.5" r="6" fill="#22d3ee"/>
+      <circle cx="70" cy="50" r="23" fill="#08090c"/>
+      <circle cx="70" cy="50" r="17.5" fill="none" stroke="url(#duelGrad)" stroke-width="3.4"/>
+      <circle cx="70" cy="50" r="15" fill="#0b1024"/>
+      <circle cx="66.5" cy="46.5" r="6" fill="#d946ef"/>
+    </svg>`;
 }
 
-/* ------------------------------------------------------------- utilities */
+/* -------------------------------------------------------------- utilities */
 
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]));
 
 function stampNow(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
@@ -117,9 +138,12 @@ function hms(ms) {
   return `${p(Math.floor(total / 3600))}:${p(Math.floor((total % 3600) / 60))}:${p(total % 60)}`;
 }
 
-function mb(bytes) {
-  return Math.max(1, Math.round(bytes / (1024 * 1024)));
+function shortTime(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
+
+const mb = (bytes) => Math.max(1, Math.round(bytes / (1024 * 1024)));
 
 function savePrefs() {
   try {
@@ -131,7 +155,7 @@ function savePrefs() {
       codec: state.codec,
       premium: state.premium,
     }));
-  } catch (_) { /* private mode – ignore */ }
+  } catch (_) { /* private mode */ }
 }
 
 function loadPrefs() {
@@ -156,39 +180,60 @@ function toast(msg) {
   el.textContent = msg;
   deviceEl.appendChild(el);
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.remove(), 2600);
+  toastTimer = setTimeout(() => el.remove(), 2800);
 }
 
-/* --------------------------------------------------------------- overlays */
+/* ---------------------------------------------------------------- sheets */
 
-function closeModal() {
+function closeSheet() {
   modalRoot.innerHTML = '';
 }
 
-function openModal(html, bind) {
-  modalRoot.innerHTML = `<div class="modal">${html}</div>`;
+function openSheet(html, bind) {
+  modalRoot.innerHTML = `<div class="modal"><div class="sheet">${html}</div></div>`;
   const backdrop = $('.modal', modalRoot);
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
-  $$('[data-close]', modalRoot).forEach((b) => b.addEventListener('click', closeModal));
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  $$('[data-close]', modalRoot).forEach((b) => b.addEventListener('click', closeSheet));
   bind && bind();
 }
 
-function showPremium(feature = 'DuelShots Premium') {
-  openModal(`
-    <div class="modal-card">
-      <h3 class="modal-title">♛ ${esc(feature)}</h3>
-      <p class="modal-body">This is a Premium feature. Upgrade for 4K, 60fps, HEVC, per-camera format
-      control and watermark-free export.</p>
-      <div class="modal-actions">
-        <button class="modal-btn" data-close type="button">Later</button>
-        <button class="modal-btn primary" data-upgrade type="button">Upgrade</button>
+function proFeatures() {
+  return [
+    '4K capture and HEVC encoding',
+    '60 fps and custom bitrate',
+    'Per-camera aspect control',
+    'Watermark-free export',
+  ];
+}
+
+function showPro(pending = null) {
+  const body = state.premium
+    ? `<p class="sheet-sub">Pro is active. 4K, HEVC and every format control are unlocked.</p>
+       <div class="sheet-actions"><button class="btn-primary" data-close type="button" style="margin-top:0">Close</button></div>`
+    : `<p class="sheet-sub">One-time unlock. Everything below stays on this device — no account, no subscription.</p>
+       <ul class="pro-list">${proFeatures().map((f) => `<li class="pro-item">${ICONS.check}<span>${f}</span></li>`).join('')}</ul>
+       <button class="btn-primary" data-upgrade type="button">Unlock Pro</button>
+       <button class="btn-ghost" data-close type="button">Not now</button>`;
+
+  openSheet(`
+    <div class="grabber"></div>
+    <div class="pro-sheet-head">
+      <span class="pro-sheet-mark">♛</span>
+      <div>
+        <div class="sheet-title">DuelShots Pro</div>
+        <div class="caption">Mock purchase in this preview</div>
       </div>
-    </div>`, () => {
-    $('[data-upgrade]', modalRoot).addEventListener('click', () => {
+    </div>
+    ${body}`, () => {
+    const up = $('[data-upgrade]', modalRoot);
+    if (up) up.addEventListener('click', () => {
       state.premium = true;
+      // apply the option that was locked behind the upgrade
+      if (pending && pending.kind === 'quality' && QUALITIES[pending.key]) state.quality = pending.key;
+      if (pending && pending.kind === 'codec' && CODECS[pending.key]) state.codec = pending.key;
       savePrefs();
-      closeModal();
-      toast('Premium unlocked — mock purchase, no billing');
+      closeSheet();
+      toast('Pro unlocked');
       if (state.record) refreshRecord(); else renderTab();
     });
   });
@@ -200,29 +245,27 @@ function showAbout() {
   wrap.innerHTML = `
     <div class="about-card">
       <h2>DuelShots · web preview</h2>
-      <p>This is a browser replica of the native Android app in this repository. The screens,
-      design tokens, recording modes and premium gating come straight from the Kotlin/Compose
-      source in <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
+      <p>This is a browser build of the native Android app in this repository. The screens,
+      design system, recording modes and premium gating come from the Kotlin/Compose source in
+      <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
 
-      <h3>What actually works here</h3>
+      <h3>What works here</h3>
       <ul>
-        <li>All three recording modes: composed PiP, two separate files, or both.</li>
-        <li>Recordings are encoded live in the browser and land in the Gallery tab, playable and downloadable.</li>
-        <li>Settings persist in <code>localStorage</code> (the app uses SharedPreferences).</li>
-        <li>4K / HEVC are gated behind the mock premium dialog — same as the app's <code>grantPremium()</code>.</li>
+        <li>All three recording modes: composed picture-in-picture, two separate files, or both.</li>
+        <li>Clips are encoded live in the browser and land in the Gallery tab, playable and downloadable.</li>
+        <li>Settings persist in <code>localStorage</code> (SharedPreferences in the app).</li>
+        <li>4K and HEVC are gated behind the mock Pro purchase — same as <code>grantPremium()</code>.</li>
       </ul>
 
       <h3>Cameras</h3>
-      <p>Browsers usually allow only one camera stream at a time. When both the front and the back
-      camera can be opened at once you get a real dual feed; otherwise the preview falls back to
-      single-camera mode — exactly like the Android fallback. If camera access is blocked
-      (permissions, iframe policy or plain HTTP) an animated demo feed is used so the recording
-      pipeline still works.</p>
+      <p>Browsers usually allow only one camera stream at a time. If both the front and back camera
+      can be opened at once you get a real dual feed; otherwise the preview falls back to
+      single-camera mode, exactly like the Android fallback. If camera access is blocked
+      (permission, iframe policy or plain HTTP) an animated demo feed keeps the recorder usable.</p>
 
       <h3>The real app</h3>
       <p>Build the APK locally with JDK 17/21 and the Android SDK:</p>
       <p><code>./gradlew :app:assembleDebug</code></p>
-      <p>True concurrent dual-camera capture needs a device whose camera HAL supports it.</p>
 
       <div class="close-row"><button class="about-cta" type="button">Got it</button></div>
     </div>`;
@@ -270,42 +313,42 @@ async function openStream(facing, deviceId) {
 
 function camErrorMessage(err) {
   const name = (err && err.name) || '';
-  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera permission blocked — demo feed active.';
-  if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera found — demo feed active.';
-  if (name === 'NotReadableError') return 'Camera is busy in another app — demo feed active.';
-  return 'Camera unavailable — demo feed active.';
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera blocked — demo feed';
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera found — demo feed';
+  if (name === 'NotReadableError') return 'Camera busy — demo feed';
+  return 'Camera unavailable — demo feed';
 }
 
-/* animated synthetic feed so the recorder always has something to draw */
+/* animated synthetic feed so recording still has a source */
 function drawDemo(canvas, label, hue, t) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
 
   const bg = ctx.createLinearGradient(0, 0, w, h);
-  bg.addColorStop(0, '#0b1024');
-  bg.addColorStop(0.5, '#131b3a');
-  bg.addColorStop(1, '#070a12');
+  bg.addColorStop(0, '#0a0f1e');
+  bg.addColorStop(0.55, '#131b36');
+  bg.addColorStop(1, '#070910');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
   for (let i = 0; i < 4; i++) {
-    const x = w * (0.5 + 0.32 * Math.sin(t / 2600 + i * 1.7 + hue));
-    const y = h * (0.5 + 0.3 * Math.cos(t / 3100 + i * 2.3 + hue));
-    const r = Math.min(w, h) * (0.2 + 0.06 * Math.sin(t / 1800 + i));
+    const x = w * (0.5 + 0.3 * Math.sin(t / 2700 + i * 1.7 + hue));
+    const y = h * (0.5 + 0.28 * Math.cos(t / 3300 + i * 2.3 + hue));
+    const r = Math.min(w, h) * (0.2 + 0.06 * Math.sin(t / 1900 + i));
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `hsla(${(188 + i * 42 + hue * 40) % 360}, 88%, 62%, .5)`);
-    g.addColorStop(1, 'hsla(220, 88%, 55%, 0)');
+    g.addColorStop(0, `hsla(${(195 + i * 38 + hue * 50) % 360}, 85%, 62%, .45)`);
+    g.addColorStop(1, 'hsla(220, 85%, 55%, 0)');
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  const step = Math.max(40, Math.round(w / 9));
-  const off = (t / 45) % step;
-  ctx.strokeStyle = 'rgba(255,255,255,.05)';
-  ctx.lineWidth = Math.max(1, w / 720);
+  const step = Math.max(44, Math.round(w / 9));
+  const off = (t / 48) % step;
+  ctx.strokeStyle = 'rgba(255,255,255,.045)';
+  ctx.lineWidth = Math.max(1, w / 760);
   for (let x = -off; x < w; x += step) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
   }
@@ -313,11 +356,10 @@ function drawDemo(canvas, label, hue, t) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
   }
 
-  // focus brackets
-  const m = w * 0.09;
-  const len = w * 0.1;
-  ctx.strokeStyle = 'rgba(255,255,255,.4)';
-  ctx.lineWidth = Math.max(2, w / 260);
+  const m = w * 0.1;
+  const len = w * 0.09;
+  ctx.strokeStyle = 'rgba(255,255,255,.32)';
+  ctx.lineWidth = Math.max(2, w / 300);
   [[m, m, 1, 1], [w - m, m, -1, 1], [m, h - m, 1, -1], [w - m, h - m, -1, -1]].forEach(([x, y, dx, dy]) => {
     ctx.beginPath();
     ctx.moveTo(x + dx * len, y);
@@ -326,14 +368,14 @@ function drawDemo(canvas, label, hue, t) {
     ctx.stroke();
   });
 
-  ctx.fillStyle = 'rgba(255,255,255,.9)';
-  ctx.font = `700 ${Math.round(w * 0.105)}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillText(label, w / 2, h / 2 - w * 0.02);
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.font = `700 ${Math.round(w * 0.095)}px -apple-system, system-ui, sans-serif`;
+  ctx.fillText(label, w / 2, h / 2 - w * 0.01);
 
-  ctx.fillStyle = 'rgba(255,255,255,.45)';
-  ctx.font = `600 ${Math.round(w * 0.036)}px ui-monospace, monospace`;
-  ctx.fillText('SIMULATED FEED', w / 2, h / 2 + w * 0.05);
+  ctx.fillStyle = 'rgba(255,255,255,.4)';
+  ctx.font = `600 ${Math.round(w * 0.032)}px ui-monospace, monospace`;
+  ctx.fillText('SIMULATED FEED', w / 2, h / 2 + w * 0.055);
   ctx.fillText(new Date().toLocaleTimeString(), w / 2, h / 2 + w * 0.11);
 }
 
@@ -341,12 +383,14 @@ function startDemo() {
   cam.demo = true;
   cam.ready = true;
   cam.singleFallback = false;
+
   const back = document.createElement('canvas');
   back.width = 720; back.height = 1280;
   const front = document.createElement('canvas');
   front.width = 720; front.height = 1280;
-  cam.feeds.back = { el: back, kind: 'demo', mirror: false, label: 'BACK' };
-  cam.feeds.front = { el: front, kind: 'demo', mirror: false, label: 'FRONT' };
+
+  cam.feeds.back = { el: back, kind: 'demo', mirror: false };
+  cam.feeds.front = { el: front, kind: 'demo', mirror: false };
   sinkEl.appendChild(back);
   sinkEl.appendChild(front);
 
@@ -361,7 +405,8 @@ function startDemo() {
 function enableDemo(message) {
   if (!cam.demo) startDemo();
   cam.ready = true;
-  refreshRecord(message);
+  recordMessage = message;
+  refreshRecord();
 }
 
 async function startCameras() {
@@ -370,7 +415,7 @@ async function startCameras() {
   refreshRecord();
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    enableDemo('Camera API unavailable (needs HTTPS) — demo feed active.');
+    enableDemo('Camera API unavailable — demo feed');
     return;
   }
 
@@ -391,14 +436,14 @@ async function startCameras() {
     front = null;
   }
 
-  // Some browsers return the very same camera for both facing modes.
+  // Some browsers hand back the same physical camera for both facing modes.
   if (front && backId && deviceIdOf(front) === backId) {
     front.getTracks().forEach((t) => t.stop());
     front = null;
     try {
-      const devs = (await navigator.mediaDevices.enumerateDevices())
+      const others = (await navigator.mediaDevices.enumerateDevices())
         .filter((d) => d.kind === 'videoinput' && d.deviceId && d.deviceId !== backId);
-      if (devs.length) front = await openStream(null, devs[0].deviceId);
+      if (others.length) front = await openStream(null, others[0].deviceId);
     } catch (_) { front = null; }
   }
 
@@ -422,15 +467,18 @@ async function startCameras() {
 async function switchCamera() {
   if (cam.demo) { toast('Demo feed has no physical cameras'); return; }
   const other = cam.active === 'back' ? 'front' : 'back';
+
   if (cam.feeds[other]) {
     cam.active = other;
     cam.singleFallback = true;
     refreshRecord();
     return;
   }
-  // Only one physical camera: reopen it with the other facing mode.
+
   const current = cam.feeds[cam.active];
-  if (current && current.el.srcObject) current.el.srcObject.getTracks().forEach((t) => t.stop());
+  if (current && current.el.srcObject) {
+    current.el.srcObject.getTracks().forEach((t) => t.stop());
+  }
   try {
     const stream = await openStream(other === 'back' ? 'environment' : 'user');
     const v = videoEl();
@@ -459,10 +507,9 @@ const rec = {
   raf: 0,
   outs: [],
   audio: null,
-  stamp: '',
 };
 
-const recordDom = { shell: null, stage: null, status: null, saved: null, timer: null, btn: null, wrap: null };
+const recDom = { root: null, preview: null, feeds: null, status: null, timer: null, btn: null, mode: null, flip: null, thumb: null };
 let mountedKey = null;
 let recordMessage = '';
 let recordSaved = [];
@@ -479,17 +526,16 @@ function outputSize(aspectKey, qualityKey) {
 }
 
 function pickMime() {
-  const list = [
+  const candidates = [
     'video/mp4;codecs=avc1.42E01E',
     'video/mp4',
     'video/webm;codecs=vp9',
     'video/webm;codecs=vp8',
     'video/webm',
   ];
-  for (const m of list) {
-    if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m;
-  }
-  return '';
+  return candidates.find((m) => window.MediaRecorder
+    && MediaRecorder.isTypeSupported
+    && MediaRecorder.isTypeSupported(m)) || '';
 }
 
 function drawCover(ctx, src, w, h, mirror) {
@@ -536,28 +582,34 @@ function makeOutput(key, name, aspectKey, withAudio, existingStream) {
     ctx = canvas.getContext('2d');
     try {
       stream = canvas.captureStream(30);
-    } catch (err) {
+    } catch (_) {
       return null;
     }
   }
+
   if (withAudio && rec.audio) {
     rec.audio.getAudioTracks().forEach((t) => stream.addTrack(t));
   }
+
   const mime = pickMime();
   let recorder;
   try {
     recorder = new MediaRecorder(stream, mime
       ? { mimeType: mime, videoBitsPerSecond: state.quality === 'UHD4K' ? 12_000_000 : 6_000_000 }
       : undefined);
-  } catch (err) {
-    try { recorder = new MediaRecorder(stream); } catch (e2) { return null; }
+  } catch (_) {
+    try { recorder = new MediaRecorder(stream); } catch (__) { return null; }
   }
+
   const chunks = [];
   recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   const done = new Promise((resolve) => { recorder.onstop = resolve; });
   recorder.start(200);
 
-  return { key, name, canvas, ctx, recorder, chunks, done, mime, stream, ownsStream: !existingStream };
+  return {
+    key, name, canvas, ctx, recorder, chunks, done, mime, stream,
+    ownsStream: !existingStream,
+  };
 }
 
 function drawOutput(o) {
@@ -579,15 +631,15 @@ function drawOutput(o) {
       const x = w - pipW - margin;
       const y = margin;
       ctx.save();
-      roundRect(ctx, x, y, pipW, pipH, Math.round(w * 0.02));
+      roundRect(ctx, x, y, pipW, pipH, Math.round(w * 0.022));
       ctx.clip();
       ctx.fillStyle = '#000';
       ctx.fillRect(x, y, pipW, pipH);
       drawCover(ctx, front.el, pipW, pipH, front.mirror);
       ctx.restore();
-      ctx.strokeStyle = 'rgba(255,255,255,.6)';
-      ctx.lineWidth = Math.max(2, Math.round(w / 320));
-      roundRect(ctx, x, y, pipW, pipH, Math.round(w * 0.02));
+      ctx.strokeStyle = 'rgba(255,255,255,.55)';
+      ctx.lineWidth = Math.max(2, Math.round(w / 340));
+      roundRect(ctx, x, y, pipW, pipH, Math.round(w * 0.022));
       ctx.stroke();
     }
     return;
@@ -597,28 +649,52 @@ function drawOutput(o) {
   if (feed) drawCover(ctx, feed.el, w, h, feed.mirror);
 }
 
+function posterFor(output) {
+  try {
+    const src = output.canvas || (cam.feeds[output.key] && cam.feeds[output.key].el);
+    if (!src) return '';
+    const sw = src.videoWidth || src.width;
+    const sh = src.videoHeight || src.height;
+    if (!sw || !sh) return '';
+    const w = 300;
+    const h = Math.max(2, Math.round((w * sh) / sw));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(src, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.62);
+  } catch (_) {
+    return '';
+  }
+}
+
 async function startRecording() {
   if (rec.active || rec.starting) return;
   rec.starting = true;
-  if (!cam.ready) { rec.starting = false; setRecordMessage('Cameras are not ready yet.'); return; }
+
+  if (!cam.ready) {
+    rec.starting = false;
+    setRecordMessage('Cameras are not ready yet');
+    return;
+  }
 
   recordSaved = [];
   setRecordMessage('');
 
-  // microphone (optional – recording works silently if blocked)
   rec.audio = null;
   try {
     rec.audio = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (_) { rec.audio = null; }
 
   const stamp = stampNow();
-  rec.stamp = stamp;
   const single = cam.singleFallback || !cam.feeds.back || !cam.feeds.front;
   const outs = [];
 
   if (single) {
     const key = cam.active;
-    const o = makeOutput(key, `duelshot_${key}_${stamp}`, key === 'back' ? state.backAspect : state.frontAspect, true);
+    const o = makeOutput(key, `duelshot_${key}_${stamp}`,
+      key === 'back' ? state.backAspect : state.frontAspect, true);
     if (o) outs.push(o);
   } else if (state.mode === 'DUAL_VIEW') {
     const o = makeOutput('composed', `duelshot_combined_${stamp}`, state.backAspect, true);
@@ -636,7 +712,7 @@ async function startRecording() {
   }
 
   if (!outs.length) {
-    // No canvas capture support (older Safari): record the camera stream itself.
+    // Older browsers without canvas.captureStream: record the camera stream directly.
     const feed = cam.feeds[cam.active] || cam.feeds.back || cam.feeds.front;
     const src = feed && feed.el && feed.el.srcObject;
     if (src instanceof MediaStream) {
@@ -648,7 +724,7 @@ async function startRecording() {
 
   if (!outs.length) {
     rec.starting = false;
-    setRecordMessage('Recording did not start: MediaRecorder unavailable in this browser.');
+    setRecordMessage('This browser cannot encode video');
     return;
   }
 
@@ -660,23 +736,21 @@ async function startRecording() {
   let lastDraw = 0;
   const loop = (now) => {
     if (!rec.active) return;
-    if (now - lastDraw >= 30) { // ~30 fps composite, matches captureStream(30)
+    if (now - lastDraw >= 30) {
       lastDraw = now;
       rec.outs.forEach(drawOutput);
     }
     rec.raf = requestAnimationFrame(loop);
   };
   rec.raf = requestAnimationFrame(loop);
+
   rec.timer = setInterval(() => {
-    if (recordDom.timer && rec.active) recordDom.timer.textContent = hms(Date.now() - rec.startedAt);
+    if (recDom.timer && rec.active) recDom.timer.textContent = shortTime(Date.now() - rec.startedAt);
   }, 250);
 
-  if (recordDom.wrap) recordDom.wrap.classList.add('recording');
-  if (recordDom.btn) recordDom.btn.classList.add('on');
-  deviceEl.querySelector('.flash')?.classList.add('on');
-  setTimeout(() => deviceEl.querySelector('.flash')?.classList.remove('on'), 460);
-
-  setRecordMessage(`Recording – ${MODES[state.mode].title.toLowerCase()}${single ? ' (single camera)' : ''}…`);
+  recordSaved = [];
+  recordMessage = `Recording · ${MODES[state.mode].title.toLowerCase()}${single ? ' · single camera' : ''}`;
+  refreshRecord();
 }
 
 async function stopRecording() {
@@ -691,14 +765,8 @@ async function stopRecording() {
   rec.outs = [];
   outs.forEach((o) => { try { o.recorder.stop(); } catch (_) { /* already stopped */ } });
   await Promise.all(outs.map((o) => o.done));
-  outs.forEach((o) => { if (o.ownsStream) o.stream.getTracks().forEach((t) => t.stop()); });
 
-  if (rec.audio) {
-    rec.audio.getTracks().forEach((t) => t.stop());
-    rec.audio = null;
-  }
-
-  const duration = hms(Date.now() - rec.startedAt);
+  const durationMs = Date.now() - rec.startedAt;
   const newClips = outs.map((o) => {
     const type = o.recorder.mimeType || o.mime || 'video/webm';
     const ext = type.includes('mp4') ? 'mp4' : 'webm';
@@ -707,33 +775,32 @@ async function stopRecording() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name: `${o.name}.${ext}`,
       sizeMb: mb(blob.size),
-      bytes: blob.size,
       url: URL.createObjectURL(blob),
       mime: type,
-      duration,
+      duration: hms(durationMs),
       when: new Date(),
-      mode: state.mode,
+      mode: o.key === 'composed' ? (state.mode === 'BOTH' ? 'BOTH' : 'DUAL_VIEW') : state.mode,
+      poster: posterFor(o),
     };
   });
+
+  outs.forEach((o) => { if (o.ownsStream) o.stream.getTracks().forEach((t) => t.stop()); });
+  if (rec.audio) {
+    rec.audio.getTracks().forEach((t) => t.stop());
+    rec.audio = null;
+  }
 
   state.clips.unshift(...newClips);
   recordSaved = newClips.map((c) => c.name);
 
-  if (recordDom.wrap) recordDom.wrap.classList.remove('recording');
-  if (recordDom.btn) recordDom.btn.classList.remove('on');
-  if (recordDom.timer) recordDom.timer.textContent = '00:00:00';
-
-  setRecordMessage(`Stopped. Saved to Gallery → Movies/DuelShots`);
+  recordMessage = newClips.length === 1 ? 'Saved to Gallery' : `Saved ${newClips.length} clips to Gallery`;
   refreshRecord();
+  toast(newClips.length === 1 ? 'Saved to Gallery' : `Saved ${newClips.length} clips`);
 }
 
 function setRecordMessage(msg) {
   recordMessage = msg;
-  if (recordDom.status) {
-    recordDom.status.innerHTML = esc(msg) + (recordSaved.length
-      ? `<span class="saved">Saved: ${esc(recordSaved.join(', '))}</span>`
-      : '');
-  }
+  refreshRecord();
 }
 
 /* =====================================================================
@@ -742,70 +809,82 @@ function setRecordMessage(msg) {
 
 function buildRecordShell() {
   screenEl.innerHTML = `
-    <div class="record" id="record-wrap">
-      <div class="record-top">
-        <button class="icon-chip" id="rec-close" type="button" aria-label="Close">${ICONS.close}</button>
-        <div class="timer-pill"><span class="timer-dot"></span><span id="rec-timer">00:00:00</span></div>
-        <span style="flex:1"></span>
-        <button class="icon-chip" id="rec-switch" type="button" aria-label="Switch camera">${ICONS.switch}</button>
+    <div class="record">
+      <div class="rec-preview" id="rec-preview">
+        <div class="feeds" id="rec-feeds"></div>
+        <div class="rec-scrim"></div>
+        <div class="rec-top">
+          <button class="glass" id="rec-close" type="button" aria-label="Close">${ICONS.close}</button>
+          <span class="pill-glass mode-pill" id="rec-mode">Dual View</span>
+          <span class="pill-glass rec-timer"><span class="dot"></span><span id="rec-timer">00:00</span></span>
+        </div>
       </div>
-      <div class="record-stage" id="record-stage"></div>
-      <div class="record-status" id="record-status"></div>
-      <div class="record-actions">
-        <button class="rec-btn" id="rec-btn" type="button" aria-label="Record"><i></i></button>
+
+      <div class="rec-dock">
+        <div class="rec-status" id="rec-status"></div>
+        <div class="rec-controls">
+          <button class="dock-btn" id="rec-thumb" type="button" aria-label="Open gallery">${ICONS.gallery}</button>
+          <button class="shutter" id="rec-btn" type="button" aria-label="Record"><i></i></button>
+          <button class="dock-btn" id="rec-flip" type="button" aria-label="Switch camera">${ICONS.flip}</button>
+        </div>
       </div>
     </div>`;
 
-  recordDom.wrap = $('#record-wrap');
-  recordDom.stage = $('#record-stage');
-  recordDom.status = $('#record-status');
-  recordDom.timer = $('#rec-timer');
-  recordDom.btn = $('#rec-btn');
+  recDom.root = $('.record');
+  recDom.preview = $('#rec-preview');
+  recDom.feeds = $('#rec-feeds');
+  recDom.status = $('#rec-status');
+  recDom.timer = $('#rec-timer');
+  recDom.btn = $('#rec-btn');
+  recDom.mode = $('#rec-mode');
+  recDom.flip = $('#rec-flip');
+  recDom.thumb = $('#rec-thumb');
 
   $('#rec-close').addEventListener('click', async () => {
     if (rec.active) await stopRecording();
     closeRecord();
   });
-  $('#rec-switch').addEventListener('click', switchCamera);
-  $('#rec-btn').addEventListener('click', () => {
+  recDom.flip.addEventListener('click', switchCamera);
+  recDom.thumb.addEventListener('click', () => {
+    if (rec.active) { toast('Stop recording first'); return; }
+    closeRecord();
+    switchTab('GALLERY');
+  });
+  recDom.btn.addEventListener('click', () => {
     if (rec.active) stopRecording();
     else startRecording();
   });
 }
 
-function makeTile(label, ratioLabel) {
+function makeTile(label) {
   const tile = document.createElement('div');
-  tile.className = 'feed';
+  tile.className = 'tile';
   if (label) {
-    const tag = document.createElement('span');
-    tag.className = 'tag tl';
-    tag.textContent = label;
-    tile.appendChild(tag);
-  }
-  if (ratioLabel) {
-    const tag = document.createElement('span');
-    tag.className = 'tag bl';
-    tag.textContent = ratioLabel;
-    tile.appendChild(tag);
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = label;
+    tile.appendChild(badge);
   }
   return tile;
 }
 
 function placeholder(text) {
   const d = document.createElement('div');
-  d.className = 'feed-placeholder';
-  d.innerHTML = `<span class="big">◎</span><span>${esc(text)}</span>`;
+  d.className = 'tile-placeholder';
+  d.innerHTML = `<span class="big">${ICONS.camera}</span><span>${esc(text)}</span>`;
   return d;
 }
 
 function mountFeeds() {
-  const stage = recordDom.stage;
+  const stage = recDom.feeds;
   if (!stage) return;
   stage.innerHTML = '';
   mountedKey = layoutKey();
 
   if (!cam.ready) {
-    stage.appendChild(makeTile('SETUP', null)).appendChild(placeholder('Starting cameras…'));
+    const tile = makeTile(null);
+    tile.appendChild(placeholder('Starting cameras'));
+    stage.appendChild(tile);
     return;
   }
 
@@ -815,8 +894,8 @@ function mountFeeds() {
   if (single) {
     const key = cam.feeds[cam.active] ? cam.active : (cam.feeds.back ? 'back' : 'front');
     const feed = cam.feeds[key];
-    const ratioLabel = ASPECTS[key === 'back' ? state.backAspect : state.frontAspect].label;
-    const tile = makeTile('CAMERA', ratioLabel);
+    const aspect = ASPECTS[key === 'back' ? state.backAspect : state.frontAspect].short;
+    const tile = makeTile(`CAMERA · ${aspect}`);
     stage.appendChild(tile);
     if (feed) {
       if (feed.mirror) tile.classList.add('mirror');
@@ -828,7 +907,7 @@ function mountFeeds() {
   }
 
   if (state.mode === 'DUAL_VIEW') {
-    const tile = makeTile(null, null);
+    const tile = makeTile(null);
     tile.style.flex = '1 1 100%';
     stage.appendChild(tile);
     const back = cam.feeds.back;
@@ -848,12 +927,11 @@ function mountFeeds() {
     return;
   }
 
-  const tiles = [
+  [
     { key: 'back', label: 'BACK', aspect: state.backAspect },
     { key: 'front', label: 'FRONT', aspect: state.frontAspect },
-  ];
-  tiles.forEach(({ key, label, aspect }) => {
-    const tile = makeTile(label, ASPECTS[aspect].label);
+  ].forEach(({ key, label, aspect }) => {
+    const tile = makeTile(`${label} · ${ASPECTS[aspect].short}`);
     const feed = cam.feeds[key];
     if (feed) {
       if (feed.mirror) tile.classList.add('mirror');
@@ -866,7 +944,7 @@ function mountFeeds() {
 }
 
 function layoutKey() {
-  return [cam.ready, cam.singleFallback, cam.active, state.mode, state.premium].join('|');
+  return [cam.ready, cam.singleFallback, cam.active, state.mode].join('|');
 }
 
 function unmountFeeds() {
@@ -874,27 +952,45 @@ function unmountFeeds() {
 }
 
 function recordStatusText() {
-  if (rec.active && recordMessage) return recordMessage;
-  if (!cam.ready) return 'Starting cameras…';
   if (recordMessage) return recordMessage;
-  if (cam.demo) return 'Demo feed active — camera unavailable in this browser.';
-  if (cam.singleFallback) return `Single camera (${cam.active.toUpperCase()}) — recording one file.`;
-  return `Camera ready — ${MODES[state.mode].title}.`;
+  if (!cam.ready) return 'Starting cameras…';
+  if (cam.demo) return 'Demo feed — camera unavailable here';
+  if (cam.singleFallback) return `Single camera · ${cam.active} · one file`;
+  return `${MODES[state.mode].title} · front + back`;
 }
 
-function refreshRecord(message) {
-  if (!state.record || !recordDom.wrap) return;
-  if (typeof message === 'string' && message) recordMessage = message;
+function updateDockThumb() {
+  if (!recDom.thumb) return;
+  const last = state.clips[0];
+  if (last && last.poster) {
+    recDom.thumb.style.backgroundImage = `url(${last.poster})`;
+    recDom.thumb.innerHTML = '';
+  } else {
+    recDom.thumb.style.backgroundImage = '';
+    recDom.thumb.innerHTML = ICONS.gallery;
+  }
+}
+
+function refreshRecord() {
+  if (!state.record || !recDom.root) return;
 
   if (layoutKey() !== mountedKey) mountFeeds();
 
-  recordDom.status.innerHTML = esc(recordStatusText()) + (recordSaved.length
-    ? `<span class="saved">Saved: ${esc(recordSaved.join(', '))}</span>`
-    : '');
-
-  if (recordDom.btn) recordDom.btn.disabled = !cam.ready;
-  if (recordDom.wrap) recordDom.wrap.classList.toggle('recording', rec.active);
-  if (recordDom.btn) recordDom.btn.classList.toggle('on', rec.active);
+  if (recDom.mode) recDom.mode.textContent = MODES[state.mode].title;
+  if (recDom.preview) recDom.preview.classList.toggle('recording', rec.active);
+  if (recDom.btn) {
+    recDom.btn.classList.toggle('on', rec.active);
+    recDom.btn.disabled = !cam.ready;
+  }
+  if (recDom.timer) {
+    recDom.timer.textContent = rec.active ? shortTime(Date.now() - rec.startedAt) : '00:00';
+  }
+  if (recDom.status) {
+    recDom.status.innerHTML = esc(recordStatusText()) + (recordSaved.length
+      ? `<span class="saved">${esc(recordSaved.join(' · '))}</span>`
+      : '');
+  }
+  updateDockThumb();
 }
 
 function openRecord() {
@@ -904,6 +1000,7 @@ function openRecord() {
   recordMessage = '';
   recordSaved = [];
   mountedKey = null;
+
   buildRecordShell();
   mountFeeds();
   refreshRecord();
@@ -913,7 +1010,7 @@ function openRecord() {
 
 function closeRecord() {
   state.record = false;
-  recordDom.wrap = recordDom.stage = recordDom.status = recordDom.timer = recordDom.btn = null;
+  Object.keys(recDom).forEach((k) => { recDom[k] = null; });
   mountedKey = null;
   recordMessage = '';
   recordSaved = [];
@@ -924,154 +1021,189 @@ function closeRecord() {
 }
 
 /* =====================================================================
-   TABS
+   SEGMENTED CONTROL
    ===================================================================== */
 
-function updateTabs() {
-  $$('.tab', tabbarEl).forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === state.tab));
+function segmentedHTML(items, activeKey, opts = {}) {
+  const n = items.length;
+  const idx = Math.max(0, items.findIndex((i) => i.key === activeKey));
+  return `
+    <div class="segmented ${opts.small ? 'small' : ''}" data-seg="${opts.name}" style="--n:${n}">
+      <span class="ind" style="--i:${idx}"></span>
+      ${items.map((i) => `
+        <button type="button" data-${opts.attr}="${i.key}" class="${i.key === activeKey ? 'active' : ''}">${i.label}</button>
+      `).join('')}
+    </div>`;
 }
 
-function modeRowHTML(m) {
-  const selected = state.mode === m;
-  return `
-    <button class="card mode-card ${selected ? 'selected' : ''}" data-mode="${m}" type="button">
-      <span class="mode-icon">${MODES[m].icon}</span>
-      <span class="mode-text">
-        <span class="mode-title">${MODES[m].title}</span>
-        <span class="mode-sub">${MODES[m].subtitle}</span>
-      </span>
-      <span class="check">${selected ? '✓' : ''}</span>
-    </button>`;
+function wireSegmented(root, opts, onPick) {
+  $$(`[data-${opts.attr}]`, root).forEach((btn) => {
+    btn.addEventListener('click', () => onPick(btn.dataset[opts.attr]));
+  });
 }
 
-function premiumCardHTML() {
-  return `
-    <button class="card premium-card" id="premium-card" type="button">
-      <span class="premium-crown">♛</span>
-      <span class="premium-text">
-        <span class="premium-title">Go Premium</span>
-        <span class="premium-sub">4K · 60fps · HEVC · custom formats · watermark-free</span>
-      </span>
-    </button>`;
-}
+const modeItems = () => MODE_ORDER.map((m) => ({ key: m, label: MODES[m].short }));
+
+/* =====================================================================
+   SCREEN: HOME
+   ===================================================================== */
 
 function renderHome() {
+  const modeItemsList = modeItems();
+  const quality = QUALITIES[state.quality];
+
   screenEl.innerHTML = `
-    <div class="screen-scroll">
-      <header class="home-head">
-        ${logoMark(44)}
-        <div class="wordmark">Duel<span>Shots</span></div>
-        <span class="pill ${state.premium ? 'gold' : ''}">${state.premium ? '♛ Premium' : 'Free'}</span>
+    <div class="scroll">
+      <header class="topbar">
+        <div class="brand">
+          ${logoMark(26)}
+          <span class="brand-name">Duel<span>Shots</span></span>
+        </div>
+        <button class="chip-btn" id="pro-btn" type="button">
+          <span class="spark"></span>${state.premium ? 'Pro' : 'Free'}
+        </button>
       </header>
 
-      <p class="tagline">Capture More. From Every Angle.</p>
+      <h1 class="display">Two angles.<br><span class="grad-text">One take.</span></h1>
+      <p class="lede">Front and back camera, recorded at the same moment.</p>
 
-      <button class="cta" id="start-btn" type="button">
-        <span class="cta-emoji">🎥</span>
-        <span class="cta-text"><b>Start Recording</b><em>Choose your mode</em></span>
+      <div class="hero" aria-hidden="true">
+        <div class="hero-art"></div>
+        <span class="hero-badge">DUAL CAMERA</span>
+        <div class="hero-pip"><span>FRONT</span></div>
+        <div class="hero-tag"><i></i><span>BACK · ${ASPECTS[state.backAspect].short}</span></div>
+      </div>
+
+      <div class="label">Mode</div>
+      ${segmentedHTML(modeItemsList, state.mode, { name: 'mode', attr: 'mode' })}
+      <p class="mode-desc">${MODES[state.mode].desc}</p>
+
+      <button class="btn-primary" id="start-btn" type="button">
+        <span class="rec-dot"></span>Start recording
       </button>
+      <p class="cta-meta">${MODES[state.mode].title} · ${quality.label} · ${ASPECTS[state.frontAspect].short} + ${ASPECTS[state.backAspect].short}</p>
 
-      <div class="section-label">Recording Mode</div>
-      <div class="mode-list">${MODE_ORDER.map(modeRowHTML).join('')}</div>
+      <div class="label">Camera</div>
+      <div class="group">
+        <button class="row" data-go="SETTINGS" type="button">
+          <span class="row-label">Front camera</span>
+          <span class="row-val">${ASPECTS[state.frontAspect].label}</span>
+          <span class="chev">${ICONS.chevron}</span>
+        </button>
+        <button class="row" data-go="SETTINGS" type="button">
+          <span class="row-label">Back camera</span>
+          <span class="row-val">${ASPECTS[state.backAspect].label}</span>
+          <span class="chev">${ICONS.chevron}</span>
+        </button>
+        <button class="row" data-go="SETTINGS" type="button">
+          <span class="row-label">Quality</span>
+          <span class="row-val">${quality.label} · ${CODECS[state.codec].label}</span>
+          <span class="chev">${ICONS.chevron}</span>
+        </button>
+      </div>
 
-      <div class="section-label">Quick Settings</div>
-      <button class="card quick" id="quick-btn" type="button">
-        <span class="quick-text">
-          <span class="quick-title">⚡ ${ASPECTS[state.frontAspect].label} · ${ASPECTS[state.backAspect].label}</span>
-          <span class="quick-sub">${QUALITIES[state.quality].label} · ${CODECS[state.codec].label}</span>
-        </span>
-        <span class="chev">›</span>
-      </button>
-
-      ${state.premium ? '' : premiumCardHTML()}
+      ${state.premium ? '' : `
+        <button class="pro-row" id="pro-row" type="button">
+          <span class="pro-mark">♛</span>
+          <span class="pro-copy">
+            <span class="pro-title">Unlock Pro</span>
+            <span class="pro-sub">4K · HEVC · 60 fps · watermark-free</span>
+          </span>
+          <span class="chev">${ICONS.chevron}</span>
+        </button>`}
     </div>`;
 
   $('#start-btn').addEventListener('click', openRecord);
-  $('#quick-btn').addEventListener('click', () => switchTab('SETTINGS'));
-  $$('[data-mode]', screenEl).forEach((b) => b.addEventListener('click', () => {
-    state.mode = b.dataset.mode;
+  $('#pro-btn').addEventListener('click', showPro);
+  const proRow = $('#pro-row');
+  if (proRow) proRow.addEventListener('click', showPro);
+  $$('[data-go]', screenEl).forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.go)));
+
+  wireSegmented(screenEl, { attr: 'mode' }, (key) => {
+    state.mode = key;
     savePrefs();
     renderHome();
-  }));
-  const pc = $('#premium-card');
-  if (pc) pc.addEventListener('click', () => showPremium());
+  });
 }
 
-function radioRowHTML(m) {
-  const selected = state.mode === m;
-  return `
-    <button class="card radio-row ${selected ? 'selected' : ''}" data-mode="${m}" type="button">
-      <span class="radio-text">
-        <span class="radio-title">${MODES[m].title}</span>
-        <span class="radio-sub">${MODES[m].subtitle}</span>
-      </span>
-      <span class="radio-dot"><i></i></span>
-    </button>`;
-}
-
-function chipsHTML(which, selected) {
-  return `<div class="chips">${ASPECT_ORDER.map((k) => `
-    <button class="chip ${k === selected ? 'selected' : ''}" data-${which}="${k}" type="button">${ASPECTS[k].label}</button>
-  `).join('')}</div>`;
-}
-
-function segmentedHTML(which, order, defs, selected, premium) {
-  return `<div class="segmented">${order.map((k) => `
-    <button class="seg ${k === selected ? 'selected' : ''}" data-${which}="${k}" type="button">${defs[k].seg}</button>
-  `).join('')}</div>`;
-}
+/* =====================================================================
+   SCREEN: SETTINGS
+   ===================================================================== */
 
 function renderSettings() {
   screenEl.innerHTML = `
-    <div class="screen-scroll">
-      <h1 class="page-title">Settings</h1>
+    <div class="scroll">
+      <h1 class="h1">Settings</h1>
+      <p class="sub">How DuelShots records and what it writes.</p>
 
-      <div class="section-label">Recording Mode</div>
-      ${MODE_ORDER.map(radioRowHTML).join('')}
+      <div class="label">Recording mode</div>
+      ${segmentedHTML(modeItems(), state.mode, { name: 'mode', attr: 'mode' })}
+      <p class="mode-desc">${MODES[state.mode].desc}</p>
 
-      <div class="section-label">Camera Formats</div>
-      <div class="card">
-        <div class="card-title">Front Camera</div>
-        ${chipsHTML('front', state.frontAspect)}
-      </div>
-      <div class="card">
-        <div class="card-title">Back Camera</div>
-        ${chipsHTML('back', state.backAspect)}
-      </div>
-
-      <div class="section-label">Video Quality</div>
-      <div class="card">
-        <div class="setting-row">
-          <span>Resolution</span>
-          ${segmentedHTML('quality', QUALITY_ORDER, QUALITIES, state.quality, state.premium)}
+      <div class="label">Camera formats</div>
+      <div class="group">
+        <div class="row stack">
+          <div class="row-head">
+            <span class="row-label">Front camera</span>
+            <span class="row-val">${ASPECTS[state.frontAspect].short}</span>
+          </div>
+          <div class="chips">
+            ${ASPECT_ORDER.map((k) => `
+              <button class="chip ${k === state.frontAspect ? 'active' : ''}" data-front="${k}" type="button">${ASPECTS[k].label}</button>
+            `).join('')}
+          </div>
+        </div>
+        <div class="row stack">
+          <div class="row-head">
+            <span class="row-label">Back camera</span>
+            <span class="row-val">${ASPECTS[state.backAspect].short}</span>
+          </div>
+          <div class="chips">
+            ${ASPECT_ORDER.map((k) => `
+              <button class="chip ${k === state.backAspect ? 'active' : ''}" data-back="${k}" type="button">${ASPECTS[k].label}</button>
+            `).join('')}
+          </div>
         </div>
       </div>
 
-      <div class="section-label">Container / Codec</div>
-      <div class="card">
-        <div class="setting-row">
-          <span>Format</span>
-          ${segmentedHTML('codec', CODEC_ORDER, CODECS, state.codec, state.premium)}
+      <div class="label">Video</div>
+      <div class="group">
+        <div class="row">
+          <span class="row-label">Resolution</span>
+          <div class="row-val" style="margin-left:auto">
+            ${segmentedHTML(QUALITY_ORDER.map((k) => ({ key: k, label: QUALITIES[k].seg })), state.quality, { name: 'quality', attr: 'quality', small: true })}
+          </div>
+        </div>
+        <div class="row">
+          <span class="row-label">Container</span>
+          <div class="row-val" style="margin-left:auto">
+            ${segmentedHTML(CODEC_ORDER.map((k) => ({ key: k, label: CODECS[k].seg })), state.codec, { name: 'codec', attr: 'codec', small: true })}
+          </div>
         </div>
       </div>
 
-      <div class="card premium-block gold-border">
-        <div class="premium-head">♛ Premium</div>
-        <div class="premium-list">
-          ${['More format options (4K, HEVC)', '60fps & custom bitrate', 'Per-camera aspect control', 'No watermark']
-      .map((t) => `<div class="premium-item"><b>✓</b><span>${t}</span></div>`).join('')}
+      <div class="pro-card">
+        <div class="pro-card-head">
+          <span class="pro-mark">♛</span>
+          <div>
+            <div class="pro-card-title">DuelShots Pro</div>
+            <div class="caption">${state.premium ? 'Active on this device' : 'One-time unlock'}</div>
+          </div>
+        </div>
+        <div class="pro-list">
+          ${proFeatures().map((f) => `<div class="pro-item">${ICONS.check}<span>${f}</span></div>`).join('')}
         </div>
         ${state.premium
-      ? `<div class="premium-active">Premium active</div>`
-      : `<button class="gold-btn" id="gold-btn" type="button">♛ Go Premium</button>`}
+      ? `<div class="pro-active">${ICONS.check}<span>Pro is active</span></div>`
+      : `<button class="btn-primary" id="pro-btn-settings" type="button" style="margin-top:16px"><span class="spark"></span>Unlock Pro</button>`}
       </div>
     </div>`;
 
-  $$('[data-mode]', screenEl).forEach((b) => b.addEventListener('click', () => {
-    state.mode = b.dataset.mode;
+  wireSegmented(screenEl, { attr: 'mode' }, (key) => {
+    state.mode = key;
     savePrefs();
     renderSettings();
-  }));
+  });
 
   $$('[data-front]', screenEl).forEach((b) => b.addEventListener('click', () => {
     state.frontAspect = b.dataset.front;
@@ -1083,95 +1215,109 @@ function renderSettings() {
     savePrefs();
     renderSettings();
   }));
-
   $$('[data-quality]', screenEl).forEach((b) => b.addEventListener('click', () => {
     const key = b.dataset.quality;
-    if (QUALITIES[key].premium && !state.premium) { showPremium(QUALITIES[key].label); return; }
+    if (QUALITIES[key].premium && !state.premium) { showPro({ kind: 'quality', key }); return; }
     state.quality = key;
     savePrefs();
     renderSettings();
   }));
-
   $$('[data-codec]', screenEl).forEach((b) => b.addEventListener('click', () => {
     const key = b.dataset.codec;
-    if (CODECS[key].premium && !state.premium) { showPremium(CODECS[key].label); return; }
+    if (CODECS[key].premium && !state.premium) { showPro({ kind: 'codec', key }); return; }
     state.codec = key;
     savePrefs();
     renderSettings();
   }));
 
-  const gold = $('#gold-btn');
-  if (gold) gold.addEventListener('click', () => {
-    state.premium = true;
-    savePrefs();
-    toast('Premium unlocked — mock purchase, no billing');
-    renderSettings();
-  });
+  const proBtn = $('#pro-btn-settings');
+  if (proBtn) proBtn.addEventListener('click', showPro);
 }
 
-function clipRowHTML(c) {
-  return `
-    <div class="clip" data-clip="${c.id}">
-      <div class="clip-thumb">${ICONS.play}</div>
-      <div class="clip-text">
-        <div class="clip-name">${esc(c.name)}</div>
-        <div class="clip-meta">${c.sizeMb} MB · ${c.duration} · ${MODES[c.mode] ? MODES[c.mode].title : 'Video'}</div>
-      </div>
-      <button class="clip-del" data-del="${c.id}" type="button" aria-label="Delete recording">${ICONS.trash}</button>
-    </div>`;
-}
+/* =====================================================================
+   SCREEN: GALLERY
+   ===================================================================== */
 
 function renderGallery() {
-  const clips = state.clips;
   screenEl.innerHTML = `
-    <div class="screen-scroll">
-      <h1 class="page-title">Gallery</h1>
-      <p class="gallery-sub">Recordings are saved to Gallery → Movies/DuelShots</p>
-      ${clips.length
-      ? clips.map(clipRowHTML).join('')
-      : `<div class="empty-state">No recordings yet.<br>Tap “Start Recording”.</div>`}
+    <div class="scroll">
+      <h1 class="h1">Gallery</h1>
+      <p class="sub">${state.clips.length
+      ? `${state.clips.length} clip${state.clips.length === 1 ? '' : 's'} this session · saved to Movies/DuelShots`
+      : 'Saved to Movies/DuelShots'}</p>
+
+      ${state.clips.length ? `<div class="grid">${state.clips.map(clipCardHTML).join('')}</div>` : `
+        <div class="empty">
+          <div class="empty-icon">${ICONS.camera}</div>
+          <h3>No recordings yet</h3>
+          <p>Your first take lands here — composed, separate, or both.</p>
+          <button class="btn-primary" id="empty-start" type="button" style="margin-top:18px">
+            <span class="rec-dot"></span>Start recording
+          </button>
+        </div>`}
     </div>`;
 
-  $$('.clip', screenEl).forEach((row) => row.addEventListener('click', (e) => {
-    if (e.target.closest('[data-del]')) return;
-    const clip = state.clips.find((c) => c.id === row.dataset.clip);
+  $$('.clip', screenEl).forEach((el) => el.addEventListener('click', () => {
+    const clip = state.clips.find((c) => c.id === el.dataset.clip);
     if (clip) playClip(clip);
   }));
 
-  $$('[data-del]', screenEl).forEach((btn) => btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const clip = state.clips.find((c) => c.id === btn.dataset.del);
-    if (!clip) return;
-    URL.revokeObjectURL(clip.url);
-    state.clips = state.clips.filter((c) => c.id !== clip.id);
-    toast(`Deleted ${clip.name}`);
-    renderGallery();
-  }));
+  const empty = $('#empty-start');
+  if (empty) empty.addEventListener('click', openRecord);
+}
+
+function clipCardHTML(c) {
+  return `
+    <button class="clip" data-clip="${c.id}" type="button">
+      <div class="thumb" style="${c.poster ? `background-image:url(${c.poster})` : ''}">
+        <span class="play">${ICONS.play}</span>
+        <span class="dur">${c.duration.replace(/^00:/, '')}</span>
+      </div>
+      <div class="clip-name">${esc(c.name)}</div>
+      <div class="clip-meta">${c.sizeMb} MB · ${MODES[c.mode] ? MODES[c.mode].title : 'Clip'}</div>
+    </button>`;
 }
 
 function playClip(clip) {
-  openModal(`
-    <div class="modal-card player-card">
-      <h3 class="modal-title" style="color:#fff;font-size:14px">${esc(clip.name)}</h3>
+  openSheet(`
+    <div class="grabber"></div>
+    <div class="player">
       <video src="${clip.url}" controls autoplay playsinline></video>
-      <div class="player-meta">${clip.sizeMb} MB · ${clip.duration} · ${esc(clip.mime)}<br>
-        ${MODES[clip.mode] ? MODES[clip.mode].title : ''}</div>
-      <div class="modal-actions">
-        <a class="modal-btn" href="${clip.url}" download="${esc(clip.name)}">Download</a>
-        <button class="modal-btn primary" data-close type="button">Close</button>
+      <div class="player-meta">${esc(clip.name)}<br>${clip.sizeMb} MB · ${clip.duration} · ${esc(clip.mime)}</div>
+      <div class="player-actions">
+        <a class="btn-primary" href="${clip.url}" download="${esc(clip.name)}">${ICONS.download} Download</a>
+        <button class="btn-secondary btn-danger" data-delete type="button">Delete</button>
+        <button class="btn-secondary" data-close type="button">Close</button>
       </div>
-    </div>`);
+    </div>`, () => {
+    const del = $('[data-delete]', modalRoot);
+    if (del) del.addEventListener('click', () => {
+      URL.revokeObjectURL(clip.url);
+      state.clips = state.clips.filter((c) => c.id !== clip.id);
+      closeSheet();
+      toast('Clip deleted');
+      if (state.tab === 'GALLERY') renderGallery();
+    });
+  });
+}
+
+/* =====================================================================
+   TABS
+   ===================================================================== */
+
+function updateTabs() {
+  $$('.tab', tabbarEl).forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === state.tab));
 }
 
 function renderTab(animate = false) {
-  const prev = screenEl.querySelector('.screen-scroll');
+  const prev = screenEl.querySelector('.scroll');
   const prevScroll = prev ? prev.scrollTop : 0;
 
   if (state.tab === 'SETTINGS') renderSettings();
   else if (state.tab === 'GALLERY') renderGallery();
   else renderHome();
 
-  const next = screenEl.querySelector('.screen-scroll');
+  const next = screenEl.querySelector('.scroll');
   if (next) {
     next.scrollTop = animate ? 0 : prevScroll;
     if (animate) next.classList.add('enter');
@@ -1190,7 +1336,8 @@ function switchTab(tab) {
 
 function tickClock() {
   const now = new Date();
-  $('#clock').textContent = `${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const h = now.getHours() % 12 || 12;
+  $('#clock').textContent = `${h}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
 function init() {
@@ -1205,11 +1352,6 @@ function init() {
     span.innerHTML = ICONS[span.dataset.icon] || '';
   });
   $('#about-btn').addEventListener('click', showAbout);
-
-  // flash overlay for the shutter effect
-  const flash = document.createElement('div');
-  flash.className = 'flash';
-  deviceEl.querySelector('.device-inner').appendChild(flash);
 
   renderTab();
 }

@@ -24,6 +24,13 @@ No build step, no npm packages — just `index.html`, `styles.css` and `app.js`.
 | `camera/DualCameraController.kt` | `startCameras()` / `startRecording()` |
 | `grantPremium()` (mocked billing) | premium dialog → `state.premium` |
 
+## Design
+
+Graphite surfaces, hairline borders and a single accent — colour is reserved for the
+brand mark, the hero art and the record state, so the viewfinder stays the loudest
+thing on screen. The floating tab bar, bottom sheets and segmented controls are the
+same components used in the native Compose UI.
+
 ## What actually works
 
 - **Three recording modes.** Dual View composes the two feeds into one file with a
@@ -31,13 +38,15 @@ No build step, no npm packages — just `index.html`, `styles.css` and `app.js`.
   `CompositionSettings` in the Kotlin controller). Separate Videos records two
   files, Both Options records all three.
 - **Real files.** Recording is done with canvas composition + `MediaRecorder`;
-  finished clips appear in the Gallery tab, play inline and can be downloaded.
-  Filenames follow the Android scheme: `duelshot_combined_YYYYMMDD_HHMMSS.mp4`.
+  finished clips appear in the Gallery tab as poster thumbnails, play inline and can
+  be downloaded or deleted. Filenames follow the Android scheme:
+  `duelshot_combined_YYYYMMDD_HHMMSS.mp4`.
 - **Camera handling.** Both cameras are requested at once. If the browser refuses
   the second stream the preview degrades to the same single-camera fallback the
   app uses. If camera access is blocked entirely (permissions, iframe policy,
   plain HTTP) an animated demo feed keeps the recorder usable.
-- **Settings persistence** and the freemium gating (4K, HEVC) behave like the app.
+- **Settings persistence** and the freemium gating (4K, HEVC) behave like the app:
+  picking a locked option opens the Pro sheet, and unlocking applies that option.
 
 ## Known differences
 
