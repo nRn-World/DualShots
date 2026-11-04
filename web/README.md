@@ -29,12 +29,24 @@ No build step, no npm packages — just `index.html`, `styles.css` and `app.js`.
 
 ## Design
 
-Warm near-black surfaces with an orange-to-ember brand gradient. The menu is a single
-column: the logo mark and wordmark on top, one primary *Start Recording* pill, then
-plain rows for Gallery, Settings, Premium and About — no tab bar. Colour is reserved
-for the brand, the primary action and the record state, so the viewfinder stays the
-loudest thing on screen. Bottom sheets, chips and grouped rows match the components in
-the native Compose UI; Settings uses the same grouped list as the reference design.
+The interface is built like an analog camera manual rather than a dashboard.
+
+- **Split title card.** The home screen opens on a duotone panel split down the middle —
+  back camera on the left, front camera on the right — with the lens mark and the
+  DuelShots wordmark sitting on the seam, and a strip of film perforations along the
+  bottom edge.
+- **One accent, used sparingly.** Orange appears on the brand gradient, the record state
+  and premium. Everything else is warm near-black, paper white and hairline rules.
+- **Monospaced metadata.** Every technical value (formats, resolution, durations,
+  filenames, section labels) is set in mono with wide tracking; prose stays in the system
+  sans. The home screen carries a live *Capture* readout of the current settings.
+- **Hairlines, not cards.** Rows are separated by 1px rules instead of stacked rounded
+  cards and drop shadows, so the screens read as one continuous instrument panel.
+- **Viewfinder HUD.** The record screen frames the preview with corner brackets, a
+  red-dot timer, a torch control in the top bar, a white-ring shutter and mono status
+  lines. A fine film grain sits over the whole device.
+
+Colour tokens live in `:root` in `styles.css`; the type stacks are `--font` and `--mono`.
 
 ## What actually works
 

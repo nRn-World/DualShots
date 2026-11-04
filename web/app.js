@@ -84,18 +84,19 @@ const svg = (d, extra = '') =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
 
 const ICONS = {
-  camera: svg('<rect x="2.8" y="6.6" width="12.4" height="10.8" rx="3.2"/><path d="m15.2 12 6-3.6v7.2l-6-3.6z"/>'),
-  video: svg('<rect x="2.8" y="6.6" width="12.4" height="10.8" rx="3.2"/><path d="m15.2 12 6-3.6v7.2l-6-3.6z"/>'),
+  camera: svg('<rect x="2.7" y="7.2" width="18.6" height="12.2" rx="3.1"/><path d="M8.4 7.2 9.9 4.6h4.2l1.5 2.6"/><circle cx="12" cy="13.3" r="3.5"/>'),
+  video: svg('<rect x="2.7" y="7.2" width="18.6" height="12.2" rx="3.1"/><path d="M8.4 7.2 9.9 4.6h4.2l1.5 2.6"/><circle cx="12" cy="13.3" r="3.5"/>'),
   gallery: svg('<rect x="3.2" y="4.4" width="17.6" height="15.2" rx="4"/><circle cx="8.6" cy="9.6" r="1.5" fill="currentColor" stroke="none"/><path d="m4.4 17.6 4.6-4.3a2 2 0 0 1 2.7 0l5 4.6"/><path d="m14.2 15.2 1.9-1.8a2 2 0 0 1 2.7 0l1.6 1.4"/>'),
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.3 14.9a1.6 1.6 0 0 0 .3 1.8l.06.06a2 2 0 1 1-2.8 2.8l-.06-.06a1.6 1.6 0 0 0-1.8-.32 1.6 1.6 0 0 0-.96 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1.06-1.5 1.6 1.6 0 0 0-1.8.32l-.06.06a2 2 0 1 1-2.8-2.8l.06-.06a1.6 1.6 0 0 0 .32-1.8 1.6 1.6 0 0 0-1.5-.96H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9.1a1.6 1.6 0 0 0-.32-1.8l-.06-.06a2 2 0 1 1 2.8-2.8l.06.06a1.6 1.6 0 0 0 1.8.32H9a1.6 1.6 0 0 0 .96-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 .96 1.5 1.6 1.6 0 0 0 1.8-.32l.06-.06a2 2 0 1 1 2.8 2.8l-.06.06a1.6 1.6 0 0 0-.32 1.8V9a1.6 1.6 0 0 0 1.5.96H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.6.94z"/>'),
   crown: svg('<path d="M3.4 18.4h17.2l1.1-11-5.4 3.4L12 4.6 7.7 10.8 2.3 7.4z"/>'),
   info: svg('<circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.4"/><circle cx="12" cy="7.9" r="1" fill="currentColor" stroke="none"/>'),
-  film: svg('<rect x="2.8" y="5" width="18.4" height="14" rx="3"/><path d="M7 5v14M17 5v14M2.8 12h18.4"/>'),
+  film: svg('<rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2.6"/><path d="M7.4 6.2v11.6M16.6 6.2v11.6"/>'),
   mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0"/><path d="M12 17.8V21"/>'),
   folder: svg('<path d="M3 7.4a2 2 0 0 1 2-2h3.6l2 2.4H19a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
   close: svg('<path d="M6.8 6.8l10.4 10.4M17.2 6.8 6.8 17.2"/>', 'stroke-width="2"'),
   flip: svg('<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.4 4.7v5.1h-5.1"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>'),
   swap: svg('<path d="M4.5 8.5h13l-3-3"/><path d="M19.5 15.5h-13l3 3"/>'),
+  flipCam: svg('<rect x="2.8" y="6.4" width="18.4" height="13.2" rx="3.2"/><path d="M9.5 12.6a2.8 2.8 0 0 1 4.7-1.6"/><path d="M14.6 8.9v2.4h-2.4"/><path d="M14.5 14.4a2.8 2.8 0 0 1-4.7 1.6"/><path d="M9.4 18.1v-2.4h2.4"/>'),
   chevronRight: svg('<path d="M9.4 6.2 15.2 12l-5.8 5.8"/>', 'stroke-width="2"'),
   chevronLeft: svg('<path d="M14.6 6.2 8.8 12l5.8 5.8"/>', 'stroke-width="2"'),
   chevronDown: svg('<path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>', 'stroke-width="2.1"'),
@@ -104,39 +105,39 @@ const ICONS = {
   download: svg('<path d="M12 4v11"/><path d="m7.8 11.4 4.2 4.2 4.2-4.2"/><path d="M4.8 19.4h14.4"/>'),
   trash: svg('<path d="M5 7h14M9.5 7V5.4h5V7M6.6 7l.8 12.1A1.9 1.9 0 0 0 9.3 21h5.4a1.9 1.9 0 0 0 1.9-1.9L17.4 7"/>'),
   bolt: svg('<path d="M13.4 2.6 5.6 13.4h5.2l-1.2 8 7.8-10.8h-5.2z"/>'),
-  aperture: svg('<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3.4 8 10M20 8.6l-7 1M17.6 19l-4-6.4M6.4 19l4-6.6M4 8.6l6.6 1"/>'),
+  aperture: svg('<path d="M4 9.2V6.6A2.6 2.6 0 0 1 6.6 4H9.2"/><path d="M14.8 4h2.6A2.6 2.6 0 0 1 20 6.6v2.6"/><path d="M20 14.8v2.6a2.6 2.6 0 0 1-2.6 2.6h-2.6"/><path d="M9.2 20H6.6A2.6 2.6 0 0 1 4 17.4v-2.6"/>'),
+  layers: svg('<path d="m12 3.6 8.2 4.3-8.2 4.3-8.2-4.3z"/><path d="m3.8 12.3 8.2 4.3 8.2-4.3"/><path d="m3.8 16.5 8.2 4.3 8.2-4.3"/>'),
 };
 
-function logoMark(size = 108, cls = 'logo-lg') {
+function logoMark(size = 76, cls = 'logo-lg') {
   return `
     <svg class="${cls}" viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true">
       <defs>
-        <linearGradient id="duelGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#FFC24B"/>
-          <stop offset=".45" stop-color="#FF7A1A"/>
+        <linearGradient id="dsGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FFC65C"/>
+          <stop offset=".5" stop-color="#FF7A1A"/>
           <stop offset="1" stop-color="#FF4D00"/>
         </linearGradient>
-        <linearGradient id="duelGradSoft" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#FFB020" stop-opacity=".85"/>
-          <stop offset="1" stop-color="#FF4D00" stop-opacity=".2"/>
-        </linearGradient>
+        <radialGradient id="dsGlass" cx=".36" cy=".3" r=".78">
+          <stop offset="0" stop-color="#463429"/>
+          <stop offset=".5" stop-color="#151110"/>
+          <stop offset="1" stop-color="#070605"/>
+        </radialGradient>
       </defs>
 
-      <!-- orbit -->
-      <path d="M32 22.5A52 44 0 0 1 100 44" fill="none" stroke="url(#duelGrad)" stroke-width="5"
-            stroke-linecap="round" opacity=".9"/>
-      <path d="M88 96A52 44 0 0 1 22 74" fill="none" stroke="url(#duelGradSoft)" stroke-width="4"
-            stroke-linecap="round"/>
+      <!-- split lens: the two halves of the product -->
+      <circle cx="54" cy="60" r="30" fill="#0b0806" stroke="url(#dsGrad)" stroke-width="4"/>
+      <path d="M54 30a30 30 0 0 0 0 60z" fill="url(#dsGrad)" opacity=".14"/>
+      <path d="M54 24v72" stroke="rgba(255,227,194,.4)" stroke-width="1.4" stroke-dasharray="3 5"/>
+      <circle cx="54" cy="60" r="16.5" fill="url(#dsGlass)" stroke="rgba(255,227,194,.22)" stroke-width="1.4"/>
+      <circle cx="47" cy="53" r="5" fill="#FFC65C" opacity=".9"/>
+      <circle cx="59" cy="66" r="2.4" fill="#FF7A1A" opacity=".55"/>
 
-      <!-- lens -->
-      <circle cx="52" cy="60" r="30" fill="#0b0806" stroke="url(#duelGrad)" stroke-width="5"/>
-      <circle cx="52" cy="60" r="20" fill="#1b1310"/>
-      <circle cx="52" cy="60" r="20" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1.5"/>
-      <circle cx="45" cy="52" r="7" fill="#FFC24B" opacity=".9"/>
-      <circle cx="59" cy="68" r="3.4" fill="#FF7A1A" opacity=".55"/>
+      <!-- play cuts into the frame -->
+      <path d="M82 46.5 108 60 82 73.5z" fill="url(#dsGrad)"/>
 
-      <!-- play -->
-      <path d="M78 44.5 108 60 78 75.5z" fill="url(#duelGrad)"/>
+      <!-- rec led -->
+      <circle cx="54" cy="30" r="2.6" fill="#FF3B30"/>
     </svg>`;
 }
 
@@ -178,13 +179,23 @@ function pipRect(w, h, aspectKey, pip) {
   const a = ASPECTS[aspectKey];
   let pw = w * clamp(pip.scale, PIP_MIN, PIP_MAX);
   let ph = pw * (a.h / a.w);
-  const maxH = h * 0.82;
+
+  // keep the inset inside the frame with a margin, preserving the camera aspect
+  const maxH = h * 0.72;
+  const maxW = w * 0.46;
   if (ph > maxH) {
     ph = maxH;
     pw = ph * (a.w / a.h);
   }
-  const x = clamp(pip.cx * w - pw / 2, 0, Math.max(0, w - pw));
-  const y = clamp(pip.cy * h - ph / 2, 0, Math.max(0, h - ph));
+  if (pw > maxW) {
+    pw = maxW;
+    ph = pw * (a.h / a.w);
+  }
+
+  const mx = w * 0.035;
+  const my = h * 0.035;
+  const x = clamp(pip.cx * w - pw / 2, mx, Math.max(mx, w - pw - mx));
+  const y = clamp(pip.cy * h - ph / 2, my, Math.max(my, h - ph - my));
   return { x, y, w: pw, h: ph };
 }
 
@@ -320,7 +331,7 @@ function showFormatSheet(which) {
     <div class="chips">
       ${ASPECT_ORDER.map((k) => `
         <button class="chip ${k === (isFront ? state.frontAspect : state.backAspect) ? 'active' : ''}"
-                data-aspect="${k}" type="button">${ASPECTS[k].label}</button>
+                data-aspect="${k}" type="button">${ASPECTS[k].short}</button>
       `).join('')}
     </div>
     <button class="btn-primary" data-close type="button">Done</button>`;
@@ -402,7 +413,9 @@ function showAbout() {
       <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
 
       <h3>Build</h3>
-      <p>v3 — orange menu design with a centred logo, one primary action and a settings list.
+      <p><b>3.1 · “two sides”.</b> The interface is built like an analog camera manual: a split
+      viewfinder title card, monospaced metadata, hairline lists and a live capture readout.
+      Colour is reserved for the brand gradient, the record state and premium.
       Format controls live on the record screen and in Settings. Last updated 2026-11-04.</p>
 
       <h3>What works here</h3>
@@ -932,10 +945,11 @@ function drawOutput(o) {
       const g = pipRect(w, h, aspectKey, currentPip());
       const radius = Math.round(Math.min(g.w, g.h) * 0.07);
       ctx.save();
-      roundRect(ctx, g.x, g.y, g.w, g.h, radius);
+      ctx.translate(g.x, g.y);
+      roundRect(ctx, 0, 0, g.w, g.h, radius);
       ctx.clip();
       ctx.fillStyle = '#000';
-      ctx.fillRect(g.x, g.y, g.w, g.h);
+      ctx.fillRect(0, 0, g.w, g.h);
       drawCover(ctx, front.el, g.w, g.h, front.mirror, zoom);
       ctx.restore();
       ctx.strokeStyle = 'rgba(255,255,255,.55)';
@@ -1127,6 +1141,7 @@ function buildRecordShell() {
         <button class="icon-btn" id="rec-close" type="button" aria-label="Close">${ICONS.close}</button>
         <span class="timer"><span class="dot"></span><span id="rec-timer">00:00</span></span>
         <span class="spacer"></span>
+        <button class="torch" id="rec-torch" type="button" aria-label="Torch">${ICONS.bolt}</button>
         <button class="mode-pill" id="rec-mode" type="button" aria-label="Camera setup">
           <span id="rec-mode-label">Both</span>
           <span class="caret">${ICONS.chevronDown}</span>
@@ -1135,7 +1150,6 @@ function buildRecordShell() {
 
       <div class="rec-preview" id="rec-preview">
         <div class="feeds" id="rec-feeds"></div>
-        <button class="torch" id="rec-torch" type="button" aria-label="Torch">${ICONS.bolt}</button>
       </div>
 
       <div class="rec-dock">
@@ -1147,7 +1161,7 @@ function buildRecordShell() {
         <div class="rec-controls">
           <button class="zoom-chip" id="rec-zoom" type="button" aria-label="Zoom">1×</button>
           <button class="shutter" id="rec-btn" type="button" aria-label="Record"><i></i></button>
-          <button class="dock-btn" id="rec-flip" type="button" aria-label="Switch camera">${ICONS.flip}</button>
+          <button class="dock-btn" id="rec-flip" type="button" aria-label="Switch camera">${ICONS.flipCam}</button>
         </div>
       </div>
     </div>`;
@@ -1318,7 +1332,7 @@ function mountFeeds() {
   swap.className = 'stack-swap';
   swap.type = 'button';
   swap.setAttribute('aria-label', 'Swap camera order');
-  swap.innerHTML = ICONS.swap;
+  swap.innerHTML = `${ICONS.swap}<span>Swap</span>`;
   swap.addEventListener('click', () => {
     state.stack = state.stack === 'back-first' ? 'front-first' : 'back-first';
     mountFeeds();
@@ -1439,14 +1453,14 @@ function cameraSheetHTML() {
     <div class="section-title">Front camera</div>
     <div class="chips">
       ${ASPECT_ORDER.map((k) => `
-        <button class="chip ${k === state.frontAspect ? 'active' : ''}" data-recfront="${k}" type="button">${ASPECTS[k].label}</button>
+        <button class="chip ${k === state.frontAspect ? 'active' : ''}" data-recfront="${k}" type="button">${ASPECTS[k].short}</button>
       `).join('')}
     </div>
 
     <div class="section-title">Back camera</div>
     <div class="chips">
       ${ASPECT_ORDER.map((k) => `
-        <button class="chip ${k === state.backAspect ? 'active' : ''}" data-recback="${k}" type="button">${ASPECTS[k].label}</button>
+        <button class="chip ${k === state.backAspect ? 'active' : ''}" data-recback="${k}" type="button">${ASPECTS[k].short}</button>
       `).join('')}
     </div>
 
@@ -1522,47 +1536,91 @@ function render() {
 }
 
 function renderHome() {
+  const clipCount = state.clips.length;
   screenEl.innerHTML = `
     <div class="menu">
       <div class="menu-top">
-        <span></span>
+        <span class="menu-brand">
+          <span class="stage-dot"></span>DuelShots<span class="brand-slash">/</span><span class="brand-dim">Web</span>
+        </span>
         <button class="icon-btn" id="home-settings" type="button" aria-label="Settings">${ICONS.gear}</button>
       </div>
 
-      <div class="menu-hero">
-        ${logoMark(108)}
-        <h1 class="wordmark">Duel<span>Shots</span></h1>
-        <p class="tagline">Record both sides. At once.</p>
+      <div class="hero">
+        <div class="hero-panes" aria-hidden="true">
+          <span class="pane back"></span>
+          <span class="pane front"></span>
+          <span class="seam"></span>
+        </div>
+        <span class="pane-tag left">Back · ${ASPECTS[state.backAspect].short}</span>
+        <span class="pane-tag right">Front · ${ASPECTS[state.frontAspect].short}</span>
+        <div class="hero-content">
+          ${logoMark(62)}
+          <h1 class="wordmark">Duel<span>Shots</span></h1>
+        </div>
       </div>
+
+      <p class="tagline">Record both sides. At once.</p>
 
       <button class="btn-primary" id="start-btn" type="button">
         ${ICONS.camera}
         <span class="grow">Start Recording</span>
         <span class="chev">${ICONS.chevronRight}</span>
       </button>
-      <p class="cta-meta">${MODES[state.mode].title} · ${QUALITIES[state.quality].label} · ${ASPECTS[state.frontAspect].short} + ${ASPECTS[state.backAspect].short}</p>
+      <p class="cta-meta">${MODES[state.mode].title} · ${outputCount()} file${outputCount() === 1 ? '' : 's'}</p>
+
+      <div class="spec">
+        <div class="spec-head">
+          <span class="spec-title">Capture</span>
+          <span class="spec-line"></span>
+          <span class="spec-state">Ready</span>
+        </div>
+        <div class="spec-grid">
+          <div class="spec-cell"><span class="k">Front</span><span class="v">${ASPECTS[state.frontAspect].short}</span></div>
+          <div class="spec-cell"><span class="k">Back</span><span class="v">${ASPECTS[state.backAspect].short}</span></div>
+          <div class="spec-cell"><span class="k">Video</span><span class="v">${QUALITIES[state.quality].label}</span></div>
+          <div class="spec-cell"><span class="k">Audio</span><span class="v">${state.audio ? 'On' : 'Off'}</span></div>
+        </div>
+      </div>
+
+      <div class="rail">
+        <span class="rail-label">Library</span>
+        <i class="rail-line"></i>
+        <span class="rail-count">${clipCount} clip${clipCount === 1 ? '' : 's'}</span>
+      </div>
 
       <div class="menu-list">
         <button class="menu-row" data-go="GALLERY" type="button">
+          <span class="idx">01</span>
           <span class="menu-ico">${ICONS.gallery}</span>
           <span class="label">Gallery</span>
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
         <button class="menu-row" data-go="SETTINGS" type="button">
+          <span class="idx">02</span>
           <span class="menu-ico">${ICONS.gear}</span>
           <span class="label">Settings</span>
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
         <button class="menu-row gold" id="menu-premium" type="button">
+          <span class="idx">03</span>
           <span class="menu-ico">${ICONS.crown}</span>
           <span class="label">${state.premium ? 'Premium active' : 'Premium'}</span>
+          ${state.premium ? '' : '<span class="pro-tag">Pro</span>'}
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
         <button class="menu-row" id="menu-about" type="button">
+          <span class="idx">04</span>
           <span class="menu-ico">${ICONS.info}</span>
           <span class="label">About</span>
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
+      </div>
+
+      <div class="menu-foot">
+        <span>Build 3.1</span>
+        <i class="foot-line"></i>
+        <span>On this device</span>
       </div>
     </div>`;
 
@@ -1571,6 +1629,11 @@ function renderHome() {
   $('#menu-premium').addEventListener('click', () => showPro());
   $('#menu-about').addEventListener('click', showAbout);
   $$('[data-go]', screenEl).forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
+}
+
+function outputCount() {
+  if (state.mode === 'DUAL_VIEW') return 1;
+  return state.mode === 'SEPARATE' ? 2 : 3;
 }
 
 function backHead(title) {
@@ -1632,7 +1695,7 @@ function renderSettings() {
           <span class="chev">${ICONS.chevronRight}</span>
         </button>
         <button class="row" data-codec-row type="button">
-          <span class="row-ico">${ICONS.bolt}</span>
+          <span class="row-ico">${ICONS.layers}</span>
           <span class="label">Container</span>
           <span class="val">${CODECS[state.codec].label}</span>
           <span class="chev">${ICONS.chevronRight}</span>
@@ -1712,13 +1775,14 @@ function renderGallery() {
   screenEl.innerHTML = `
     <div class="page enter">
       ${backHead('Gallery')}
-      <p class="sub" style="margin:10px 2px 0;font-size:12.5px;color:var(--text-3)">
+      <p class="sub">
         ${state.clips.length
       ? `${state.clips.length} clip${state.clips.length === 1 ? '' : 's'} this session · Movies/DuelShots`
       : 'Recordings are saved to Movies/DuelShots'}
       </p>
 
-      ${state.clips.length ? `<div class="gallery-grid">${state.clips.map(clipCardHTML).join('')}</div>` : `
+      ${state.clips.length ? `<div class="gallery-grid">${state.clips.map(clipCardHTML).join('')}</div>
+        <p class="gallery-hint">Tap a clip to play, download or delete.<br>Files are held in this tab until you reload.</p>` : `
         <div class="empty">
           <div class="empty-ico">${ICONS.camera}</div>
           <h3>No recordings yet</h3>
@@ -1746,8 +1810,11 @@ function clipCardHTML(c) {
         <span class="play">${ICONS.play}</span>
         <span class="dur">${c.duration.replace(/^00:/, '')}</span>
       </div>
-      <div class="clip-name">${esc(c.name)}</div>
-      <div class="clip-meta">${c.sizeMb} MB · ${MODES[c.mode] ? MODES[c.mode].title : 'Clip'}</div>
+      <div class="clip-body">
+        <div class="clip-name">${esc(c.name)}</div>
+        <div class="clip-meta">${c.sizeMb} MB · ${MODES[c.mode] ? MODES[c.mode].title : 'Clip'}</div>
+      </div>
+      <span class="clip-arrow">${ICONS.chevronRight}</span>
     </button>`;
 }
 
