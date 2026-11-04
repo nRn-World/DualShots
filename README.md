@@ -69,10 +69,13 @@ python3 web/serve.py 8000
 # open http://localhost:8000
 ```
 
-It records real (downloadable) clips into the Gallery tab, persists settings in
+It records real (downloadable) clips into the Gallery, persists settings in
 `localStorage`, and falls back to a single camera — or an animated demo feed — when the
-browser cannot open both cameras. The native Android app remains the reference
-implementation; see [`web/README.md`](web/README.md) for the mapping.
+browser cannot open both cameras. The v3 interface follows the product design: a
+centred orange logo and wordmark, one primary *Start Recording* action, plain list rows
+for Gallery / Settings / Premium / About, and a grouped Settings screen with the
+premium card. The native Android app remains the reference implementation; see
+[`web/README.md`](web/README.md) for the mapping.
 
 ## 🚀 Getting started
 

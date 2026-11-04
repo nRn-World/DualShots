@@ -1,7 +1,7 @@
 /* ==========================================================================
    DuelShots — interactive web preview
    A browser replica of the native Android app (Kotlin + Compose + CameraX):
-   same screens, same three recording modes, real encoded clips.
+   same flows, same three recording modes, real encoded clips.
 
    The Kotlin implementation lives in app/src/main/java/com/nrworld/duelshot/.
    ========================================================================== */
@@ -14,17 +14,14 @@ const MODE_ORDER = ['DUAL_VIEW', 'SEPARATE', 'BOTH'];
 const MODES = {
   DUAL_VIEW: {
     title: 'Dual View',
-    short: 'Dual',
     desc: 'Both cameras composed into one video — back feed full frame, front feed inset.',
   },
   SEPARATE: {
-    title: 'Separate',
-    short: 'Separate',
+    title: 'Separate Videos',
     desc: 'Two files, one per camera. Trim and post each angle independently.',
   },
   BOTH: {
-    title: 'Both',
-    short: 'Both',
+    title: 'Both Options',
     desc: 'The composed video plus both individual files — three clips in one take.',
   },
 };
@@ -41,32 +38,34 @@ const ASPECTS = {
 const QUALITY_ORDER = ['HD720', 'FHD1080', 'UHD4K'];
 
 const QUALITIES = {
-  HD720: { label: '720p', seg: '720p', premium: false, long: 1280 },
-  FHD1080: { label: '1080p', seg: '1080p', premium: false, long: 1920 },
-  UHD4K: { label: '4K', seg: '4K', premium: true, long: 3840 },
+  HD720: { label: '720p', premium: false, long: 1280 },
+  FHD1080: { label: '1080p', premium: false, long: 1920 },
+  UHD4K: { label: '4K', premium: true, long: 3840 },
 };
 
 const CODEC_ORDER = ['MP4', 'HEVC'];
 
 const CODECS = {
-  MP4: { label: 'MP4', seg: 'MP4', premium: false },
-  HEVC: { label: 'HEVC', seg: 'HEVC', premium: true },
+  MP4: { label: 'MP4', premium: false },
+  HEVC: { label: 'HEVC', premium: true },
 };
 
 const STORE_KEY = 'duelshot_prefs';
 
 const state = {
-  tab: 'HOME',
+  page: 'HOME',
   record: false,
-  mode: 'SEPARATE',
+  mode: 'BOTH',
   frontAspect: 'R_9_16',
   backAspect: 'R_16_9',
   quality: 'FHD1080',
   codec: 'MP4',
   premium: false,
-  clips: [],
-  // front-camera overlay inside the Dual View frame (cx/cy = centre, scale = width)
+  audio: true,
+  zoom: 1,
+  stack: 'front-first',
   pip: { cx: 0.74, cy: 0.24, scale: 0.34 },
+  clips: [],
 };
 
 /* --------------------------------------------------------------- elements */
@@ -75,7 +74,6 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 const screenEl = $('#screen');
-const tabbarEl = $('#tabbar');
 const sinkEl = $('#media-sink');
 const modalRoot = $('#modal-root');
 const deviceEl = $('#device');
@@ -83,44 +81,62 @@ const deviceEl = $('#device');
 /* ------------------------------------------------------------------ icons */
 
 const svg = (d, extra = '') =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
 
 const ICONS = {
-  home: svg('<path d="M3.5 10.7 12 3.6l8.5 7.1"/><path d="M5.8 9.7v10.2h12.4V9.7"/>'),
-  gallery: svg('<rect x="3.2" y="4.2" width="17.6" height="15.6" rx="4"/><path d="M10.4 9.1v5.8l4.9-2.9z" fill="currentColor" stroke="none"/>'),
-  settings: svg('<circle cx="12" cy="12" r="3"/><path d="M19.3 14.9a1.6 1.6 0 0 0 .3 1.8l.06.06a2 2 0 1 1-2.8 2.8l-.06-.06a1.6 1.6 0 0 0-1.8-.32 1.6 1.6 0 0 0-.96 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1.06-1.5 1.6 1.6 0 0 0-1.8.32l-.06.06a2 2 0 1 1-2.8-2.8l.06-.06a1.6 1.6 0 0 0 .32-1.8 1.6 1.6 0 0 0-1.5-.96H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9.1a1.6 1.6 0 0 0-.32-1.8l-.06-.06a2 2 0 1 1 2.8-2.8l.06.06a1.6 1.6 0 0 0 1.8.32H9a1.6 1.6 0 0 0 .96-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 .96 1.5 1.6 1.6 0 0 0 1.8-.32l.06-.06a2 2 0 1 1 2.8 2.8l-.06.06a1.6 1.6 0 0 0-.32 1.8V9a1.6 1.6 0 0 0 1.5.96H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.6.94z"/>'),
-  close: svg('<path d="M6.8 6.8l10.4 10.4M17.2 6.8 6.8 17.2"/>'),
+  camera: svg('<rect x="2.8" y="6.6" width="12.4" height="10.8" rx="3.2"/><path d="m15.2 12 6-3.6v7.2l-6-3.6z"/>'),
+  video: svg('<rect x="2.8" y="6.6" width="12.4" height="10.8" rx="3.2"/><path d="m15.2 12 6-3.6v7.2l-6-3.6z"/>'),
+  gallery: svg('<rect x="3.2" y="4.4" width="17.6" height="15.2" rx="4"/><circle cx="8.6" cy="9.6" r="1.5" fill="currentColor" stroke="none"/><path d="m4.4 17.6 4.6-4.3a2 2 0 0 1 2.7 0l5 4.6"/><path d="m14.2 15.2 1.9-1.8a2 2 0 0 1 2.7 0l1.6 1.4"/>'),
+  gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.3 14.9a1.6 1.6 0 0 0 .3 1.8l.06.06a2 2 0 1 1-2.8 2.8l-.06-.06a1.6 1.6 0 0 0-1.8-.32 1.6 1.6 0 0 0-.96 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1.06-1.5 1.6 1.6 0 0 0-1.8.32l-.06.06a2 2 0 1 1-2.8-2.8l.06-.06a1.6 1.6 0 0 0 .32-1.8 1.6 1.6 0 0 0-1.5-.96H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9.1a1.6 1.6 0 0 0-.32-1.8l-.06-.06a2 2 0 1 1 2.8-2.8l.06.06a1.6 1.6 0 0 0 1.8.32H9a1.6 1.6 0 0 0 .96-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 .96 1.5 1.6 1.6 0 0 0 1.8-.32l.06-.06a2 2 0 1 1 2.8 2.8l-.06.06a1.6 1.6 0 0 0-.32 1.8V9a1.6 1.6 0 0 0 1.5.96H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.6.94z"/>'),
+  crown: svg('<path d="M3.4 18.4h17.2l1.1-11-5.4 3.4L12 4.6 7.7 10.8 2.3 7.4z"/>'),
+  info: svg('<circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.4"/><circle cx="12" cy="7.9" r="1" fill="currentColor" stroke="none"/>'),
+  film: svg('<rect x="2.8" y="5" width="18.4" height="14" rx="3"/><path d="M7 5v14M17 5v14M2.8 12h18.4"/>'),
+  mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0"/><path d="M12 17.8V21"/>'),
+  folder: svg('<path d="M3 7.4a2 2 0 0 1 2-2h3.6l2 2.4H19a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+  close: svg('<path d="M6.8 6.8l10.4 10.4M17.2 6.8 6.8 17.2"/>', 'stroke-width="2"'),
   flip: svg('<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.4 4.7v5.1h-5.1"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>'),
-  chevron: svg('<path d="M9.5 6.5 15 12l-5.5 5.5"/>', 'stroke-width="2"'),
-  caretDown: svg('<path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>', 'stroke-width="2.1"'),
-  check: svg('<path d="M4.5 12.6 9.4 17.5 19.5 6.9"/>', 'stroke-width="2.1"'),
+  swap: svg('<path d="M4.5 8.5h13l-3-3"/><path d="M19.5 15.5h-13l3 3"/>'),
+  chevronRight: svg('<path d="M9.4 6.2 15.2 12l-5.8 5.8"/>', 'stroke-width="2"'),
+  chevronLeft: svg('<path d="M14.6 6.2 8.8 12l5.8 5.8"/>', 'stroke-width="2"'),
+  chevronDown: svg('<path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>', 'stroke-width="2.1"'),
+  check: svg('<path d="M4.5 12.6 9.4 17.5 19.5 6.9"/>', 'stroke-width="2.2"'),
   play: svg('<path d="M8.4 5.6v12.8L19 12z" fill="currentColor" stroke="none"/>', 'stroke-width="0"'),
   download: svg('<path d="M12 4v11"/><path d="m7.8 11.4 4.2 4.2 4.2-4.2"/><path d="M4.8 19.4h14.4"/>'),
   trash: svg('<path d="M5 7h14M9.5 7V5.4h5V7M6.6 7l.8 12.1A1.9 1.9 0 0 0 9.3 21h5.4a1.9 1.9 0 0 0 1.9-1.9L17.4 7"/>'),
-  camera: svg('<rect x="2.8" y="6.4" width="12.8" height="11.2" rx="3.2"/><path d="m15.6 12 5.6-3.4v6.8L15.6 12z"/>'),
-  crown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 18.2h16l1-10.5-5 3.2L12 4.3 8 10.9l-5-3.2z"/></svg>',
+  bolt: svg('<path d="M13.4 2.6 5.6 13.4h5.2l-1.2 8 7.8-10.8h-5.2z"/>'),
+  aperture: svg('<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3.4 8 10M20 8.6l-7 1M17.6 19l-4-6.4M6.4 19l4-6.6M4 8.6l6.6 1"/>'),
 };
 
-function logoMark(size = 26, cls = 'brand-mark') {
+function logoMark(size = 108, cls = 'logo-lg') {
   return `
-    <svg class="${cls}" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">
+    <svg class="${cls}" viewBox="0 0 120 120" width="${size}" height="${size}" aria-hidden="true">
       <defs>
         <linearGradient id="duelGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#22D3EE"/>
-          <stop offset=".45" stop-color="#6366F1"/>
-          <stop offset="1" stop-color="#D946EF"/>
+          <stop offset="0" stop-color="#FFC24B"/>
+          <stop offset=".45" stop-color="#FF7A1A"/>
+          <stop offset="1" stop-color="#FF4D00"/>
+        </linearGradient>
+        <linearGradient id="duelGradSoft" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FFB020" stop-opacity=".85"/>
+          <stop offset="1" stop-color="#FF4D00" stop-opacity=".2"/>
         </linearGradient>
       </defs>
-      <ellipse cx="50" cy="50" rx="44" ry="29" fill="none" stroke="url(#duelGrad)" stroke-width="3"
-               stroke-linecap="round" stroke-dasharray="205 40" stroke-dashoffset="-13" opacity=".9"/>
-      <circle cx="30" cy="50" r="23" fill="#08090c"/>
-      <circle cx="30" cy="50" r="17.5" fill="none" stroke="url(#duelGrad)" stroke-width="3.4"/>
-      <circle cx="30" cy="50" r="15" fill="#0b1024"/>
-      <circle cx="26.5" cy="46.5" r="6" fill="#22d3ee"/>
-      <circle cx="70" cy="50" r="23" fill="#08090c"/>
-      <circle cx="70" cy="50" r="17.5" fill="none" stroke="url(#duelGrad)" stroke-width="3.4"/>
-      <circle cx="70" cy="50" r="15" fill="#0b1024"/>
-      <circle cx="66.5" cy="46.5" r="6" fill="#d946ef"/>
+
+      <!-- orbit -->
+      <path d="M32 22.5A52 44 0 0 1 100 44" fill="none" stroke="url(#duelGrad)" stroke-width="5"
+            stroke-linecap="round" opacity=".9"/>
+      <path d="M88 96A52 44 0 0 1 22 74" fill="none" stroke="url(#duelGradSoft)" stroke-width="4"
+            stroke-linecap="round"/>
+
+      <!-- lens -->
+      <circle cx="52" cy="60" r="30" fill="#0b0806" stroke="url(#duelGrad)" stroke-width="5"/>
+      <circle cx="52" cy="60" r="20" fill="#1b1310"/>
+      <circle cx="52" cy="60" r="20" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1.5"/>
+      <circle cx="45" cy="52" r="7" fill="#FFC24B" opacity=".9"/>
+      <circle cx="59" cy="68" r="3.4" fill="#FF7A1A" opacity=".55"/>
+
+      <!-- play -->
+      <path d="M78 44.5 108 60 78 75.5z" fill="url(#duelGrad)"/>
     </svg>`;
 }
 
@@ -148,17 +164,16 @@ function shortTime(ms) {
 
 const mb = (bytes) => Math.max(1, Math.round(bytes / (1024 * 1024)));
 
-/* --------------------------------------------------- overlay (PiP) layout */
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/* overlay geometry */
 
 const PIP_MIN = 0.16;
 const PIP_MAX = 0.62;
 const PIP_DEFAULT = { cx: 0.74, cy: 0.24, scale: 0.34 };
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-
 const currentPip = () => state.pip || PIP_DEFAULT;
 
-/** Pixel rect of the front-camera overlay inside a w x h frame. */
 function pipRect(w, h, aspectKey, pip) {
   const a = ASPECTS[aspectKey];
   let pw = w * clamp(pip.scale, PIP_MIN, PIP_MAX);
@@ -168,14 +183,11 @@ function pipRect(w, h, aspectKey, pip) {
     ph = maxH;
     pw = ph * (a.w / a.h);
   }
-  let x = pip.cx * w - pw / 2;
-  let y = pip.cy * h - ph / 2;
-  x = clamp(x, 0, Math.max(0, w - pw));
-  y = clamp(y, 0, Math.max(0, h - ph));
+  const x = clamp(pip.cx * w - pw / 2, 0, Math.max(0, w - pw));
+  const y = clamp(pip.cy * h - ph / 2, 0, Math.max(0, h - ph));
   return { x, y, w: pw, h: ph };
 }
 
-/** Keep the overlay centre inside the frame so it can never be dragged away. */
 function clampPipToStage(pip, el, aspectKey) {
   const w = el.clientWidth;
   const h = el.clientHeight;
@@ -192,6 +204,8 @@ function clampPipToStage(pip, el, aspectKey) {
   };
 }
 
+/* prefs */
+
 function savePrefs() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
@@ -201,6 +215,7 @@ function savePrefs() {
       quality: state.quality,
       codec: state.codec,
       premium: state.premium,
+      audio: state.audio,
       pip: state.pip,
     }));
   } catch (_) { /* private mode */ }
@@ -217,6 +232,7 @@ function loadPrefs() {
     if (QUALITIES[p.quality]) state.quality = p.quality;
     if (CODECS[p.codec]) state.codec = p.codec;
     state.premium = !!p.premium;
+    if (typeof p.audio === 'boolean') state.audio = p.audio;
     if (p.pip && Number.isFinite(p.pip.cx) && Number.isFinite(p.pip.cy) && Number.isFinite(p.pip.scale)) {
       state.pip = {
         cx: clamp(p.pip.cx, 0, 1),
@@ -248,34 +264,35 @@ function openSheet(html, bind) {
   modalRoot.innerHTML = `<div class="modal"><div class="sheet">${html}</div></div>`;
   const backdrop = $('.modal', modalRoot);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
-  $$('[data-close]', modalRoot).forEach((b) => b.addEventListener('click', closeSheet));
+  wireSheet();
   bind && bind();
 }
 
+function wireSheet() {
+  $$('[data-close]', modalRoot).forEach((b) => b.addEventListener('click', closeSheet));
+}
+
 function proFeatures() {
-  return [
-    '4K capture and HEVC encoding',
-    '60 fps and custom bitrate',
-    'Per-camera aspect control',
-    'Watermark-free export',
-  ];
+  return ['Advanced formats', 'Custom resolution', 'HEVC encoding', 'No watermark'];
 }
 
 function showPro(pending = null) {
   const body = state.premium
-    ? `<p class="sheet-sub">Pro is active. 4K, HEVC and every format control are unlocked.</p>
-       <div class="sheet-actions"><button class="btn-primary" data-close type="button" style="margin-top:0">Close</button></div>`
+    ? `<p class="sheet-sub">Premium is active. 4K, HEVC and every format control are unlocked.</p>
+       <button class="btn-primary" data-close type="button">Close</button>`
     : `<p class="sheet-sub">One-time unlock. Everything below stays on this device — no account, no subscription.</p>
-       <ul class="pro-list">${proFeatures().map((f) => `<li class="pro-item">${ICONS.check}<span>${f}</span></li>`).join('')}</ul>
-       <button class="btn-primary" data-upgrade type="button">Unlock Pro</button>
+       <ul class="premium-list" style="margin-top:16px">
+         ${proFeatures().map((f) => `<li class="premium-item">${ICONS.check}<span>${f}</span></li>`).join('')}
+       </ul>
+       <button class="btn-primary" data-upgrade type="button">Unlock Premium</button>
        <button class="btn-ghost" data-close type="button">Not now</button>`;
 
   openSheet(`
     <div class="grabber"></div>
     <div class="pro-sheet-head">
-      <span class="pro-sheet-mark">♛</span>
+      <span class="pro-sheet-mark">${ICONS.crown}</span>
       <div>
-        <div class="sheet-title">DuelShots Pro</div>
+        <div class="sheet-title">DuelShots Premium</div>
         <div class="caption">Mock purchase in this preview</div>
       </div>
     </div>
@@ -283,15 +300,95 @@ function showPro(pending = null) {
     const up = $('[data-upgrade]', modalRoot);
     if (up) up.addEventListener('click', () => {
       state.premium = true;
-      // apply the option that was locked behind the upgrade
       if (pending && pending.kind === 'quality' && QUALITIES[pending.key]) state.quality = pending.key;
       if (pending && pending.kind === 'codec' && CODECS[pending.key]) state.codec = pending.key;
       savePrefs();
       closeSheet();
-      toast('Pro unlocked');
-      if (state.record) refreshRecord(); else renderTab();
+      toast('Premium unlocked');
+      if (state.record) refreshRecord(); else render();
     });
   });
+}
+
+function showFormatSheet(which) {
+  const isFront = which === 'front';
+
+  const body = () => `
+    <div class="grabber"></div>
+    <div class="sheet-title">${isFront ? 'Front' : 'Back'} Camera Format</div>
+    <p class="sheet-sub">How this camera is framed in the recording.</p>
+    <div class="chips">
+      ${ASPECT_ORDER.map((k) => `
+        <button class="chip ${k === (isFront ? state.frontAspect : state.backAspect) ? 'active' : ''}"
+                data-aspect="${k}" type="button">${ASPECTS[k].label}</button>
+      `).join('')}
+    </div>
+    <button class="btn-primary" data-close type="button">Done</button>`;
+
+  const bind = () => {
+    wireSheet();
+    $$('[data-aspect]', modalRoot).forEach((b) => b.addEventListener('click', () => {
+      if (isFront) state.frontAspect = b.dataset.aspect;
+      else state.backAspect = b.dataset.aspect;
+      savePrefs();
+      $('.sheet', modalRoot).innerHTML = body();
+      bind();
+      if (!state.record) render();
+    }));
+  };
+
+  openSheet(body(), bind);
+}
+
+function showModeSheet() {
+  const html = `
+    <div class="grabber"></div>
+    <div class="sheet-title">Save as</div>
+    <p class="sheet-sub">What each take writes to the gallery.</p>
+    <div class="option-list">
+      ${MODE_ORDER.map((m) => `
+        <button class="option ${state.mode === m ? 'active' : ''}" data-mode="${m}" type="button">
+          <span>
+            <span class="t">${MODES[m].title}</span>
+            <span class="d">${MODES[m].desc}</span>
+          </span>
+          <span class="tick">${ICONS.check}</span>
+        </button>
+      `).join('')}
+    </div>
+    <button class="btn-primary" data-close type="button">Done</button>`;
+
+  openSheet(html);
+  $$('[data-mode]', modalRoot).forEach((b) => b.addEventListener('click', () => {
+    state.mode = b.dataset.mode;
+    savePrefs();
+    $$('[data-mode]', modalRoot).forEach((x) => x.classList.toggle('active', x.dataset.mode === state.mode));
+    if (!state.record) render();
+  }));
+}
+
+function showOptionSheet({ title, sub, items, activeKey, onPick }) {
+  const html = `
+    <div class="grabber"></div>
+    <div class="sheet-title">${title}</div>
+    ${sub ? `<p class="sheet-sub">${sub}</p>` : ''}
+    <div class="option-list">
+      ${items.map((i) => `
+        <button class="option ${i.key === activeKey ? 'active' : ''}" data-opt="${i.key}" type="button">
+          <span>
+            <span class="t">${i.label}</span>
+            ${i.desc ? `<span class="d">${i.desc}</span>` : ''}
+          </span>
+          <span class="tick">${ICONS.check}</span>
+        </button>
+      `).join('')}
+    </div>
+    <button class="btn-primary" data-close type="button">Done</button>`;
+
+  openSheet(html);
+  $$('[data-opt]', modalRoot).forEach((b) => b.addEventListener('click', () => {
+    onPick(b.dataset.opt);
+  }));
 }
 
 function showAbout() {
@@ -301,30 +398,26 @@ function showAbout() {
     <div class="about-card">
       <h2>DuelShots · web preview</h2>
       <p>This is a browser build of the native Android app in this repository. The screens,
-      design system, recording modes and premium gating come from the Kotlin/Compose source in
+      flows, recording modes and premium gating come from the Kotlin/Compose source in
       <code>app/src/main/java/com/nrworld/duelshot/</code>.</p>
 
       <h3>Build</h3>
-      <p>v2.2 — redesigned interface, a camera setup sheet on the record screen
-      (format per camera, swap, mode) and a front-camera overlay you can drag,
-      pinch and reset while filming. Last updated 2026-11-04.</p>
+      <p>v3 — orange menu design with a centred logo, one primary action and a settings list.
+      Format controls live on the record screen and in Settings. Last updated 2026-11-04.</p>
 
       <h3>What works here</h3>
       <ul>
         <li>All three recording modes: composed picture-in-picture, two separate files, or both.</li>
-        <li>Clips are encoded live in the browser and land in the Gallery tab, playable and downloadable.</li>
+        <li>Clips are encoded live in the browser, land in the Gallery, play inline and download.</li>
         <li>Settings persist in <code>localStorage</code> (SharedPreferences in the app).</li>
-        <li>Tap the mode pill on the record screen to set a format per camera while you film.</li>
-        <li>In Dual View, drag the front-camera inset to move it, pinch (or scroll) to resize it,
-        double-tap to reset. The layout is baked into the recorded video.</li>
-        <li>4K and HEVC are gated behind the mock Pro purchase — same as <code>grantPremium()</code>.</li>
+        <li>4K and HEVC sit behind the mock premium purchase, like <code>grantPremium()</code>.</li>
+        <li>In Dual View the front camera inset can be dragged, pinched and reset.</li>
       </ul>
 
       <h3>Cameras</h3>
-      <p>Browsers usually allow only one camera stream at a time. If both the front and back camera
-      can be opened at once you get a real dual feed; otherwise the preview falls back to
-      single-camera mode, exactly like the Android fallback. If camera access is blocked
-      (permission, iframe policy or plain HTTP) an animated demo feed keeps the recorder usable.</p>
+      <p>Browsers usually allow only one camera stream at a time. If both cameras open you get a
+      real dual feed; otherwise the preview falls back to single-camera mode, exactly like the
+      Android fallback. If camera access is blocked an animated demo feed keeps recording usable.</p>
 
       <h3>The real app</h3>
       <p>Build the APK locally with JDK 17/21 and the Android SDK:</p>
@@ -382,16 +475,15 @@ function camErrorMessage(err) {
   return 'Camera unavailable — demo feed';
 }
 
-/* animated synthetic feed so recording still has a source */
 function drawDemo(canvas, label, hue, t) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
 
   const bg = ctx.createLinearGradient(0, 0, w, h);
-  bg.addColorStop(0, '#0a0f1e');
-  bg.addColorStop(0.55, '#131b36');
-  bg.addColorStop(1, '#070910');
+  bg.addColorStop(0, '#1a0f08');
+  bg.addColorStop(0.55, '#22130a');
+  bg.addColorStop(1, '#0a0705');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
@@ -400,8 +492,8 @@ function drawDemo(canvas, label, hue, t) {
     const y = h * (0.5 + 0.28 * Math.cos(t / 3300 + i * 2.3 + hue));
     const r = Math.min(w, h) * (0.2 + 0.06 * Math.sin(t / 1900 + i));
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `hsla(${(195 + i * 38 + hue * 50) % 360}, 85%, 62%, .45)`);
-    g.addColorStop(1, 'hsla(220, 85%, 55%, 0)');
+    g.addColorStop(0, `hsla(${(28 + i * 14 + hue * 30) % 360}, 92%, 58%, .5)`);
+    g.addColorStop(1, 'hsla(20, 92%, 50%, 0)');
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -499,7 +591,6 @@ async function startCameras() {
     front = null;
   }
 
-  // Some browsers hand back the same physical camera for both facing modes.
   if (front && backId && deviceIdOf(front) === backId) {
     front.getTracks().forEach((t) => t.stop());
     front = null;
@@ -577,7 +668,7 @@ function onPreviewPointerDown(e) {
   gesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
   if (gesture.pointers.size === 1) {
-    if (!onPip) return; // only start a drag when the overlay itself is grabbed
+    if (!onPip) return;
     const p = currentPip();
     gesture.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: p.cx, cy: p.cy };
     gesture.pinch = null;
@@ -585,7 +676,7 @@ function onPreviewPointerDown(e) {
     gesture.multi = false;
     recDom.pip.classList.add('active');
     hidePipHint();
-    try { recDom.preview.setPointerCapture(e.pointerId); } catch (_) { /* not supported */ }
+    try { recDom.preview.setPointerCapture(e.pointerId); } catch (_) { /* unsupported */ }
   } else if (gesture.pointers.size === 2) {
     gesture.pinch = { dist: pointerDistance(), scale: currentPip().scale };
     gesture.drag = null;
@@ -648,7 +739,6 @@ function onPreviewPointerUp(e) {
     savePrefs();
   }
 
-  // double tap only when it was a clean, single-finger tap on the overlay
   if (onPip && !wasMulti && !dragged) {
     const now = Date.now();
     if (now - gesture.lastTap < 320) {
@@ -721,7 +811,10 @@ const rec = {
   audio: null,
 };
 
-const recDom = { root: null, preview: null, feeds: null, status: null, timer: null, btn: null, mode: null, flip: null, thumb: null };
+const recDom = {
+  root: null, preview: null, feeds: null, status: null, timer: null,
+  btn: null, label: null, flip: null, thumb: null, pip: null, hint: null, zoom: null,
+};
 let mountedKey = null;
 let recordMessage = '';
 let recordSaved = [];
@@ -750,11 +843,11 @@ function pickMime() {
     && MediaRecorder.isTypeSupported(m)) || '';
 }
 
-function drawCover(ctx, src, w, h, mirror) {
+function drawCover(ctx, src, w, h, mirror, zoom = 1) {
   const sw = src.videoWidth || src.width;
   const sh = src.videoHeight || src.height;
   if (!sw || !sh) return;
-  const scale = Math.max(w / sw, h / sh);
+  const scale = Math.max(w / sw, h / sh) * zoom;
   const dw = sw * scale;
   const dh = sh * scale;
   ctx.save();
@@ -785,7 +878,6 @@ function makeOutput(key, name, aspectKey, withAudio, existingStream) {
   let canvas = null;
   let ctx = null;
   let stream = existingStream || null;
-
   const quality = (rec.take && rec.take.quality) || state.quality;
 
   if (!stream) {
@@ -820,23 +912,21 @@ function makeOutput(key, name, aspectKey, withAudio, existingStream) {
   const done = new Promise((resolve) => { recorder.onstop = resolve; });
   recorder.start(200);
 
-  return {
-    key, name, canvas, ctx, recorder, chunks, done, mime, stream,
-    ownsStream: !existingStream,
-  };
+  return { key, name, canvas, ctx, recorder, chunks, done, mime, stream, ownsStream: !existingStream };
 }
 
 function drawOutput(o) {
   if (!o.canvas) return;
   const ctx = o.ctx;
   const { width: w, height: h } = o.canvas;
+  const zoom = state.zoom || 1;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, w, h);
 
   if (o.key === 'composed') {
     const back = cam.feeds.back;
     const front = cam.feeds.front;
-    if (back) drawCover(ctx, back.el, w, h, back.mirror);
+    if (back) drawCover(ctx, back.el, w, h, back.mirror, zoom);
     if (front) {
       const aspectKey = (rec.take && rec.take.frontAspect) || state.frontAspect;
       const g = pipRect(w, h, aspectKey, currentPip());
@@ -846,7 +936,7 @@ function drawOutput(o) {
       ctx.clip();
       ctx.fillStyle = '#000';
       ctx.fillRect(g.x, g.y, g.w, g.h);
-      drawCover(ctx, front.el, g.w, g.h, front.mirror);
+      drawCover(ctx, front.el, g.w, g.h, front.mirror, zoom);
       ctx.restore();
       ctx.strokeStyle = 'rgba(255,255,255,.55)';
       ctx.lineWidth = Math.max(2, Math.round(w / 340));
@@ -857,7 +947,7 @@ function drawOutput(o) {
   }
 
   const feed = cam.feeds[o.key];
-  if (feed) drawCover(ctx, feed.el, w, h, feed.mirror);
+  if (feed) drawCover(ctx, feed.el, w, h, feed.mirror, zoom);
 }
 
 function posterFor(output) {
@@ -894,11 +984,12 @@ async function startRecording() {
   setRecordMessage('');
 
   rec.audio = null;
-  try {
-    rec.audio = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (_) { rec.audio = null; }
+  if (state.audio) {
+    try {
+      rec.audio = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (_) { rec.audio = null; }
+  }
 
-  // Snapshot the layout: format changes made mid-take must not tear the file apart.
   const take = {
     mode: state.mode,
     frontAspect: state.frontAspect,
@@ -932,7 +1023,6 @@ async function startRecording() {
   }
 
   if (!outs.length) {
-    // Older browsers without canvas.captureStream: record the camera stream directly.
     const feed = cam.feeds[cam.active] || cam.feeds.back || cam.feeds.front;
     const src = feed && feed.el && feed.el.srcObject;
     if (src instanceof MediaStream) {
@@ -968,7 +1058,6 @@ async function startRecording() {
     if (recDom.timer && rec.active) recDom.timer.textContent = shortTime(Date.now() - rec.startedAt);
   }, 250);
 
-  recordSaved = [];
   recordMessage = `Recording · ${MODES[take.mode].title.toLowerCase()}${single ? ' · single camera' : ''}`;
   refreshRecord();
 }
@@ -1016,7 +1105,7 @@ async function stopRecording() {
   recordSaved = newClips.map((c) => c.name);
 
   rec.take = null;
-  mountedKey = null; // pick up formats chosen during the take
+  mountedKey = null;
   recordMessage = newClips.length === 1 ? 'Saved to Gallery' : `Saved ${newClips.length} clips to Gallery`;
   refreshRecord();
   toast(newClips.length === 1 ? 'Saved to Gallery' : `Saved ${newClips.length} clips`);
@@ -1033,35 +1122,37 @@ function setRecordMessage(msg) {
 
 function buildRecordShell() {
   screenEl.innerHTML = `
-    <div class="record">
+    <div class="record" id="record-root">
+      <div class="rec-top">
+        <button class="icon-btn" id="rec-close" type="button" aria-label="Close">${ICONS.close}</button>
+        <span class="timer"><span class="dot"></span><span id="rec-timer">00:00</span></span>
+        <span class="spacer"></span>
+        <button class="mode-pill" id="rec-mode" type="button" aria-label="Camera setup">
+          <span id="rec-mode-label">Both</span>
+          <span class="caret">${ICONS.chevronDown}</span>
+        </button>
+      </div>
+
       <div class="rec-preview" id="rec-preview">
         <div class="feeds" id="rec-feeds"></div>
-        <div class="rec-scrim"></div>
-        <div class="rec-top">
-          <button class="glass" id="rec-close" type="button" aria-label="Close">${ICONS.close}</button>
-          <button class="pill-glass mode-pill" id="rec-mode" type="button" aria-label="Camera setup">
-            <span id="rec-mode-label">Separate</span>
-            <span class="caret">${ICONS.caretDown}</span>
-          </button>
-          <span class="pill-glass rec-timer"><span class="dot"></span><span id="rec-timer">00:00</span></span>
-        </div>
+        <button class="torch" id="rec-torch" type="button" aria-label="Torch">${ICONS.bolt}</button>
       </div>
 
       <div class="rec-dock">
         <div class="rec-status" id="rec-status">
-          <div class="rec-line" id="rec-line"></div>
-          <div class="rec-formats" id="rec-formats"></div>
-          <div class="rec-saved" id="rec-saved"></div>
+          <span id="rec-line"></span>
+          <span class="formats" id="rec-formats"></span>
+          <span class="saved" id="rec-saved"></span>
         </div>
         <div class="rec-controls">
-          <button class="dock-btn" id="rec-thumb" type="button" aria-label="Open gallery">${ICONS.gallery}</button>
+          <button class="zoom-chip" id="rec-zoom" type="button" aria-label="Zoom">1×</button>
           <button class="shutter" id="rec-btn" type="button" aria-label="Record"><i></i></button>
           <button class="dock-btn" id="rec-flip" type="button" aria-label="Switch camera">${ICONS.flip}</button>
         </div>
       </div>
     </div>`;
 
-  recDom.root = $('.record');
+  recDom.root = $('#record-root');
   recDom.preview = $('#rec-preview');
   recDom.feeds = $('#rec-feeds');
   recDom.status = $('#rec-status');
@@ -1070,28 +1161,60 @@ function buildRecordShell() {
   recDom.saved = $('#rec-saved');
   recDom.timer = $('#rec-timer');
   recDom.btn = $('#rec-btn');
-  recDom.mode = $('#rec-mode');
-  recDom.modeLabel = $('#rec-mode-label');
+  recDom.label = $('#rec-mode-label');
   recDom.flip = $('#rec-flip');
-  recDom.thumb = $('#rec-thumb');
-
-  attachPreviewGestures();
+  recDom.zoom = $('#rec-zoom');
 
   $('#rec-close').addEventListener('click', async () => {
     if (rec.active) await stopRecording();
     closeRecord();
   });
   recDom.flip.addEventListener('click', switchCamera);
-  recDom.mode.addEventListener('click', mountCameraSheet);
-  recDom.thumb.addEventListener('click', () => {
-    if (rec.active) { toast('Stop recording first'); return; }
-    closeRecord();
-    switchTab('GALLERY');
-  });
+  $('#rec-mode').addEventListener('click', mountCameraSheet);
   recDom.btn.addEventListener('click', () => {
     if (rec.active) stopRecording();
     else startRecording();
   });
+  recDom.zoom.addEventListener('click', () => {
+    state.zoom = state.zoom === 1 ? 2 : state.zoom === 2 ? 3 : 1;
+    applyZoom();
+    toast(`Zoom ${state.zoom}×`);
+  });
+  $('#rec-torch').addEventListener('click', toggleTorch);
+
+  attachPreviewGestures();
+  applyZoom();
+}
+
+let torchOn = false;
+
+async function toggleTorch() {
+  const btn = $('#rec-torch');
+  const feed = cam.feeds[cam.active] || cam.feeds.back || cam.feeds.front;
+  const stream = feed && feed.el && feed.el.srcObject;
+  const track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+
+  torchOn = !torchOn;
+  if (btn) btn.classList.toggle('on', torchOn);
+
+  let supported = false;
+  try {
+    const caps = track && track.getCapabilities ? track.getCapabilities() : null;
+    supported = !!(caps && caps.torch);
+    if (supported) await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+  } catch (_) { supported = false; }
+
+  if (supported) toast(torchOn ? 'Torch on' : 'Torch off');
+  else if (cam.demo) toast('Simulated feed — no torch');
+  else toast('This camera has no torch');
+}
+
+function applyZoom() {
+  if (recDom.feeds) recDom.feeds.style.setProperty('--zoom', state.zoom);
+  if (recDom.zoom) {
+    recDom.zoom.textContent = `${state.zoom}×`;
+    recDom.zoom.classList.toggle('active', state.zoom > 1);
+  }
 }
 
 function makeTile(label) {
@@ -1109,7 +1232,7 @@ function makeTile(label) {
 function placeholder(text) {
   const d = document.createElement('div');
   d.className = 'tile-placeholder';
-  d.innerHTML = `<span class="big">${ICONS.camera}</span><span>${esc(text)}</span>`;
+  d.innerHTML = `${ICONS.camera}<span>${esc(text)}</span>`;
   return d;
 }
 
@@ -1130,11 +1253,12 @@ function mountFeeds() {
 
   const hasBoth = !!(cam.feeds.back && cam.feeds.front);
   const single = cam.singleFallback || !hasBoth;
+  const take = activeTake();
 
   if (single) {
     const key = cam.feeds[cam.active] ? cam.active : (cam.feeds.back ? 'back' : 'front');
     const feed = cam.feeds[key];
-    const aspect = ASPECTS[key === 'back' ? state.backAspect : state.frontAspect].short;
+    const aspect = ASPECTS[key === 'back' ? take.backAspect : take.frontAspect].short;
     const tile = makeTile(`CAMERA · ${aspect}`);
     stage.appendChild(tile);
     if (feed) {
@@ -1146,9 +1270,8 @@ function mountFeeds() {
     return;
   }
 
-  if (state.mode === 'DUAL_VIEW') {
+  if (take.mode === 'DUAL_VIEW') {
     const tile = makeTile(null);
-    tile.style.flex = '1 1 100%';
     stage.appendChild(tile);
     const back = cam.feeds.back;
     const front = cam.feeds.front;
@@ -1159,7 +1282,7 @@ function mountFeeds() {
     if (front) {
       const pip = document.createElement('div');
       pip.className = 'pip' + (front.mirror ? ' mirror' : '');
-      const a = ASPECTS[state.frontAspect];
+      const a = ASPECTS[take.frontAspect];
       pip.style.setProperty('--pip-ratio', `${a.w} / ${a.h}`);
       pip.appendChild(front.el);
       tile.appendChild(pip);
@@ -1176,11 +1299,11 @@ function mountFeeds() {
     return;
   }
 
-  [
-    { key: 'back', label: 'BACK', aspect: state.backAspect },
-    { key: 'front', label: 'FRONT', aspect: state.frontAspect },
-  ].forEach(({ key, label, aspect }) => {
-    const tile = makeTile(`${label} · ${ASPECTS[aspect].short}`);
+  // stacked previews (Separate / Both), like the native app
+  const order = state.stack === 'back-first' ? ['back', 'front'] : ['front', 'back'];
+  order.forEach((key) => {
+    const aspect = ASPECTS[key === 'back' ? take.backAspect : take.frontAspect].short;
+    const tile = makeTile(`${key.toUpperCase()} · ${aspect}`);
     const feed = cam.feeds[key];
     if (feed) {
       if (feed.mirror) tile.classList.add('mirror');
@@ -1190,6 +1313,17 @@ function mountFeeds() {
     }
     stage.appendChild(tile);
   });
+
+  const swap = document.createElement('button');
+  swap.className = 'stack-swap';
+  swap.type = 'button';
+  swap.setAttribute('aria-label', 'Swap camera order');
+  swap.innerHTML = ICONS.swap;
+  swap.addEventListener('click', () => {
+    state.stack = state.stack === 'back-first' ? 'front-first' : 'back-first';
+    mountFeeds();
+  });
+  stage.appendChild(swap);
 }
 
 function activeTake() {
@@ -1203,7 +1337,7 @@ function activeTake() {
 
 function layoutKey() {
   const t = activeTake();
-  return [cam.ready, cam.singleFallback, cam.active, t.mode, t.frontAspect, t.backAspect].join('|');
+  return [cam.ready, cam.singleFallback, cam.active, t.mode, t.frontAspect, t.backAspect, state.stack].join('|');
 }
 
 function unmountFeeds() {
@@ -1214,36 +1348,19 @@ function recordStatusText() {
   if (recordMessage) return recordMessage;
   if (!cam.ready) return 'Starting cameras…';
   if (cam.demo) return 'Demo feed — camera unavailable here';
-  const t = activeTake();
-  const front = ASPECTS[t.frontAspect].short;
-  const back = ASPECTS[t.backAspect].short;
-  if (cam.singleFallback) {
-    const which = cam.active === 'back' ? back : front;
-    return `Single camera · ${cam.active} ${which} · one file`;
-  }
-  return `${MODES[t.mode].title} · front ${front} · back ${back}`;
+  if (cam.singleFallback) return `Single camera · ${cam.active}`;
+  return `${MODES[activeTake().mode].title} · front + back`;
 }
 
 function formatSummary() {
   const t = activeTake();
   const quality = QUALITIES[t.quality].label;
+  const audio = state.audio ? 'audio' : 'muted';
   if (cam.singleFallback) {
     const short = ASPECTS[cam.active === 'back' ? t.backAspect : t.frontAspect].short;
-    return `${cam.active === 'back' ? 'Back' : 'Front'} ${short} · ${quality}`;
+    return `${cam.active === 'back' ? 'Back' : 'Front'} ${short} · ${quality} · ${audio}`;
   }
-  return `Front ${ASPECTS[t.frontAspect].short} · Back ${ASPECTS[t.backAspect].short} · ${quality}`;
-}
-
-function updateDockThumb() {
-  if (!recDom.thumb) return;
-  const last = state.clips[0];
-  if (last && last.poster) {
-    recDom.thumb.style.backgroundImage = `url(${last.poster})`;
-    recDom.thumb.innerHTML = '';
-  } else {
-    recDom.thumb.style.backgroundImage = '';
-    recDom.thumb.innerHTML = ICONS.gallery;
-  }
+  return `Front ${ASPECTS[t.frontAspect].short} · Back ${ASPECTS[t.backAspect].short} · ${quality} · ${audio}`;
 }
 
 function refreshRecord() {
@@ -1251,8 +1368,9 @@ function refreshRecord() {
 
   if (layoutKey() !== mountedKey) mountFeeds();
 
-  if (recDom.modeLabel) recDom.modeLabel.textContent = MODES[activeTake().mode].title;
+  if (recDom.label) recDom.label.textContent = MODES[activeTake().mode].title;
   if (recDom.preview) recDom.preview.classList.toggle('recording', rec.active);
+  if (recDom.root) recDom.root.classList.toggle('recording', rec.active);
   if (recDom.btn) {
     recDom.btn.classList.toggle('on', rec.active);
     recDom.btn.disabled = !cam.ready;
@@ -1263,17 +1381,14 @@ function refreshRecord() {
   if (recDom.line) recDom.line.textContent = recordStatusText();
   if (recDom.formats) recDom.formats.textContent = formatSummary();
   if (recDom.saved) {
-    recDom.saved.textContent = recordSaved.length
-      ? `Saved ${recordSaved.join(' · ')}`
-      : '';
+    recDom.saved.textContent = recordSaved.length ? `Saved ${recordSaved.join(' · ')}` : '';
   }
-  updateDockThumb();
+  applyZoom();
 }
 
 function openRecord() {
   state.record = true;
   document.body.dataset.screen = 'record';
-  tabbarEl.hidden = true;
   recordMessage = '';
   recordSaved = [];
   mountedKey = null;
@@ -1292,13 +1407,12 @@ function closeRecord() {
   recordMessage = '';
   recordSaved = [];
   unmountFeeds();
-  document.body.dataset.screen = state.tab.toLowerCase();
-  tabbarEl.hidden = false;
-  renderTab(true);
+  document.body.dataset.screen = 'page';
+  render();
 }
 
 /* =====================================================================
-   SHEET: CAMERA SETUP (formats for both cameras, reachable while filming)
+   SHEET: CAMERA SETUP (reachable while filming)
    ===================================================================== */
 
 function cameraSheetHTML() {
@@ -1309,18 +1423,27 @@ function cameraSheetHTML() {
     <p class="sheet-sub">Frame each camera the way you want it. Both formats are used for the take.</p>
     ${locked ? '<div class="sheet-note">Recording — new formats start with the next take</div>' : ''}
 
-    <div class="label">Mode</div>
-    ${segmentedHTML(modeItems(), state.mode, { name: 'rec-mode', attr: 'recMode' })}
-    <p class="mode-desc">${MODES[state.mode].desc}</p>
+    <div class="section-title">Mode</div>
+    <div class="option-list">
+      ${MODE_ORDER.map((m) => `
+        <button class="option ${state.mode === m ? 'active' : ''}" data-recmode="${m}" type="button">
+          <span>
+            <span class="t">${MODES[m].title}</span>
+            <span class="d">${MODES[m].desc}</span>
+          </span>
+          <span class="tick">${ICONS.check}</span>
+        </button>
+      `).join('')}
+    </div>
 
-    <div class="label">Front camera</div>
+    <div class="section-title">Front camera</div>
     <div class="chips">
       ${ASPECT_ORDER.map((k) => `
         <button class="chip ${k === state.frontAspect ? 'active' : ''}" data-recfront="${k}" type="button">${ASPECTS[k].label}</button>
       `).join('')}
     </div>
 
-    <div class="label">Back camera</div>
+    <div class="section-title">Back camera</div>
     <div class="chips">
       ${ASPECT_ORDER.map((k) => `
         <button class="chip ${k === state.backAspect ? 'active' : ''}" data-recback="${k}" type="button">${ASPECTS[k].label}</button>
@@ -1344,7 +1467,7 @@ function mountCameraSheet() {
 }
 
 function wireCameraSheet() {
-  $$('[data-close]', modalRoot).forEach((b) => b.addEventListener('click', closeSheet));
+  wireSheet();
 
   $$('[data-recmode]', modalRoot).forEach((b) => b.addEventListener('click', () => {
     if (rec.active) { toast('Mode is locked while recording'); return; }
@@ -1368,12 +1491,6 @@ function wireCameraSheet() {
   $$('[data-recfront]', modalRoot).forEach((b) => b.addEventListener('click', () => pick('front', b.dataset.recfront)));
   $$('[data-recback]', modalRoot).forEach((b) => b.addEventListener('click', () => pick('back', b.dataset.recback)));
 
-  const resetBtn = $('[data-reset-pip]', modalRoot);
-  if (resetBtn) resetBtn.addEventListener('click', () => {
-    resetPip();
-    mountCameraSheet();
-  });
-
   const swap = $('[data-swap]', modalRoot);
   if (swap) swap.addEventListener('click', () => {
     const front = state.frontAspect;
@@ -1384,252 +1501,242 @@ function wireCameraSheet() {
     mountCameraSheet();
     if (!rec.active) refreshRecord();
   });
-}
 
-/* =====================================================================
-   SEGMENTED CONTROL
-   ===================================================================== */
-
-function segmentedHTML(items, activeKey, opts = {}) {
-  const n = items.length;
-  const idx = Math.max(0, items.findIndex((i) => i.key === activeKey));
-  return `
-    <div class="segmented ${opts.small ? 'small' : ''}" data-seg="${opts.name}" style="--n:${n}">
-      <span class="ind" style="--i:${idx}"></span>
-      ${items.map((i) => `
-        <button type="button" data-${opts.attr}="${i.key}" class="${i.key === activeKey ? 'active' : ''}">${i.label}</button>
-      `).join('')}
-    </div>`;
-}
-
-function wireSegmented(root, opts, onPick) {
-  $$(`[data-${opts.attr}]`, root).forEach((btn) => {
-    btn.addEventListener('click', () => onPick(btn.dataset[opts.attr]));
+  const resetBtn = $('[data-reset-pip]', modalRoot);
+  if (resetBtn) resetBtn.addEventListener('click', () => {
+    resetPip();
+    mountCameraSheet();
   });
 }
 
-const modeItems = () => MODE_ORDER.map((m) => ({ key: m, label: MODES[m].short }));
-
 /* =====================================================================
-   SCREEN: HOME
+   PAGES
    ===================================================================== */
 
+function render() {
+  if (state.record) return;
+  document.body.dataset.screen = 'page';
+  if (state.page === 'SETTINGS') renderSettings();
+  else if (state.page === 'GALLERY') renderGallery();
+  else renderHome();
+}
+
 function renderHome() {
-  const modeItemsList = modeItems();
-  const quality = QUALITIES[state.quality];
-
   screenEl.innerHTML = `
-    <div class="scroll">
-      <header class="topbar">
-        <div class="brand">
-          ${logoMark(26)}
-          <span class="brand-name">Duel<span>Shots</span></span>
-        </div>
-        <button class="chip-btn" id="pro-btn" type="button">
-          <span class="spark"></span>${state.premium ? 'Pro' : 'Free'}
-        </button>
-      </header>
-
-      <h1 class="display">Two angles.<br><span class="grad-text">One take.</span></h1>
-      <p class="lede">Front and back camera, recorded at the same moment.</p>
-
-      <div class="hero" aria-hidden="true">
-        <div class="hero-art"></div>
-        <span class="hero-badge">DUAL CAMERA</span>
-        <div class="hero-pip"><span>FRONT</span></div>
-        <div class="hero-tag"><i></i><span>BACK · ${ASPECTS[state.backAspect].short}</span></div>
+    <div class="menu">
+      <div class="menu-top">
+        <span></span>
+        <button class="icon-btn" id="home-settings" type="button" aria-label="Settings">${ICONS.gear}</button>
       </div>
 
-      <div class="label">Mode</div>
-      ${segmentedHTML(modeItemsList, state.mode, { name: 'mode', attr: 'mode' })}
-      <p class="mode-desc">${MODES[state.mode].desc}</p>
+      <div class="menu-hero">
+        ${logoMark(108)}
+        <h1 class="wordmark">Duel<span>Shots</span></h1>
+        <p class="tagline">Record both sides. At once.</p>
+      </div>
 
       <button class="btn-primary" id="start-btn" type="button">
-        <span class="rec-dot"></span>Start recording
+        ${ICONS.camera}
+        <span class="grow">Start Recording</span>
+        <span class="chev">${ICONS.chevronRight}</span>
       </button>
-      <p class="cta-meta">${MODES[state.mode].title} · ${quality.label} · ${ASPECTS[state.frontAspect].short} + ${ASPECTS[state.backAspect].short}</p>
+      <p class="cta-meta">${MODES[state.mode].title} · ${QUALITIES[state.quality].label} · ${ASPECTS[state.frontAspect].short} + ${ASPECTS[state.backAspect].short}</p>
 
-      <div class="label">Camera</div>
-      <div class="group">
-        <button class="row" data-go="SETTINGS" type="button">
-          <span class="row-label">Front camera</span>
-          <span class="row-val">${ASPECTS[state.frontAspect].label}</span>
-          <span class="chev">${ICONS.chevron}</span>
+      <div class="menu-list">
+        <button class="menu-row" data-go="GALLERY" type="button">
+          <span class="menu-ico">${ICONS.gallery}</span>
+          <span class="label">Gallery</span>
+          <span class="chev">${ICONS.chevronRight}</span>
         </button>
-        <button class="row" data-go="SETTINGS" type="button">
-          <span class="row-label">Back camera</span>
-          <span class="row-val">${ASPECTS[state.backAspect].label}</span>
-          <span class="chev">${ICONS.chevron}</span>
+        <button class="menu-row" data-go="SETTINGS" type="button">
+          <span class="menu-ico">${ICONS.gear}</span>
+          <span class="label">Settings</span>
+          <span class="chev">${ICONS.chevronRight}</span>
         </button>
-        <button class="row" data-go="SETTINGS" type="button">
-          <span class="row-label">Quality</span>
-          <span class="row-val">${quality.label} · ${CODECS[state.codec].label}</span>
-          <span class="chev">${ICONS.chevron}</span>
+        <button class="menu-row gold" id="menu-premium" type="button">
+          <span class="menu-ico">${ICONS.crown}</span>
+          <span class="label">${state.premium ? 'Premium active' : 'Premium'}</span>
+          <span class="chev">${ICONS.chevronRight}</span>
+        </button>
+        <button class="menu-row" id="menu-about" type="button">
+          <span class="menu-ico">${ICONS.info}</span>
+          <span class="label">About</span>
+          <span class="chev">${ICONS.chevronRight}</span>
         </button>
       </div>
-
-      ${state.premium ? '' : `
-        <button class="pro-row" id="pro-row" type="button">
-          <span class="pro-mark">♛</span>
-          <span class="pro-copy">
-            <span class="pro-title">Unlock Pro</span>
-            <span class="pro-sub">4K · HEVC · 60 fps · watermark-free</span>
-          </span>
-          <span class="chev">${ICONS.chevron}</span>
-        </button>`}
     </div>`;
 
   $('#start-btn').addEventListener('click', openRecord);
-  $('#pro-btn').addEventListener('click', showPro);
-  const proRow = $('#pro-row');
-  if (proRow) proRow.addEventListener('click', showPro);
-  $$('[data-go]', screenEl).forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.go)));
-
-  wireSegmented(screenEl, { attr: 'mode' }, (key) => {
-    state.mode = key;
-    savePrefs();
-    renderHome();
-  });
+  $('#home-settings').addEventListener('click', () => go('SETTINGS'));
+  $('#menu-premium').addEventListener('click', () => showPro());
+  $('#menu-about').addEventListener('click', showAbout);
+  $$('[data-go]', screenEl).forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
 }
 
-/* =====================================================================
-   SCREEN: SETTINGS
-   ===================================================================== */
+function backHead(title) {
+  return `
+    <div class="page-head">
+      <button class="icon-btn" data-back type="button" aria-label="Back">${ICONS.chevronLeft}</button>
+      <span class="page-title">${title}</span>
+    </div>`;
+}
 
 function renderSettings() {
   screenEl.innerHTML = `
-    <div class="scroll">
-      <h1 class="h1">Settings</h1>
-      <p class="sub">How DuelShots records and what it writes.</p>
+    <div class="page enter">
+      ${backHead('Settings')}
 
-      <div class="label">Recording mode</div>
-      ${segmentedHTML(modeItems(), state.mode, { name: 'mode', attr: 'mode' })}
-      <p class="mode-desc">${MODES[state.mode].desc}</p>
-
-      <div class="label">Camera formats</div>
+      <div class="section-title">Camera Settings</div>
       <div class="group">
-        <div class="row stack">
-          <div class="row-head">
-            <span class="row-label">Front camera</span>
-            <span class="row-val">${ASPECTS[state.frontAspect].short}</span>
-          </div>
-          <div class="chips">
-            ${ASPECT_ORDER.map((k) => `
-              <button class="chip ${k === state.frontAspect ? 'active' : ''}" data-front="${k}" type="button">${ASPECTS[k].label}</button>
-            `).join('')}
-          </div>
+        <button class="row" data-front-row type="button">
+          <span class="row-ico">${ICONS.camera}</span>
+          <span class="label">Front Camera Format</span>
+          <span class="val">${ASPECTS[state.frontAspect].short}</span>
+          <span class="chev">${ICONS.chevronRight}</span>
+        </button>
+        <button class="row" data-back-row type="button">
+          <span class="row-ico">${ICONS.camera}</span>
+          <span class="label">Back Camera Format</span>
+          <span class="val">${ASPECTS[state.backAspect].short}</span>
+          <span class="chev">${ICONS.chevronRight}</span>
+        </button>
+      </div>
+
+      <div class="section-title">Recording Options</div>
+      <div class="group">
+        <button class="row" data-mode-row type="button">
+          <span class="row-ico">${ICONS.film}</span>
+          <span class="label">Save as</span>
+          <span class="val">${MODES[state.mode].title}</span>
+          <span class="chev">${ICONS.chevronRight}</span>
+        </button>
+        <div class="row">
+          <span class="row-ico">${ICONS.mic}</span>
+          <span class="label">Enable Audio</span>
+          <button class="switch" id="audio-switch" type="button" role="switch"
+                  aria-checked="${state.audio}" aria-label="Enable audio"></button>
         </div>
-        <div class="row stack">
-          <div class="row-head">
-            <span class="row-label">Back camera</span>
-            <span class="row-val">${ASPECTS[state.backAspect].short}</span>
-          </div>
-          <div class="chips">
-            ${ASPECT_ORDER.map((k) => `
-              <button class="chip ${k === state.backAspect ? 'active' : ''}" data-back="${k}" type="button">${ASPECTS[k].label}</button>
-            `).join('')}
-          </div>
+        <div class="row">
+          <span class="row-ico">${ICONS.folder}</span>
+          <span class="label">Save Location</span>
+          <span class="val">Phone Storage</span>
         </div>
       </div>
 
-      <div class="label">Video</div>
+      <div class="section-title">Video</div>
       <div class="group">
-        <div class="row">
-          <span class="row-label">Resolution</span>
-          <div class="row-val" style="margin-left:auto">
-            ${segmentedHTML(QUALITY_ORDER.map((k) => ({ key: k, label: QUALITIES[k].seg })), state.quality, { name: 'quality', attr: 'quality', small: true })}
-          </div>
-        </div>
-        <div class="row">
-          <span class="row-label">Container</span>
-          <div class="row-val" style="margin-left:auto">
-            ${segmentedHTML(CODEC_ORDER.map((k) => ({ key: k, label: CODECS[k].seg })), state.codec, { name: 'codec', attr: 'codec', small: true })}
-          </div>
-        </div>
+        <button class="row" data-quality-row type="button">
+          <span class="row-ico">${ICONS.aperture}</span>
+          <span class="label">Resolution</span>
+          <span class="val">${QUALITIES[state.quality].label}</span>
+          <span class="chev">${ICONS.chevronRight}</span>
+        </button>
+        <button class="row" data-codec-row type="button">
+          <span class="row-ico">${ICONS.bolt}</span>
+          <span class="label">Container</span>
+          <span class="val">${CODECS[state.codec].label}</span>
+          <span class="chev">${ICONS.chevronRight}</span>
+        </button>
       </div>
 
-      <div class="pro-card">
-        <div class="pro-card-head">
-          <span class="pro-mark">♛</span>
-          <div>
-            <div class="pro-card-title">DuelShots Pro</div>
-            <div class="caption">${state.premium ? 'Active on this device' : 'One-time unlock'}</div>
-          </div>
-        </div>
-        <div class="pro-list">
-          ${proFeatures().map((f) => `<div class="pro-item">${ICONS.check}<span>${f}</span></div>`).join('')}
+      <div class="premium-card">
+        <div class="premium-head">${ICONS.crown}Premium Features</div>
+        <div class="premium-list">
+          ${proFeatures().map((f) => `<div class="premium-item">${ICONS.check}<span>${f}</span></div>`).join('')}
         </div>
         ${state.premium
-      ? `<div class="pro-active">${ICONS.check}<span>Pro is active</span></div>`
-      : `<button class="btn-primary" id="pro-btn-settings" type="button" style="margin-top:16px"><span class="spark"></span>Unlock Pro</button>`}
+      ? `<div class="premium-active">${ICONS.check}<span>Premium is active</span></div>`
+      : `<button class="btn-primary" id="settings-premium" type="button" style="margin-top:16px">
+             ${ICONS.crown}<span class="grow">Go Premium</span>
+           </button>`}
       </div>
     </div>`;
 
-  wireSegmented(screenEl, { attr: 'mode' }, (key) => {
-    state.mode = key;
+  $('[data-back]').addEventListener('click', () => go('HOME'));
+  $('[data-front-row]').addEventListener('click', () => showFormatSheet('front'));
+  $('[data-back-row]').addEventListener('click', () => showFormatSheet('back'));
+  $('[data-mode-row]').addEventListener('click', showModeSheet);
+
+  $('#audio-switch').addEventListener('click', (e) => {
+    state.audio = !state.audio;
+    e.currentTarget.setAttribute('aria-checked', String(state.audio));
     savePrefs();
-    renderSettings();
+    toast(state.audio ? 'Audio on' : 'Audio off');
   });
 
-  $$('[data-front]', screenEl).forEach((b) => b.addEventListener('click', () => {
-    state.frontAspect = b.dataset.front;
-    savePrefs();
-    renderSettings();
-  }));
-  $$('[data-back]', screenEl).forEach((b) => b.addEventListener('click', () => {
-    state.backAspect = b.dataset.back;
-    savePrefs();
-    renderSettings();
-  }));
-  $$('[data-quality]', screenEl).forEach((b) => b.addEventListener('click', () => {
-    const key = b.dataset.quality;
-    if (QUALITIES[key].premium && !state.premium) { showPro({ kind: 'quality', key }); return; }
-    state.quality = key;
-    savePrefs();
-    renderSettings();
-  }));
-  $$('[data-codec]', screenEl).forEach((b) => b.addEventListener('click', () => {
-    const key = b.dataset.codec;
-    if (CODECS[key].premium && !state.premium) { showPro({ kind: 'codec', key }); return; }
-    state.codec = key;
-    savePrefs();
-    renderSettings();
-  }));
+  $('[data-quality-row]').addEventListener('click', () => {
+    showOptionSheet({
+      title: 'Resolution',
+      sub: '4K needs Premium.',
+      activeKey: state.quality,
+      items: QUALITY_ORDER.map((k) => ({
+        key: k,
+        label: QUALITIES[k].label,
+        desc: QUALITIES[k].premium ? 'Premium' : '',
+      })),
+      onPick: (key) => {
+        if (QUALITIES[key].premium && !state.premium) { closeSheet(); showPro({ kind: 'quality', key }); return; }
+        state.quality = key;
+        savePrefs();
+        closeSheet();
+        renderSettings();
+      },
+    });
+  });
 
-  const proBtn = $('#pro-btn-settings');
-  if (proBtn) proBtn.addEventListener('click', showPro);
+  $('[data-codec-row]').addEventListener('click', () => {
+    showOptionSheet({
+      title: 'Container',
+      sub: 'HEVC needs Premium.',
+      activeKey: state.codec,
+      items: CODEC_ORDER.map((k) => ({
+        key: k,
+        label: CODECS[k].label,
+        desc: CODECS[k].premium ? 'Premium' : '',
+      })),
+      onPick: (key) => {
+        if (CODECS[key].premium && !state.premium) { closeSheet(); showPro({ kind: 'codec', key }); return; }
+        state.codec = key;
+        savePrefs();
+        closeSheet();
+        renderSettings();
+      },
+    });
+  });
+
+  const premiumBtn = $('#settings-premium');
+  if (premiumBtn) premiumBtn.addEventListener('click', () => showPro());
 }
-
-/* =====================================================================
-   SCREEN: GALLERY
-   ===================================================================== */
 
 function renderGallery() {
   screenEl.innerHTML = `
-    <div class="scroll">
-      <h1 class="h1">Gallery</h1>
-      <p class="sub">${state.clips.length
-      ? `${state.clips.length} clip${state.clips.length === 1 ? '' : 's'} this session · saved to Movies/DuelShots`
-      : 'Saved to Movies/DuelShots'}</p>
+    <div class="page enter">
+      ${backHead('Gallery')}
+      <p class="sub" style="margin:10px 2px 0;font-size:12.5px;color:var(--text-3)">
+        ${state.clips.length
+      ? `${state.clips.length} clip${state.clips.length === 1 ? '' : 's'} this session · Movies/DuelShots`
+      : 'Recordings are saved to Movies/DuelShots'}
+      </p>
 
-      ${state.clips.length ? `<div class="grid">${state.clips.map(clipCardHTML).join('')}</div>` : `
+      ${state.clips.length ? `<div class="gallery-grid">${state.clips.map(clipCardHTML).join('')}</div>` : `
         <div class="empty">
-          <div class="empty-icon">${ICONS.camera}</div>
+          <div class="empty-ico">${ICONS.camera}</div>
           <h3>No recordings yet</h3>
           <p>Your first take lands here — composed, separate, or both.</p>
-          <button class="btn-primary" id="empty-start" type="button" style="margin-top:18px">
-            <span class="rec-dot"></span>Start recording
+          <button class="btn-primary" id="empty-start" type="button">
+            ${ICONS.camera}<span class="grow">Start recording</span><span class="chev">${ICONS.chevronRight}</span>
           </button>
         </div>`}
     </div>`;
+
+  $('[data-back]').addEventListener('click', () => go('HOME'));
+  const empty = $('#empty-start');
+  if (empty) empty.addEventListener('click', openRecord);
 
   $$('.clip', screenEl).forEach((el) => el.addEventListener('click', () => {
     const clip = state.clips.find((c) => c.id === el.dataset.clip);
     if (clip) playClip(clip);
   }));
-
-  const empty = $('#empty-start');
-  if (empty) empty.addEventListener('click', openRecord);
 }
 
 function clipCardHTML(c) {
@@ -1662,40 +1769,17 @@ function playClip(clip) {
       state.clips = state.clips.filter((c) => c.id !== clip.id);
       closeSheet();
       toast('Clip deleted');
-      if (state.tab === 'GALLERY') renderGallery();
+      if (state.page === 'GALLERY') renderGallery();
     });
   });
 }
 
-/* =====================================================================
-   TABS
-   ===================================================================== */
+/* ------------------------------------------------------------------ nav */
 
-function updateTabs() {
-  $$('.tab', tabbarEl).forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === state.tab));
-}
-
-function renderTab(animate = false) {
-  const prev = screenEl.querySelector('.scroll');
-  const prevScroll = prev ? prev.scrollTop : 0;
-
-  if (state.tab === 'SETTINGS') renderSettings();
-  else if (state.tab === 'GALLERY') renderGallery();
-  else renderHome();
-
-  const next = screenEl.querySelector('.scroll');
-  if (next) {
-    next.scrollTop = animate ? 0 : prevScroll;
-    if (animate) next.classList.add('enter');
-  }
-  updateTabs();
-}
-
-function switchTab(tab) {
-  const changed = tab !== state.tab;
-  state.tab = tab;
-  if (state.record) { closeRecord(); return; } // closeRecord renders the tab
-  renderTab(changed);
+function go(page) {
+  state.page = page;
+  state.record = false;
+  render();
 }
 
 /* ------------------------------------------------------------------ boot */
@@ -1710,16 +1794,8 @@ function init() {
   loadPrefs();
   tickClock();
   setInterval(tickClock, 15000);
-
-  $$('.tab', tabbarEl).forEach((btn) => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-  $$('.tab-icon', tabbarEl).forEach((span) => {
-    span.innerHTML = ICONS[span.dataset.icon] || '';
-  });
   $('#about-btn').addEventListener('click', showAbout);
-
-  renderTab();
+  render();
 }
 
 init();

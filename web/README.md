@@ -29,10 +29,12 @@ No build step, no npm packages — just `index.html`, `styles.css` and `app.js`.
 
 ## Design
 
-Graphite surfaces, hairline borders and a single accent — colour is reserved for the
-brand mark, the hero art and the record state, so the viewfinder stays the loudest
-thing on screen. The floating tab bar, bottom sheets and segmented controls are the
-same components used in the native Compose UI.
+Warm near-black surfaces with an orange-to-ember brand gradient. The menu is a single
+column: the logo mark and wordmark on top, one primary *Start Recording* pill, then
+plain rows for Gallery, Settings, Premium and About — no tab bar. Colour is reserved
+for the brand, the primary action and the record state, so the viewfinder stays the
+loudest thing on screen. Bottom sheets, chips and grouped rows match the components in
+the native Compose UI; Settings uses the same grouped list as the reference design.
 
 ## What actually works
 
@@ -41,7 +43,7 @@ same components used in the native Compose UI.
   `CompositionSettings` in the Kotlin controller). Separate Videos records two
   files, Both Options records all three.
 - **Real files.** Recording is done with canvas composition + `MediaRecorder`;
-  finished clips appear in the Gallery tab as poster thumbnails, play inline and can
+  finished clips appear in the Gallery as poster thumbnails, play inline and can
   be downloaded or deleted. Filenames follow the Android scheme:
   `duelshot_combined_YYYYMMDD_HHMMSS.mp4`.
 - **Camera handling.** Both cameras are requested at once. If the browser refuses
@@ -54,6 +56,8 @@ same components used in the native Compose UI.
   the formats it started with (a file cannot change resolution mid-stream), so
   changes made while recording start with the next take; the dock always shows the
   formats currently in use.
+- **Zoom chip.** The 1×/2×/3× chip on the record dock crops the preview and the
+  recorded frame together, so what you frame is what you get.
 - **Movable overlay.** In Dual View the front camera sits in an inset you can drag
   around and pinch to resize (double-tap resets). The position and size are used for
   the composed recording, not just the preview.
