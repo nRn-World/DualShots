@@ -89,6 +89,63 @@ class AppPrefs(context: Context) {
         get() = sp.getBoolean(KEY_AUDIO, true)
         set(v) = sp.edit().putBoolean(KEY_AUDIO, v).apply()
 
+    // --- Mappar (enkel app-lokal organisation) ---------------------------------
+
+    var folders: List<String>
+        get() = readStringList(KEY_FOLDERS)
+        set(v) = sp.edit().putString(KEY_FOLDERS, org.json.JSONArray(v).toString()).apply()
+
+    var clipFolders: Map<Long, String>
+        get() = readClipFolders()
+        set(v) = sp.edit().putString(
+            KEY_CLIP_FOLDERS,
+            org.json.JSONObject().apply { v.forEach { (id, name) -> put(id.toString(), name) } }.toString()
+        ).apply()
+
+    fun addFolder(name: String): Boolean {
+        val clean = name.trim().take(40)
+        if (clean.isEmpty()) return false
+        if (folders.contains(clean)) return false
+        folders = folders + clean
+        return true
+    }
+
+    fun removeFolder(name: String) {
+        val rest = clipFolders.toMutableMap()
+        rest.values.remove(name)
+        clipFolders = rest
+        folders = folders.filter { it != name }
+    }
+
+    /** Flytta klipp till mapp; tom mapp = ingen mapp (tas bort från mappingen). */
+    fun moveToFolder(ids: List<Long>, folder: String) {
+        val map = clipFolders.toMutableMap()
+        ids.forEach {
+            if (folder.isEmpty()) map.remove(it) else map[it] = folder
+        }
+        clipFolders = map
+    }
+
+    fun folderOf(id: Long): String? = clipFolders[id]
+
+    private fun readStringList(key: String): List<String> {
+        val raw = sp.getString(key, null) ?: return emptyList()
+        return runCatching {
+            val arr = org.json.JSONArray(raw)
+            (0 until arr.length()).map { arr.getString(it) }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun readClipFolders(): Map<Long, String> {
+        val raw = sp.getString(KEY_CLIP_FOLDERS, null) ?: return emptyMap()
+        return runCatching {
+            val obj = org.json.JSONObject(raw)
+            obj.keys().asSequence().associateWith { obj.getString(it) }
+                .mapKeys { it.key.toLongOrNull() ?: -1L }
+                .filterKeys { it >= 0 }
+        }.getOrDefault(emptyMap())
+    }
+
     companion object {
         private const val KEY_MODE = "mode"
         private const val KEY_FRONT = "front_aspect"
@@ -104,6 +161,8 @@ class AppPrefs(context: Context) {
         private const val KEY_PIP_SCALE = "pip_scale"
         private const val KEY_SWAP = "swap_cameras"
         private const val KEY_AUDIO = "audio_enabled"
+        private const val KEY_FOLDERS = "folders"
+        private const val KEY_CLIP_FOLDERS = "clip_folders"
     }
 }
 

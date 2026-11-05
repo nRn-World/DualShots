@@ -19,7 +19,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /** Egna linjeikoner – avsiktligt inga standard-mobilikoner. */
-enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, SWAP, PLAY, PAUSE, CAMERA, VIDEO, CROWN, INFO, PIP, COPY, GRID, SHARE, TRASH }
+enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, SWAP, PLAY, PAUSE, CAMERA, VIDEO, CROWN, INFO, PIP, COPY, GRID, SHARE, TRASH, FOLDER, STATS, PLUS }
 
 /** Ritar en ikon på en 24×24-yta, skalad till [size]. */
 @Composable
@@ -148,6 +148,27 @@ fun DuelIcon(kind: DuelIconKind, tint: Color, size: Dp = 22.dp, modifier: Modifi
                 drawCircle(tint, radius = 9f * s, center = p(12f, 12f), style = stroke)
                 drawPath(pathOf(listOf(p(12f, 11f), p(12f, 16.5f))), tint, style = stroke)
                 drawCircle(tint, radius = 1.2f * s, center = p(12f, 7.8f))
+            }
+            DuelIconKind.FOLDER -> {
+                drawPath(
+                    pathOf(
+                        listOf(
+                            p(3f, 6f), p(10.5f, 6f), p(13f, 8.6f), p(21f, 8.6f),
+                            p(21f, 19f), p(3f, 19f)
+                        ),
+                        close = true
+                    ),
+                    tint, style = stroke
+                )
+            }
+            DuelIconKind.STATS -> {
+                drawRoundRect(tint, topLeft = p(4f, 13f), size = Size(3.6f * s, 8f * s), cornerRadius = CornerRadius(1f * s))
+                drawRoundRect(tint, topLeft = p(10.2f, 8f), size = Size(3.6f * s, 13f * s), cornerRadius = CornerRadius(1f * s))
+                drawRoundRect(tint, topLeft = p(16.4f, 16f), size = Size(3.6f * s, 5f * s), cornerRadius = CornerRadius(1f * s))
+            }
+            DuelIconKind.PLUS -> {
+                drawPath(pathOf(listOf(p(12f, 4f), p(12f, 20f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(4f, 12f), p(20f, 12f))), tint, style = stroke)
             }
         }
     }

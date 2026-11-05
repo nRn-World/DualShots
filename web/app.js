@@ -74,6 +74,9 @@ const state = {
   clips: [],
   gallerySelectMode: false,
   selectedClipIds: [],
+  folders: [],
+  clipFolders: {},
+  activeFolder: null,
 };
 
 /* --------------------------------------------------------------- elements */
@@ -113,6 +116,9 @@ const ICONS = {
   grid: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>'),
   share: svg('<path d="M12 3.5v11"/><path d="m8 7.5 4-4 4 4"/><path d="M6 12v8h12v-8"/>'),
   trash: svg('<path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1.1 13h8.8L17.5 7"/><path d="M10.5 10.5 11 16.5M13.5 10.5 13 16.5"/>'),
+  folder: svg('<path d="M3 6h7l2 2.5H21v9.5H3z" /><path d="M3 9.5h18" />'),
+  stats: svg('<rect x="4" y="13" width="3.6" height="8" rx="1"/><rect x="10.2" y="8" width="3.6" height="13" rx="1"/><rect x="16.4" y="16" width="3.6" height="5" rx="1"/>'),
+  plus: svg('<path d="M12 4v16M4 12h16"/>'),
 };
 
 /* Samma markering som launcher-ikonen: två linser på navy-botten. */
@@ -223,6 +229,8 @@ function savePrefs() {
       pip: state.pip,
       swap: state.swap,
       onboarded: !!state.onboarded,
+      folders: state.folders,
+      clipFolders: state.clipFolders,
     }));
   } catch (_) { /* private mode */ }
 }
@@ -248,6 +256,8 @@ function loadPrefs() {
         scale: clamp(p.pip.scale, PIP_MIN, PIP_MAX),
       };
     }
+    if (Array.isArray(p.folders)) state.folders = p.folders.filter((f) => typeof f === 'string');
+    if (p.clipFolders && typeof p.clipFolders === 'object') state.clipFolders = p.clipFolders;
   } catch (_) { /* ignore */ }
 }
 
@@ -1816,6 +1826,7 @@ function render() {
   document.body.dataset.screen = 'page';
   if (!state.onboarded) { renderOnboarding(); renderNav(); return; }
   if (state.page === 'SETTINGS') renderSettings();
+  else if (state.page === 'STATS') renderStats();
   else if (state.page === 'GALLERY') renderGallery();
   else renderHome();
   renderNav();
@@ -1829,6 +1840,7 @@ function renderNav() {
   const tabs = [
     ['HOME', 'Home', ICONS.home],
     ['GALLERY', 'Gallery', ICONS.gallery],
+    ['STATS', 'Stats', ICONS.stats],
     ['SETTINGS', 'Settings', ICONS.settings],
   ];
   nav.innerHTML = tabs.map(([key, label, icon]) => `
@@ -1852,6 +1864,21 @@ function renderHome() {
           <span class="start-ico">${ICONS.video}</span>
           <span class="start-label">START RECORDING</span>
           <span class="start-chev">${ICONS.chevron}</span>
+        </button>
+
+        <button class="menu-btn last-setup" id="last-setup" type="button">
+          <span class="menu-ico">${ICONS.crown}</span>
+          <span class="menu-label">
+            <span class="ls-title">LAST SETUP</span>
+            <span class="ls-summary">${MODES[state.mode].title} · ${QUALITIES[state.quality].label} · ${CODECS[state.codec].label} · ${ASPECTS[state.frontAspect].label} / ${ASPECTS[state.backAspect].label}</span>
+          </span>
+          <span class="menu-chev">${ICONS.video}</span>
+        </button>
+
+        <button class="menu-btn" id="home-stats" type="button">
+          <span class="menu-ico">${ICONS.stats}</span>
+          <span class="menu-label">Stats</span>
+          <span class="menu-chev">${ICONS.chevron}</span>
         </button>
 
         <button class="menu-btn" id="home-settings" type="button">
@@ -1884,6 +1911,8 @@ function renderHome() {
     </div>`;
 
   $('#start-btn').addEventListener('click', openRecord);
+  $('#last-setup').addEventListener('click', openRecord);
+  $('#home-stats').addEventListener('click', () => go('STATS'));
   $('#home-settings').addEventListener('click', () => go('SETTINGS'));
   $('#menu-premium').addEventListener('click', () => showPremium());
   $('#menu-about').addEventListener('click', showAbout);
@@ -2012,6 +2041,83 @@ function renderSettings() {
 }
 
 /* GalleryScreen.kt: large title, long-press multi-select, batch Share / Delete. */
+/* StatsScreen.kt: all-time totals, saved storage, recordings by hour. */
+function renderStats() {
+  const clips = state.clips;
+  const totalMb = clips.reduce((a, c) => a + (Number(c.sizeMb) || 0), 0);
+  const totalMs = clips.reduce((a, c) => a + parseDurationMs(c.duration), 0);
+  const byHour = new Array(24).fill(0);
+  clips.forEach((c) => {
+    if (c.when instanceof Date && !Number.isNaN(c.when.getTime())) {
+      byHour[c.when.getHours()]++;
+    }
+  });
+  const gb = totalMb / 1024;
+  const savedGb = gb * 0.5;
+  const peak = byHour.indexOf(Math.max(...byHour));
+
+  screenEl.innerHTML = `
+    <div class="page stats">
+      <header class="screen-header">
+        <h1>Stats</h1>
+        <p>Your DualShots recording history</p>
+      </header>
+
+      <div class="stats-hero">
+        <div class="stats-hero-ico">${ICONS.stats}</div>
+        <div class="stats-hero-body">
+          <div class="stats-hero-label">ALL-TIME RECORDINGS</div>
+          <div class="stats-hero-value">${clips.length} ${clips.length === 1 ? 'clip' : 'clips'}</div>
+        </div>
+        <div class="stats-mini">
+          <div class="stats-mini-card"><div class="stats-mini-label">Duration</div><div class="stats-mini-value">${formatDuration(totalMs)}</div></div>
+          <div class="stats-mini-card"><div class="stats-mini-label">Size</div><div class="stats-mini-value">${gb >= 1 ? gb.toFixed(2) + ' GB' : totalMb + ' MB'}</div></div>
+        </div>
+      </div>
+
+      <div class="stats-saved">
+        <span class="stats-saved-ico">${ICONS.crown}</span>
+        <div>
+          <div class="stats-saved-title">Storage saved</div>
+          <div class="stats-saved-text">Dual View puts both cameras in one file instead of two — you've saved about ${savedGb.toFixed(2)} GB of separate dual recordings.</div>
+        </div>
+      </div>
+
+      <div class="stats-hours">
+        <div class="section-label">RECORDINGS BY TIME OF DAY</div>
+        <div class="hour-bars">
+          ${byHour.map((c, h) => {
+            const max = Math.max(...byHour, 1);
+            const frac = c / max;
+            return `<div class="hour-col">
+              <span class="hour-count">${c > 0 ? c : ''}</span>
+              <span class="hour-bar" style="height:${Math.max(frac * 60, frac > 0 ? 8 : 0)}px"></span>
+              <span class="hour-label">${h % 3 === 0 ? h : ''}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="stats-peak">${peak >= 0 && byHour[peak] > 0 ? `Most active around ${peak}:00` : 'Record something to see your pattern'}</div>
+      </div>
+    </div>`;
+}
+
+function parseDurationMs(d) {
+  if (!d) return 0;
+  const parts = String(d).split(':').map((x) => parseInt(x, 10));
+  if (parts.some((x) => Number.isNaN(x))) return 0;
+  let s = 0;
+  parts.forEach((p) => { s = s * 60 + p; });
+  return s * 1000;
+}
+
+function formatDuration(ms) {
+  if (!ms || ms <= 0) return '0m';
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m} min`;
+}
+
 function renderGallery() {
   if (!state.clips.length) {
     state.gallerySelectMode = false;
@@ -2023,8 +2129,12 @@ function renderGallery() {
   const selMode = !!state.gallerySelectMode;
   const selSet = new Set(state.selectedClipIds);
   const selCount = selSet.size;
-  const allSelected = state.clips.length > 0 && selCount === state.clips.length;
-  const totalMb = state.clips
+  const folders = state.folders || [];
+  const folderOf = (id) => state.clipFolders[id] || null;
+  const activeFolder = state.activeFolder;
+  const shown = state.clips.filter((c) => activeFolder == null || folderOf(c.id) === activeFolder);
+  const allSelected = shown.length > 0 && shown.every((c) => selSet.has(c.id));
+  const totalMb = shown
     .filter((c) => selSet.has(c.id))
     .reduce((acc, c) => acc + (Number(c.sizeMb) || 0), 0);
 
@@ -2047,13 +2157,21 @@ function renderGallery() {
              ${state.clips.length ? `<button class="gal-select-btn" id="gal-enter-select" type="button">Select</button>` : ''}
            </div>`}
 
-      ${state.clips.length
-        ? `<div class="clip-list">${state.clips.map((c) => clipCardHTML(c, selMode, selSet.has(c.id))).join('')}</div>`
-        : `<div class="empty">
+      ${!selMode && state.clips.length ? folderChipsHTML(folders, activeFolder, folderOf) : ''}
+
+      ${state.clips.length === 0
+        ? `<div class="empty">
              <span class="empty-ico">${ICONS.gallery}</span>
              <span class="empty-title">No recordings yet</span>
              <span class="empty-sub">Start a recording from Home</span>
-           </div>`}
+           </div>`
+        : shown.length === 0
+          ? `<div class="empty">
+             <span class="empty-ico">${ICONS.folder}</span>
+             <span class="empty-title">Nothing in this folder</span>
+             <span class="empty-sub">Record something or move clips here</span>
+           </div>`
+          : `<div class="clip-list">${shown.map((c) => clipCardHTML(c, selMode, selSet.has(c.id), folderOf(c.id))).join('')}</div>`}
 
       ${selMode && state.clips.length
         ? `<div class="gal-action-bar">
@@ -2061,6 +2179,9 @@ function renderGallery() {
              <div class="gal-action-btns">
                <button class="gal-btn-share" id="gal-share-selected" type="button" ${selCount === 0 ? 'disabled' : ''}>
                  ${ICONS.share}<span>${selCount > 0 ? `Share (${selCount})` : 'Share'}</span>
+               </button>
+               <button class="gal-btn-move" id="gal-move-selected" type="button" ${selCount === 0 ? 'disabled' : ''}>
+                 ${ICONS.folder}<span>${selCount > 0 ? `Move (${selCount})` : 'Move'}</span>
                </button>
                <button class="gal-btn-delete" id="gal-delete-selected" type="button" ${selCount === 0 ? 'disabled' : ''}>
                  ${ICONS.trash}<span>${selCount > 0 ? `Delete (${selCount})` : 'Delete'}</span>
@@ -2150,6 +2271,101 @@ function renderGallery() {
       }
     });
   });
+
+  $$('[data-folder]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    const f = b.dataset.folder;
+    if (f === '__new__') { openNewFolderDialog(); return; }
+    state.activeFolder = f === '' ? null : f;
+    renderGallery();
+  }));
+
+  const moveBtn = $('#gal-move-selected', screenEl);
+  if (moveBtn) {
+    moveBtn.addEventListener('click', () => {
+      const chosen = shown.filter((c) => selSet.has(c.id));
+      if (chosen.length) openMoveSheet(chosen.length);
+    });
+  }
+}
+
+/* Flytta-kontroll för markerade klipp. */
+function openMoveSheet(count) {
+  const folders = state.folders || [];
+  const folderOf = (id) => state.clipFolders[id] || null;
+  const rows = folders.map((f) => {
+    const c = state.clips.filter((x) => folderOf(x.id) === f).length;
+    return `<button class="folder-row" data-move="${esc(f)}" type="button">
+      <span class="folder-row-ico">${ICONS.folder}</span>
+      <span class="folder-row-name">${esc(f)}</span>
+      <span class="folder-row-count">${c}</span>
+      <span class="folder-row-chev">${ICONS.chevron}</span>
+    </button>`;
+  }).join('');
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog confirm-dialog">
+        <div class="confirm-title">Move $count clips</div>
+        <p class="confirm-text">Marked clips will move here.</p>
+        <div class="folder-rows">${rows || '<div class="folder-empty">No folders yet — create one below.</div>'}
+          <button class="folder-row" data-move="__new__" type="button">
+            <span class="folder-row-ico">${ICONS.plus}</span>
+            <span class="folder-row-name">New folder…</span>
+            <span class="folder-row-chev">${ICONS.chevron}</span>
+          </button>
+        </div>
+        <div class="confirm-actions">
+          <button class="confirm-delete" data-move="__none__" type="button">No folder</button>
+          <button class="confirm-cancel" data-close type="button">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  wireSheet();
+  $$('[data-move]', modalRoot).forEach((b) => b.addEventListener('click', () => {
+    const f = b.dataset.move;
+    if (f === '__new__') { openNewFolderDialog(() => openMoveSheet(count)); return; }
+    if (f === '__none__') {
+      state.selectedClipIds.forEach((id) => { delete state.clipFolders[id]; });
+    } else {
+      state.selectedClipIds.forEach((id) => { state.clipFolders[id] = f; });
+    }
+    savePrefs();
+    closeSheet();
+    toast(f === '__none__' ? `${count} clips unassigned` : `Moved ${count} clips to ${f}`);
+    if (state.page === 'GALLERY') renderGallery();
+  }));
+}
+
+/* Ny mapp: skriver in namn och skapar. */
+function openNewFolderDialog(after) {
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog confirm-dialog">
+        <div class="confirm-title">New folder</div>
+        <p class="confirm-text">Give the folder a name to organize clips.</p>
+        <input class="folder-input" id="folder-name" type="text" placeholder="Folder name" maxlength="40" />
+        <div class="confirm-actions">
+          <button class="confirm-delete" id="folder-create" type="button">Create</button>
+          <button class="confirm-cancel" data-close type="button">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  wireSheet();
+  const input = $('#folder-name', modalRoot);
+  if (input) input.focus();
+  $('#folder-create', modalRoot).addEventListener('click', () => {
+    const name = (input.value || '').trim();
+    if (!name) return;
+    if (!state.folders.includes(name)) state.folders.push(name);
+    savePrefs();
+    closeSheet();
+    toast(`Created folder "${name}"`);
+    if (after) after();
+    else if (state.page === 'GALLERY') renderGallery();
+  });
 }
 
 function toggleClipSelection(id) {
@@ -2170,7 +2386,7 @@ function clipMetaLine(c) {
   return `${c.sizeMb} MB${when ? ` · ${when}` : ''}`;
 }
 
-function clipCardHTML(c, selMode = false, selected = false) {
+function clipCardHTML(c, selMode = false, selected = false, folder = null) {
   return `
     <button class="clip ${selected ? 'selected' : ''}" data-clip="${c.id}" type="button">
       ${selMode
@@ -2180,18 +2396,38 @@ function clipCardHTML(c, selMode = false, selected = false) {
       <span class="clip-body">
         <span class="clip-name">${esc(c.name)}</span>
         <span class="clip-meta">${esc(clipMetaLine(c))}</span>
+        ${folder ? `<span class="clip-folder">${ICONS.folder}${esc(folder)}</span>` : ''}
       </span>
       ${selMode ? '' : `<span class="clip-chev">${ICONS.chevron}</span>`}
     </button>`;
 }
 
-/* GalleryScreen.kt: spelare i dialog med Share / Delete / Close. */
+/* Mappchips över galleriet: All, egna mappar + ny. */
+function folderChipsHTML(folders, activeFolder, folderOf) {
+  const chips = [
+    `<button class="folder-chip ${activeFolder == null ? 'active' : ''}" data-folder="" type="button">${ICONS.grid}<span>All</span></button>`,
+    folders.map((f) => {
+      const count = state.clips.filter((c) => folderOf(c.id) === f).length;
+      return `<button class="folder-chip ${activeFolder === f ? 'active' : ''}" data-folder="${esc(f)}" type="button">${ICONS.folder}<span>${esc(f)}</span><em>${count}</em></button>`;
+    }).join(''),
+    `<button class="folder-chip new" data-folder="__new__" type="button">${ICONS.plus}<span>New</span></button>`,
+  ];
+  return `<div class="folder-chips">${chips.join('')}</div>`;
+}
+
+/* GalleryScreen.kt: spelare med tidslinje + thumbnail-filmstrip, Share / Delete / Close. */
 function playClip(clip) {
   modalRoot.innerHTML = `
     <div class="modal">
       <div class="dialog clip-dialog">
         <div class="clip-dialog-name">${esc(clip.name)}</div>
-        <video class="clip-video" src="${clip.url}" controls autoplay playsinline></video>
+        <video class="clip-video" src="${clip.url}" preload="metadata" playsinline></video>
+        <div class="clip-timeline">
+          <span class="clip-time" id="clip-time">0:00</span>
+          <input class="clip-scrub" id="clip-scrub" type="range" min="0" max="100" value="0" step="0.1" />
+          <span class="clip-time" id="clip-time-total">0:00</span>
+        </div>
+        <div class="clip-thumbs" id="clip-thumbs"></div>
         <div class="clip-dialog-meta">${esc(clipMetaLine(clip))} · ${esc(clip.duration || '')}</div>
         <div class="pill-row">
           <button class="pill" data-share type="button">${ICONS.share}<span>Share</span></button>
@@ -2206,6 +2442,67 @@ function playClip(clip) {
   wireSheet();
   $('[data-share]', modalRoot).addEventListener('click', () => shareMultipleClips([clip]));
   $('[data-delete]', modalRoot).addEventListener('click', () => confirmDeleteClips([clip]));
+
+  const video = $('video', modalRoot);
+  const scrub = $('#clip-scrub', modalRoot);
+  const timeEl = $('#clip-time', modalRoot);
+  const totalEl = $('#clip-time-total', modalRoot);
+  const thumbsEl = $('#clip-thumbs', modalRoot);
+
+  const fmt = (s) => {
+    s = Math.max(0, Math.floor(s));
+    const m = Math.floor(s / 60);
+    const ss = s % 60;
+    return m + ':' + String(ss).padStart(2, '0');
+  };
+
+  video.addEventListener('loadedmetadata', () => {
+    const dur = video.duration;
+    if (!Number.isFinite(dur) || dur <= 0) return;
+    totalEl.textContent = fmt(dur);
+    scrub.max = String(dur);
+    video.play().catch(() => {});
+    buildThumbs(video, dur, thumbsEl);
+  });
+  video.addEventListener('timeupdate', () => {
+    scrub.value = String(video.currentTime);
+    timeEl.textContent = fmt(video.currentTime);
+  });
+  scrub.addEventListener('input', () => { video.currentTime = parseFloat(scrub.value); });
+}
+
+/* Fångar frame vid jämna intervall för thumbnail-filmstripen. */
+function buildThumbs(video, dur, container) {
+  const n = 6;
+  const canvas = document.createElement('canvas');
+  canvas.width = 120; canvas.height = 68;
+  const ctx = canvas.getContext('2d');
+  const thumbs = [];
+  let i = 1;
+  function grab() {
+    if (i > n) {
+      container.innerHTML = thumbs.map((t, idx) => {
+        const tMs = dur * (idx + 1) / (n + 1);
+        return `<button class="clip-thumb" data-seek="${tMs}" type="button">${t ? `<img src="${t}" alt="" />` : ''}</button>`;
+      }).join('');
+      $$('[data-seek]', container).forEach((b) => b.addEventListener('click', () => {
+        video.currentTime = parseFloat(b.dataset.seek);
+      }));
+      return;
+    }
+    const t = dur * i / (n + 1);
+    const onSeeked = () => {
+      video.removeEventListener('seeked', onSeeked);
+      try {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        thumbs.push(canvas.toDataURL('image/jpeg', 0.6));
+      } catch (_) { thumbs.push(''); }
+      i++; grab();
+    };
+    video.addEventListener('seeked', onSeeked, { once: true });
+    video.currentTime = t;
+  }
+  grab();
 }
 
 /* Samma bekräftelsedialog som GalleryScreen.kt (stödjer 1 eller flera klipp). */

@@ -34,6 +34,7 @@ import com.nrworld.duelshot.ui.gallery.GalleryScreen
 import com.nrworld.duelshot.ui.home.HomeScreen
 import com.nrworld.duelshot.ui.record.RecordScreen
 import com.nrworld.duelshot.ui.settings.SettingsScreen
+import com.nrworld.duelshot.ui.stats.StatsScreen
 import com.nrworld.duelshot.ui.theme.DuelBg
 import com.nrworld.duelshot.ui.theme.DuelAccent
 import com.nrworld.duelshot.ui.theme.DuelLine
@@ -43,6 +44,7 @@ import com.nrworld.duelshot.ui.theme.DuelTextFaint
 private enum class Tab(val icon: DuelIconKind, val label: String) {
     HOME(DuelIconKind.HOME, "Home"),
     GALLERY(DuelIconKind.GALLERY, "Gallery"),
+    STATS(DuelIconKind.STATS, "Stats"),
     SETTINGS(DuelIconKind.SETTINGS, "Settings")
 }
 
@@ -62,9 +64,12 @@ fun DuelShotsApp(vm: AppViewModel) {
                         vm,
                         onStart = { recording = true },
                         onOpenPremium = { showPremium = true },
-                        onOpenSettings = { tab = Tab.SETTINGS }
+                        onOpenSettings = { tab = Tab.SETTINGS },
+                        onOpenStats = { tab = Tab.STATS },
+                        onOpenGallery = { tab = Tab.GALLERY }
                     )
                     Tab.GALLERY -> GalleryScreen()
+                    Tab.STATS -> StatsScreen()
                     Tab.SETTINGS -> SettingsScreen(vm)
                 }
             }

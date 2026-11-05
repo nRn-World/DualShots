@@ -57,7 +57,14 @@ private val Ink = Color(0xFF04060D)
 
 /** Startmenyn i studiodesignen: logotyp, titel och menyknappar. */
 @Composable
-fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit, onOpenSettings: () -> Unit) {
+fun HomeScreen(
+    vm: AppViewModel,
+    onStart: () -> Unit,
+    onOpenPremium: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenStats: () -> Unit,
+    onOpenGallery: () -> Unit
+) {
     var showAbout by remember { mutableStateOf(false) }
 
     Box(
@@ -101,6 +108,8 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
             Spacer(Modifier.height(44.dp))
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 PrimaryMenuButton(onClick = onStart)
+                LastSetupTile(vm = vm, onStart = onStart)
+                MenuButton(DuelIconKind.STATS, "Stats", onClick = onOpenStats)
                 MenuButton(DuelIconKind.SETTINGS, "Settings", onClick = onOpenSettings)
                 PremiumMenuButton(isPremium = vm.isPremium, onClick = onOpenPremium)
                 MenuButton(DuelIconKind.INFO, "About", onClick = { showAbout = true })
@@ -118,7 +127,7 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
             title = { Text("DualShots", color = DuelText, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Version 1.4 · Dual lens recording engine",
+                    "Version 1.5 · Dual lens recording engine",
                     color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp
                 )
             },
@@ -221,6 +230,30 @@ private fun PrimaryMenuButton(onClick: () -> Unit) {
             modifier = Modifier.weight(1f)
         )
         DuelIcon(DuelIconKind.CHEVRON, Ink, 18.dp)
+    }
+}
+
+/** "Senaste setupen" – visar sparade inställningar och en genväg direkt till inspelning. */
+@Composable
+private fun LastSetupTile(vm: AppViewModel, onStart: () -> Unit) {
+    val summary = "${vm.mode.title} · ${vm.quality.label} · ${vm.codec.label} · " +
+        "${vm.frontAspect.label} / ${vm.backAspect.label}"
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF161A29))
+            .border(1.dp, DuelOrange.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onStart)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DuelIcon(DuelIconKind.GEM, DuelOrangeLight, 18.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("LAST SETUP", color = DuelTextFaint, fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 1.sp)
+            Text(summary, color = Color(0xFFE2E8F0), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        DuelIcon(DuelIconKind.VIDEO, DuelOrangeLight, 18.dp)
     }
 }
 
