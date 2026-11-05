@@ -153,6 +153,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         status = controller.init()
         camReady = controller.canBind
     }
+    // Stäng kamerorna när man lämnar inspelningsvyn.
+    DisposableEffect(Unit) { onDispose { controller.release() } }
 
     // Bind när förhandsvisningarna finns. Ändras något under inspelning avslutas klippet,
     // kameran binds om och nästa del (_p2, _p3 …) startar direkt.

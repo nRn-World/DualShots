@@ -25,7 +25,10 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.QualityOption
 import com.nrworld.duelshot.model.RecordingMode
@@ -87,6 +90,23 @@ class DualCameraController(private val context: Context) {
 
     /** Ljud i inspelningen (inställningen Record Audio). */
     var recordAudio = true
+
+    // CameraX återanvänder kameran per lifecycle owner och behåller då den lilla
+    // kamerans FÖRSTA position/storlek i Dual View – ramen flyttades men bilden
+    // stod still. Varje bindning får därför en ny owner som följer skärmens.
+    private var bindOwner: BindOwner? = null
+
+    private fun freshOwner(parent: LifecycleOwner): LifecycleOwner {
+        bindOwner?.destroy()
+        return BindOwner(parent).also { bindOwner = it }
+    }
+
+    /** Släpper kamerorna när inspelningsvyn stängs. */
+    fun release() {
+        runCatching { provider?.unbindAll() }
+        bindOwner?.destroy()
+        bindOwner = null
+    }
 
     // Zoom per kamera (1× = av). Gäller både förhandsvisning och inspelning.
     private var backCamera: Camera? = null
@@ -193,6 +213,7 @@ class DualCameraController(private val context: Context) {
         val p = provider ?: return "Camera is not ready yet."
 
         p.unbindAll()
+        val owner = freshOwner(lifecycleOwner)
         backVideo = null; frontVideo = null; composedVideo = null
         backCamera = null; frontCamera = null
         singleFallback = false
@@ -201,20 +222,20 @@ class DualCameraController(private val context: Context) {
 
         // Dubbla kameror kräver båda selectorerna; annars enskild kamera som fallback.
         if (!supported || backSelector == null || frontSelector == null) {
-            return bindSingle(p, frontAspect, backAspect, qs, lifecycleOwner, backView, frontView)
+            return bindSingle(p, frontAspect, backAspect, qs, owner, backView, frontView)
         }
         val bs = backSelector!!
         val fs = frontSelector!!
 
         return try {
             when (wanted) {
-                RecordingMode.SEPARATE -> bindSeparate(p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner, backView, frontView)
+                RecordingMode.SEPARATE -> bindSeparate(p, bs, fs, frontAspect, backAspect, qs, owner, backView, frontView)
                 RecordingMode.DUAL_VIEW -> bindComposed(
-                    p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner,
+                    p, bs, fs, frontAspect, backAspect, qs, owner,
                     backView, frontView, composedView ?: backView, pip, saveAspect
                 )
                 RecordingMode.BOTH -> bindBoth(
-                    p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner,
+                    p, bs, fs, frontAspect, backAspect, qs, owner,
                     backView, frontView, composedView, pip
                 )
             }
@@ -584,5 +605,24 @@ class DualCameraController(private val context: Context) {
         return MediaStoreOutputOptions.Builder(
             context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         ).setContentValues(values).build()
+    }
+}
+
+/** Egen lifecycle för en bindning: följer skärmens, och kan avslutas för sig. */
+private class BindOwner(private val parent: LifecycleOwner) : LifecycleOwner {
+    private val registry = LifecycleRegistry(this)
+    private val follow = LifecycleEventObserver { _, event ->
+        if (registry.currentState != Lifecycle.State.DESTROYED) registry.handleLifecycleEvent(event)
+    }
+
+    init {
+        parent.lifecycle.addObserver(follow)
+    }
+
+    override val lifecycle: Lifecycle get() = registry
+
+    fun destroy() {
+        parent.lifecycle.removeObserver(follow)
+        if (registry.currentState != Lifecycle.State.INITIALIZED) registry.currentState = Lifecycle.State.DESTROYED
     }
 }
