@@ -818,6 +818,8 @@ const rec = {
   raf: 0,
   outs: [],
   audio: null,
+  hide: { back: false, front: false },
+  tilePaused: { back: false, front: false },
 };
 
 const recDom = {
@@ -827,6 +829,7 @@ const recDom = {
   pipBtn: null,
 };
 let mountedKey = null;
+let stackSplit = 0.5;
 let recordMessage = '';
 let recordSaved = [];
 
@@ -1073,13 +1076,15 @@ async function startRecording() {
   rec.paused = false;
   rec.pausedTotal = 0;
   rec.pausedAt = 0;
+  rec.hide = { back: false, front: false };
+  rec.tilePaused = { back: false, front: false };
 
   let lastDraw = 0;
   const loop = (now) => {
     if (!rec.active) return;
     if (now - lastDraw >= 30) {
       lastDraw = now;
-      rec.outs.forEach(drawOutput);
+      rec.outs.forEach((o) => { if (!o.stopped) drawOutput(o); });
     }
     rec.raf = requestAnimationFrame(loop);
   };
@@ -1110,6 +1115,8 @@ async function stopRecording() {
   rec.paused = false;
   rec.pausedTotal = 0;
   rec.pausedAt = 0;
+  rec.hide = { back: false, front: false };
+  rec.tilePaused = { back: false, front: false };
   const newClips = outs.map((o) => {
     const type = o.recorder.mimeType || o.mime || 'video/webm';
     const ext = type.includes('mp4') ? 'mp4' : 'webm';
@@ -1156,7 +1163,7 @@ function pauseTake() {
   if (!rec.active || rec.paused) return;
   rec.paused = true;
   rec.pausedAt = Date.now();
-  rec.outs.forEach((o) => { try { o.recorder.pause(); } catch (_) { /* unsupported */ } });
+  rec.outs.forEach((o) => { if (!o.stopped) { try { o.recorder.pause(); } catch (_) { /* unsupported */ } } });
   recordMessage = 'Paused — resume to continue the same file';
   refreshRecord();
   toast('Paused');
@@ -1167,7 +1174,7 @@ function resumeTake() {
   rec.pausedTotal = (rec.pausedTotal || 0) + (Date.now() - (rec.pausedAt || Date.now()));
   rec.pausedAt = 0;
   rec.paused = false;
-  rec.outs.forEach((o) => { try { o.recorder.resume(); } catch (_) { /* unsupported */ } });
+  rec.outs.forEach((o) => { if (!o.stopped) { try { o.recorder.resume(); } catch (_) { /* unsupported */ } } });
   recordMessage = 'Recording · ' + MODES[rec.take ? rec.take.mode : state.mode].title.toLowerCase();
   refreshRecord();
   toast('Recording');
@@ -1373,6 +1380,8 @@ function mountFeeds() {
   recDom.pip = null;
   recDom.pipAspect = null;
   recDom.hint = null;
+  recDom.stackTiles = null;
+  recDom.splitHandle = null;
   mountedKey = layoutKey();
 
   if (!cam.ready) {
@@ -1456,9 +1465,13 @@ function mountFeeds() {
 
   // stacked previews (Separate / Both), like the native app
   const order = state.stack === 'back-first' ? ['back', 'front'] : ['front', 'back'];
-  order.forEach((key) => {
+  const visible = order.filter((key) => !rec.hide[key]);
+  recDom.stackTiles = { back: null, front: null };
+  visible.forEach((key) => {
     const aspect = ASPECTS[key === 'back' ? take.backAspect : take.frontAspect].short;
     const tile = makeTile(`${key.toUpperCase()} · ${aspect}`);
+    tile.dataset.camera = key;
+    tile.classList.toggle('paused', !!rec.tilePaused[key]);
     const feed = cam.feeds[key];
     if (feed) {
       if (feed.mirror) tile.classList.add('mirror');
@@ -1466,8 +1479,22 @@ function mountFeeds() {
     } else {
       tile.appendChild(placeholder('Unavailable'));
     }
+    if (rec.active && visible.length > 1) tile.appendChild(buildTileControls(key, true));
     stage.appendChild(tile);
+    recDom.stackTiles[key] = tile;
   });
+
+  if (visible.length > 1) {
+    const split = document.createElement('div');
+    split.className = 'stack-split';
+    split.setAttribute('role', 'separator');
+    split.setAttribute('aria-label', 'Drag to resize the two previews');
+    split.innerHTML = '<i></i>';
+    stage.appendChild(split);
+    recDom.splitHandle = split;
+    wireSplitHandle(split, stage);
+  }
+  applySplit();
 
   const swap = document.createElement('button');
   swap.className = 'stack-swap';
@@ -1492,7 +1519,116 @@ function activeTake() {
 
 function layoutKey() {
   const t = activeTake();
-  return [cam.ready, cam.singleFallback, cam.active, t.mode, t.frontAspect, t.backAspect, state.stack, state.swap].join('|');
+  return [cam.ready, cam.singleFallback, cam.active, t.mode, t.frontAspect, t.backAspect, state.stack, state.swap, rec.active].join('|');
+}
+
+/* Delar upp de två rutorna: dra handtaget för att göra ena bilden större. */
+function applySplit() {
+  const tiles = recDom.stackTiles;
+  if (!tiles) return;
+  const order = state.stack === 'back-first' ? ['back', 'front'] : ['front', 'back'];
+  const shown = order.filter((k) => tiles[k] && !tiles[k].hidden);
+  if (shown.length === 2) {
+    const frac = shown[0] === 'back' ? stackSplit : 1 - stackSplit;
+    tiles[shown[0]].style.flexGrow = String(frac);
+    tiles[shown[1]].style.flexGrow = String(1 - frac);
+  } else if (shown.length === 1) {
+    tiles[shown[0]].style.flexGrow = '1';
+  }
+  const handle = recDom.splitHandle;
+  if (handle) {
+    handle.hidden = shown.length !== 2;
+    const frac = shown.length === 2 ? (shown[0] === 'back' ? stackSplit : 1 - stackSplit) : 0.5;
+    handle.style.top = `${(frac * 100).toFixed(2)}%`;
+  }
+}
+
+function wireSplitHandle(handle, stage) {
+  let dragging = false;
+  const setFrom = (clientY) => {
+    const rect = stage.getBoundingClientRect();
+    if (!rect.height) return;
+    const order = state.stack === 'back-first' ? ['back', 'front'] : ['front', 'back'];
+    const shown = order.filter((k) => recDom.stackTiles && recDom.stackTiles[k] && !recDom.stackTiles[k].hidden);
+    if (shown.length !== 2) return;
+    const frac = clamp((clientY - rect.top) / rect.height, 0.3, 0.7);
+    stackSplit = shown[0] === 'back' ? frac : 1 - frac;
+    applySplit();
+  };
+  handle.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragging = true;
+    handle.classList.add('active');
+    try { handle.setPointerCapture(e.pointerId); } catch (_) { /* unsupported */ }
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    setFrom(e.clientY);
+  });
+  const end = () => { dragging = false; handle.classList.remove('active'); };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+}
+
+/* Pausa eller ta bort en kamera i den delade vyn medan den andra spelar in. */
+function buildTileControls(key, canHide) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tile-controls';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pip-ctl';
+  const paint = () => {
+    const paused = !!rec.tilePaused[key];
+    btn.innerHTML = paused ? ICONS.play : ICONS.pause;
+    btn.setAttribute('aria-label', paused ? 'Resume this camera' : 'Pause this camera');
+    btn.classList.toggle('on', paused);
+    const tile = recDom.stackTiles && recDom.stackTiles[key];
+    if (tile) tile.classList.toggle('paused', paused);
+  };
+  paint();
+  btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const paused = !!rec.tilePaused[key];
+    const out = (rec.outs || []).find((o) => o.key === key && !o.stopped);
+    try {
+      if (out) { if (paused) out.recorder.resume(); else out.recorder.pause(); }
+    } catch (_) { /* unsupported */ }
+    rec.tilePaused[key] = !paused;
+    paint();
+    recordMessage = `${key.toUpperCase()} ${paused ? 'resumed — same file' : 'paused — the other camera keeps recording'}`;
+    refreshRecord();
+    toast(rec.tilePaused[key] ? `${key.toUpperCase()} paused` : `${key.toUpperCase()} resumed`);
+  });
+  wrap.appendChild(btn);
+
+  if (canHide) {
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'pip-ctl';
+    close.innerHTML = ICONS.close;
+    close.setAttribute('aria-label', 'Remove this camera');
+    close.addEventListener('pointerdown', (e) => e.stopPropagation());
+    close.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const out = (rec.outs || []).find((o) => o.key === key && !o.stopped);
+      if (out) { out.stopped = true; try { out.recorder.stop(); } catch (_) { /* already stopped */ } }
+      rec.hide[key] = true;
+      rec.tilePaused[key] = false;
+      const tile = recDom.stackTiles && recDom.stackTiles[key];
+      if (tile) tile.hidden = true;
+      applySplit();
+      recordMessage = `${key.toUpperCase()} removed — recording continues with the other camera`;
+      refreshRecord();
+      toast(`${key.toUpperCase()} removed — recording continues`);
+    });
+    wrap.appendChild(close);
+  }
+
+  return wrap;
 }
 
 function unmountFeeds() {

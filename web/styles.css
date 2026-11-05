@@ -1024,8 +1024,8 @@ svg { display: block; }
 .stack-swap {
   position: absolute;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  top: 10px;
+  transform: translate(-50%, 0);
   z-index: 6;
   height: 32px;
   padding: 0 12px;
@@ -1044,7 +1044,55 @@ svg { display: block; }
   text-transform: uppercase;
 }
 .stack-swap svg { width: 13px; height: 13px; }
-.stack-swap:active { transform: translate(-50%, -50%) scale(.95); }
+.stack-swap:active { transform: translate(-50%, 0) scale(.95); }
+
+/* Handtaget mellan de två rutorna */
+.stack-split {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  width: 38px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  cursor: row-resize;
+}
+.stack-split i {
+  display: block;
+  width: 34px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
+}
+.stack-split.active i { background: var(--orange-light); }
+
+/* Paus-/kryssknappar i en inspelningsruta */
+.tile-controls {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+}
+.tile-controls .pip-ctl { width: 30px; height: 30px; }
+.tile.paused > video, .tile.paused > canvas { opacity: .35; filter: grayscale(1); }
+.tile.paused::after {
+  content: "PAUSED";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  color: rgba(255, 255, 255, .82);
+  pointer-events: none;
+}
 
 .pip {
   position: absolute;

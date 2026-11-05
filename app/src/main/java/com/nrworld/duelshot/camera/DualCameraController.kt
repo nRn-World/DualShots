@@ -71,6 +71,12 @@ class DualCameraController(private val context: Context) {
     private val activeRecordings = mutableListOf<Recording>()
     private val stopWaiters = mutableListOf<() -> Unit>()
 
+    // En Recording per kamera så att en kamera kan pausas eller klickas bort
+    // medan den andra fortsätter spela in.
+    private var backRecording: Recording? = null
+    private var frontRecording: Recording? = null
+    private var composedRecording: Recording? = null
+
     /** Beskärning per kamera via ViewPort; stängs av om enheten inte klarar den. */
     private var cropEnabled = true
 
@@ -380,6 +386,7 @@ class DualCameraController(private val context: Context) {
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + (if (part > 1) "_p$part" else "")
         val started = mutableListOf<Recording>()
         val names = mutableListOf<String>()
+        backRecording = null; frontRecording = null; composedRecording = null
         try {
             when (activeMode) {
                 RecordingMode.SEPARATE -> {
@@ -387,19 +394,42 @@ class DualCameraController(private val context: Context) {
                         val isBack = backVideo != null
                         val v = backVideo ?: frontVideo
                         val n = if (isBack) "dualshot_back_$stamp" else "dualshot_front_$stamp"
-                        v?.let { started += it.record(context, n, audio = true, executor); names += "$n.mp4" }
+                        v?.let {
+                            val rec = it.record(context, n, audio = true, executor)
+                            started += rec
+                            if (isBack) backRecording = rec else frontRecording = rec
+                            names += "$n.mp4"
+                        }
                     } else {
-                        backVideo?.let { started += it.record(context, "dualshot_back_$stamp", audio = true, executor); names += "dualshot_back_$stamp.mp4" }
-                        frontVideo?.let { started += it.record(context, "dualshot_front_$stamp", audio = false, executor); names += "dualshot_front_$stamp.mp4" }
+                        backVideo?.let {
+                            val rec = it.record(context, "dualshot_back_$stamp", audio = true, executor)
+                            started += rec; backRecording = rec; names += "dualshot_back_$stamp.mp4"
+                        }
+                        frontVideo?.let {
+                            val rec = it.record(context, "dualshot_front_$stamp", audio = false, executor)
+                            started += rec; frontRecording = rec; names += "dualshot_front_$stamp.mp4"
+                        }
                     }
                 }
                 RecordingMode.DUAL_VIEW -> {
-                    composedVideo?.let { started += it.record(context, "dualshot_combined_$stamp", audio = true, executor); names += "dualshot_combined_$stamp.mp4" }
+                    composedVideo?.let {
+                        val rec = it.record(context, "dualshot_combined_$stamp", audio = true, executor)
+                        started += rec; composedRecording = rec; names += "dualshot_combined_$stamp.mp4"
+                    }
                 }
                 RecordingMode.BOTH -> {
-                    composedVideo?.let { started += it.record(context, "dualshot_combined_$stamp", audio = true, executor); names += "dualshot_combined_$stamp.mp4" }
-                    backVideo?.let { started += it.record(context, "dualshot_back_$stamp", audio = false, executor); names += "dualshot_back_$stamp.mp4" }
-                    frontVideo?.let { started += it.record(context, "dualshot_front_$stamp", audio = false, executor); names += "dualshot_front_$stamp.mp4" }
+                    composedVideo?.let {
+                        val rec = it.record(context, "dualshot_combined_$stamp", audio = true, executor)
+                        started += rec; composedRecording = rec; names += "dualshot_combined_$stamp.mp4"
+                    }
+                    backVideo?.let {
+                        val rec = it.record(context, "dualshot_back_$stamp", audio = false, executor)
+                        started += rec; backRecording = rec; names += "dualshot_back_$stamp.mp4"
+                    }
+                    frontVideo?.let {
+                        val rec = it.record(context, "dualshot_front_$stamp", audio = false, executor)
+                        started += rec; frontRecording = rec; names += "dualshot_front_$stamp.mp4"
+                    }
                 }
             }
             activeRecordings += started
@@ -422,6 +452,27 @@ class DualCameraController(private val context: Context) {
         if (activeRecordings.isEmpty()) return false
         activeRecordings.forEach { runCatching { it.resume() } }
         return true
+    }
+
+    private fun recordingFor(back: Boolean): Recording? = if (back) backRecording else frontRecording
+
+    /** Pausar bara en kamera – den andra fortsätter spela in i sin fil. */
+    fun pauseCamera(back: Boolean): Boolean {
+        val rec = recordingFor(back) ?: return false
+        return runCatching { rec.pause() }.isSuccess
+    }
+
+    fun resumeCamera(back: Boolean): Boolean {
+        val rec = recordingFor(back) ?: return false
+        return runCatching { rec.resume() }.isSuccess
+    }
+
+    /** Avslutar en kameras fil; den andra kameran fortsätter i samma take. */
+    fun stopCamera(back: Boolean): Boolean {
+        val rec = recordingFor(back) ?: return false
+        val ok = runCatching { rec.stop() }.isSuccess
+        if (back) backRecording = null else frontRecording = null
+        return ok
     }
 
     /** Tryck-för-fokus och exponering. [nx]/[ny] är 0..1 i förhandsvisningen. */

@@ -120,6 +120,13 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     // Zoom per kamera; två fingrar ändrar och inspelningen följer med.
     var backZoom by remember { mutableFloatStateOf(1f) }
     var frontZoom by remember { mutableFloatStateOf(1f) }
+    // Delningen mellan de två rutorna i Separate-läget (går att dra) samt
+    // per-kamera-paus och bortklickning under inspelning.
+    var split by remember { mutableFloatStateOf(0.5f) }
+    var hideBack by remember { mutableStateOf(false) }
+    var hideFront by remember { mutableStateOf(false) }
+    var backPaused by remember { mutableStateOf(false) }
+    var frontPaused by remember { mutableStateOf(false) }
 
     // Visat läge: önskat läge tills bindningen skett, därefter det som faktiskt band (fallback).
     val displayMode = if (boundFor == vm.mode) renderedMode else vm.mode
@@ -309,29 +316,102 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                         )
                     }
                 } else {
-                    // Samma två vyer oavsett layout – bara storlek/placering ändras (ingen omstart).
-                    val cellA = if (stacked) Modifier.fillMaxWidth().fillMaxHeight(0.5f).align(Alignment.TopCenter)
-                    else Modifier.fillMaxHeight().fillMaxWidth(0.5f).align(Alignment.CenterStart)
-                    val cellB = if (stacked) Modifier.fillMaxWidth().fillMaxHeight(0.5f).align(Alignment.BottomCenter)
-                    else Modifier.fillMaxHeight().fillMaxWidth(0.5f).align(Alignment.CenterEnd)
-                    FramedFeed(
-                        backView, vm.backAspect, label = "BACK", modifier = cellA.padding(3.dp),
-                        zoom = backZoom,
-                        onZoom = { f ->
-                            val (bz, _) = controller.setZoom(back = backZoom * f)
-                            backZoom = bz
-                        },
-                        onRelease = { if (backView === it) backView = null }
-                    ) { backView = it }
-                    FramedFeed(
-                        frontView, vm.frontAspect, label = "FRONT", modifier = cellB.padding(3.dp),
-                        zoom = frontZoom,
-                        onZoom = { f ->
-                            val (_, fz) = controller.setZoom(front = frontZoom * f)
-                            frontZoom = fz
-                        },
-                        onRelease = { if (frontView === it) frontView = null }
-                    ) { frontView = it }
+                    // Samma två vyer oavsett layout – delningen går att dra med fingret
+                    // och varje ruta kan pausas eller klickas bort under inspelning.
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val totalPx = (if (stacked) constraints.maxHeight else constraints.maxWidth).toFloat()
+                        val showBack = !hideBack
+                        val showFront = !hideFront
+                        val aFrac = when {
+                            showBack && showFront -> split
+                            showBack -> 1f
+                            else -> 0f
+                        }
+                        val cellA = if (stacked) Modifier.fillMaxWidth().fillMaxHeight(aFrac).align(Alignment.TopCenter)
+                        else Modifier.fillMaxHeight().fillMaxWidth(aFrac).align(Alignment.CenterStart)
+                        val cellB = if (stacked) Modifier.fillMaxWidth().fillMaxHeight(1f - aFrac).align(Alignment.BottomCenter)
+                        else Modifier.fillMaxHeight().fillMaxWidth(1f - aFrac).align(Alignment.CenterEnd)
+
+                        if (showBack) Box(cellA.padding(3.dp)) {
+                            FramedFeed(
+                                backView, vm.backAspect, label = "BACK", modifier = Modifier.fillMaxSize(),
+                                zoom = backZoom,
+                                onZoom = { f ->
+                                    val (bz, _) = controller.setZoom(back = backZoom * f)
+                                    backZoom = bz
+                                },
+                                onRelease = { if (backView === it) backView = null }
+                            ) { backView = it }
+                            if (isRecording) TileChips(
+                                paused = backPaused,
+                                canHide = showFront,
+                                onPause = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    if (backPaused) {
+                                        if (controller.resumeCamera(back = true)) {
+                                            backPaused = false
+                                            status = "BACK resumed – same file"
+                                        }
+                                    } else if (controller.pauseCamera(back = true)) {
+                                        backPaused = true
+                                        status = "BACK paused – FRONT keeps recording"
+                                    }
+                                },
+                                onHide = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    hideBack = true
+                                    backPaused = false
+                                    controller.stopCamera(back = true)
+                                    status = if (isRecording) "BACK removed – FRONT keeps recording"
+                                    else "BACK hidden – FRONT only"
+                                }
+                            )
+                        }
+                        if (showFront) Box(cellB.padding(3.dp)) {
+                            FramedFeed(
+                                frontView, vm.frontAspect, label = "FRONT", modifier = Modifier.fillMaxSize(),
+                                zoom = frontZoom,
+                                onZoom = { f ->
+                                    val (_, fz) = controller.setZoom(front = frontZoom * f)
+                                    frontZoom = fz
+                                },
+                                onRelease = { if (frontView === it) frontView = null }
+                            ) { frontView = it }
+                            if (isRecording) TileChips(
+                                paused = frontPaused,
+                                canHide = showBack,
+                                onPause = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    if (frontPaused) {
+                                        if (controller.resumeCamera(back = false)) {
+                                            frontPaused = false
+                                            status = "FRONT resumed – same file"
+                                        }
+                                    } else if (controller.pauseCamera(back = false)) {
+                                        frontPaused = true
+                                        status = "FRONT paused – BACK keeps recording"
+                                    }
+                                },
+                                onHide = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    hideFront = true
+                                    frontPaused = false
+                                    controller.stopCamera(back = false)
+                                    status = if (isRecording) "FRONT removed – BACK keeps recording"
+                                    else "FRONT hidden – BACK only"
+                                }
+                            )
+                        }
+                        if (showBack && showFront) SplitHandle(
+                            stacked = stacked,
+                            modifier = if (stacked) Modifier.align(Alignment.Center).offset {
+                                IntOffset(0, (aFrac * totalPx - 12.dp.toPx()).roundToInt())
+                            } else Modifier.align(Alignment.CenterStart).offset {
+                                IntOffset((aFrac * totalPx - 12.dp.toPx()).roundToInt(), 0)
+                            },
+                            onDrag = { delta -> split = (aFrac + delta / totalPx).coerceIn(0.3f, 0.7f) }
+                        )
+                    }
                 }
                 // Dold yta som behövs för composition i BOTH-läget.
                 if (displayMode == RecordingMode.BOTH) {
@@ -430,6 +510,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                     savedNames = names
                                     isRecording = true
                                     paused = false
+                                    backPaused = false
+                                    frontPaused = false
+                                    hideBack = false
+                                    hideFront = false
                                     status = "Recording – one continuous file"
                                 },
                                 onError = { status = it }
@@ -439,6 +523,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                         controller.stopRecording()
                         isRecording = false
                         paused = false
+                        backPaused = false
+                        frontPaused = false
+                        hideBack = false
+                        hideFront = false
                         status = "Stopped. Saved to Gallery → Movies/DualShots"
                     }
                 }
@@ -715,6 +803,48 @@ private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Un
         )
     }
 }
+/** Pausa-/kryssknappar uppe i hörnet på en inspelningsruta. */
+@Composable
+private fun TileChips(
+    paused: Boolean,
+    canHide: Boolean,
+    onPause: () -> Unit,
+    onHide: () -> Unit
+) {
+    Box(Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            PipChip(if (paused) DuelIconKind.PLAY else DuelIconKind.PAUSE, onClick = onPause)
+            if (canHide) PipChip(DuelIconKind.CLOSE, onClick = onHide)
+        }
+    }
+}
+
+/** Handtag mellan de två rutorna: dra för att göra ena bilden större. */
+@Composable
+private fun SplitHandle(stacked: Boolean, modifier: Modifier, onDrag: (Float) -> Unit) {
+    Box(
+        modifier = modifier
+            .then(if (stacked) Modifier.fillMaxWidth().height(24.dp) else Modifier.fillMaxHeight().width(24.dp))
+            .pointerInput(stacked) {
+                detectDragGestures { change, drag ->
+                    change.consume()
+                    onDrag(if (stacked) drag.y else drag.x)
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            Modifier
+                .then(if (stacked) Modifier.size(44.dp, 6.dp) else Modifier.size(6.dp, 44.dp))
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = .55f))
+        )
+    }
+}
+
 /** Liten, flyttbar kamera ovanpå den stora bilden i Dual View. */
 @Composable
 private fun PipInset(
