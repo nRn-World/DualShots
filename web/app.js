@@ -65,6 +65,10 @@ const state = {
   codec: 'MP4',
   premium: false,
   audio: true,
+  grid: true,
+  stabilize: true,
+  location: false,
+  galleryFilter: 'ALL',
   zoom: { main: 1, inset: 1 },
   stack: 'front-first',
   pip: { cx: 0.74, cy: 0.24, scale: 0.34 },
@@ -111,6 +115,31 @@ const ICONS = {
   grid: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>'),
   share: svg('<path d="M12 3.5v11"/><path d="m8 7.5 4-4 4 4"/><path d="M6 12v8h12v-8"/>'),
   trash: svg('<path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1.1 13h8.8L17.5 7"/><path d="M10.5 10.5 11 16.5M13.5 10.5 13 16.5"/>'),
+  user: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>'),
+  search: svg('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
+  dots: svg('<circle cx="12" cy="5" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.7" fill="currentColor" stroke="none"/>'),
+  layers: svg('<path d="M12 3 3 8l9 5 9-5z"/><path d="m3 13 9 5 9-5"/>'),
+  gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+  bulb: svg('<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>'),
+  photo: svg('<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8"/>'),
+  heart: svg('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
+  cloud: svg('<path d="M7 18a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9.5a4 4 0 0 1 .5 8.5z"/><path d="M12 12v6M9.5 14.5 12 12l2.5 2.5"/>'),
+  hd: svg('<rect x="3" y="5" width="18" height="14" rx="3"/><text x="12" y="15" text-anchor="middle" font-size="7.5" font-weight="700" fill="currentColor" stroke="none" font-family="Segoe UI, Roboto, sans-serif">HD</text>'),
+  file: svg('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/>'),
+  stabilize: svg('<path d="M12 3v18M3.5 12h5M15.5 12h5M5.5 6.5l2.5 2.5M18.5 6.5 16 9M5.5 17.5 8 15M18.5 17.5 16 15"/><rect x="10" y="9.5" width="4" height="5" rx="1" fill="currentColor"/>'),
+  audio: svg('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>'),
+  pin: svg('<path d="M12 21s-6-5.2-6-10.2a6 6 0 0 1 12 0C18 15.8 12 21 12 21z"/><circle cx="12" cy="11" r="2.2"/>'),
+  mountain: svg('<path d="M3 19 9.5 9l4 6 2.5-3.5L21 19z"/>'),
+  calendar: svg('<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+  stats: svg('<path d="M3.5 18.5 9 9.5l4.5 6L20.5 4.5"/><circle cx="3.5" cy="18.5" r="1.4" fill="currentColor"/><circle cx="9" cy="9.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="15.5" r="1.4" fill="currentColor"/><circle cx="20.5" cy="4.5" r="1.4" fill="currentColor"/>'),
+  grid4: svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>'),
+  database: svg('<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/>'),
+  film: svg('<rect x="3.5" y="3" width="17" height="18" rx="1.5"/><path d="M7.5 3v18M16.5 3v18M3.5 8h4M3.5 12h4M3.5 16h4M16.5 8h4M16.5 12h4M16.5 16h4"/>'),
+  star: svg('<path d="m12 3.2 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z"/>'),
+  trend: svg('<path d="M3.5 17.5 9 11.5l3.5 3.5 7-8"/><path d="M15 7h4.5v4.5"/><circle cx="3.5" cy="17.5" r="1.3" fill="currentColor"/><circle cx="9" cy="11.5" r="1.3" fill="currentColor"/><circle cx="12.5" cy="15" r="1.3" fill="currentColor"/>'),
+  arrowUpRight: svg('<path d="M6 18 18 6M8.5 6H18v9.5"/>'),
+  chevDown: svg('<path d="m5 9 7 7 7-7"/>'),
+  mute: svg('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>'),
 };
 
 /* Samma logotyp som appens launcher-ikon: orange squircle + svart kamera. */
@@ -234,6 +263,9 @@ function savePrefs() {
       codec: state.codec,
       premium: state.premium,
       audio: state.audio,
+      grid: state.grid,
+      stabilize: state.stabilize,
+      location: state.location,
       pip: state.pip,
       swap: state.swap,
       onboarded: !!state.onboarded,
@@ -255,6 +287,9 @@ function loadPrefs() {
     state.swap = !!p.swap;
     state.onboarded = !!p.onboarded;
     if (typeof p.audio === 'boolean') state.audio = p.audio;
+    if (typeof p.grid === 'boolean') state.grid = p.grid;
+    if (typeof p.stabilize === 'boolean') state.stabilize = p.stabilize;
+    if (typeof p.location === 'boolean') state.location = p.location;
     if (p.pip && Number.isFinite(p.pip.cx) && Number.isFinite(p.pip.cy) && Number.isFinite(p.pip.scale)) {
       state.pip = {
         cx: clamp(p.pip.cx, 0, 1),
@@ -1829,13 +1864,30 @@ function render() {
   if (state.record) { renderNav(); return; }
   document.body.dataset.screen = 'page';
   if (!state.onboarded) { renderOnboarding(); renderNav(); return; }
+  renderNav();
+  fitZoom();
   if (state.page === 'SETTINGS') renderSettings();
   else if (state.page === 'GALLERY') renderGallery();
+  else if (state.page === 'STATS') renderStats();
   else renderHome();
-  renderNav();
 }
 
-/* Bottom navigation from DualShotsApp.BottomBar(). */
+/* ------------------------------------------------------------------
+   Home / Gallery / Stats / Settings — drawn in the reference images'
+   own pixels (1024 wide) and scaled to the screen with CSS zoom, so the
+   proportions match design/reference/*.png exactly.
+   ------------------------------------------------------------------ */
+
+/* Scale factor from 1024-wide design pixels to the real screen. */
+function fitZoom() {
+  const w = screenEl.clientWidth || deviceEl.clientWidth;
+  if (!w) return;
+  const z = w / 1024;
+  const root = document.documentElement.style;
+  root.setProperty('--z', String(z));
+  root.setProperty('--ph', `${Math.max(1, screenEl.clientHeight) / z}px`);
+}
+
 function renderNav() {
   const nav = $('#nav');
   if (!nav) return;
@@ -1843,6 +1895,7 @@ function renderNav() {
   const tabs = [
     ['HOME', 'Home', ICONS.home],
     ['GALLERY', 'Gallery', ICONS.gallery],
+    ['STATS', 'Stats', ICONS.stats],
     ['SETTINGS', 'Settings', ICONS.settings],
   ];
   nav.innerHTML = tabs.map(([key, label, icon]) => `
@@ -1853,131 +1906,498 @@ function renderNav() {
   $$('[data-tab]', nav).forEach((b) => b.addEventListener('click', () => go(b.dataset.tab)));
 }
 
-/* HomeScreen.kt: logo tile, wordmark, tagline, then the four menu rows. */
-function renderHome() {
-  screenEl.innerHTML = `
-    <div class="home">
-      ${logoTile()}
-      <h1 class="wordmark">Dual<span>Shots</span></h1>
-      <p class="tagline">RECORD BOTH SIDES. AT ONCE.</p>
+/* Sample library (photos cut from the reference) until the user records. */
+const DEMO_CLIPS = [
+  { name: 'Kista Sunset', date: 'Today, 09:12', duration: '00:24', img: 'assets/kista-sunset.webp' },
+  { name: 'Live Event', date: 'Yesterday, 21:47', duration: '01:03', img: 'assets/live-event.webp' },
+  { name: 'Road Trip', date: '3 days ago', duration: '00:42', img: 'assets/road-trip.webp' },
+  { name: 'At the Beach', date: '4 days ago', duration: '00:18', img: 'assets/at-the-beach.webp' },
+  { name: 'Ski Trip', date: '1 week ago', duration: '01:21', img: 'assets/ski-trip.webp' },
+  { name: 'Stockholm', date: '1 week ago', duration: '00:37', img: 'assets/stockholm.webp' },
+];
 
-      <div class="menu-stack">
-        <button class="btn-start" id="start-btn" type="button">
-          <span class="start-ico">${ICONS.video}</span>
-          <span class="start-label">START RECORDING</span>
-          <span class="start-chev">${ICONS.chevron}</span>
-        </button>
+const isDemo = () => state.clips.length === 0;
 
-        <button class="menu-btn" id="home-settings" type="button">
-          <span class="menu-ico">${ICONS.settings}</span>
-          <span class="menu-label">Settings</span>
-          <span class="menu-chev">${ICONS.chevron}</span>
-        </button>
-
-        <button class="menu-btn premium" id="menu-premium" type="button">
-          <span class="menu-ico">${ICONS.crown}</span>
-          <span class="menu-label">${state.premium ? 'Premium active' : 'Premium Features'}</span>
-          <span class="menu-chev">${ICONS.chevron}</span>
-        </button>
-
-        <button class="menu-btn" id="menu-about" type="button">
-          <span class="menu-ico">${ICONS.info}</span>
-          <span class="menu-label">About</span>
-          <span class="menu-chev">${ICONS.chevron}</span>
-        </button>
-      </div>
-
-      <div class="made-by">
-        <span class="credit-name">Made by nRnWorld</span>
-        <a class="credit-link" href="https://nrnworld.one" target="_blank" rel="noopener noreferrer">nrnworld.one</a>
-        <span class="credit-mail">
-          <a href="mailto:bynrnworld@gmail.com">bynrnworld@gmail.com</a>
-          <button class="copy-mail" id="copy-mail" type="button" aria-label="Copy email address">${ICONS.copy}</button>
-        </span>
-      </div>
-    </div>`;
-
-  $('#start-btn').addEventListener('click', openRecord);
-  $('#home-settings').addEventListener('click', () => go('SETTINGS'));
-  $('#menu-premium').addEventListener('click', () => showPremium());
-  $('#menu-about').addEventListener('click', showAbout);
-
-  const copyMail = $('#copy-mail');
-  if (copyMail) {
-    copyMail.addEventListener('click', async () => {
-      const ok = await copyText('bynrnworld@gmail.com');
-      toast(ok ? 'Email copied' : 'bynrnworld@gmail.com');
-    });
-  }
+function clipDateText(c) {
+  return c.when instanceof Date && !Number.isNaN(c.when.getTime())
+    ? c.when.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : '';
 }
 
-/* SettingsScreen.kt: mode radios, per-camera aspect chips, inline
-   segmented quality/codec and the premium card. */
-function renderSettings() {
-  screenEl.innerHTML = `
-    <div class="page settings">
-      <div class="studio-head">
-        <span class="studio-ico">${ICONS.settings}</span>
-        <span class="studio-title">SETTINGS STUDIO</span>
-      </div>
+function clipMetaLine(c) {
+  const when = clipDateText(c);
+  return `${c.sizeMb} MB${when ? ` · ${when}` : ''}`;
+}
 
-      <div class="section-label">RECORDING MODE</div>
-      <div class="card-stack">
-        ${MODE_ORDER.map((m) => `
-          <button class="card radio-row ${state.mode === m ? 'selected' : ''}" data-mode="${m}" type="button">
-            <span class="radio-text">
-              <span class="radio-title">${MODES[m].title}</span>
-              <span class="radio-sub">${MODES[m].sub}</span>
-            </span>
-            <span class="radio-dot"></span>
+/* "00:01:05" -> 65 */
+function clipSeconds(c) {
+  return String(c.duration || '').split(':').reduce((s, p) => s * 60 + (Number(p) || 0), 0);
+}
+
+const shortDur = (sec) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+
+function libraryItems() {
+  if (!isDemo()) {
+    return state.clips.map((c) => ({
+      id: c.id, clip: c, name: c.name, date: clipDateText(c), duration: shortDur(clipSeconds(c)), img: c.poster, baked: false,
+    }));
+  }
+  return DEMO_CLIPS.map((d, i) => ({ id: `demo-${i}`, clip: null, baked: true, ...d }));
+}
+
+function openItem(id) {
+  const item = libraryItems().find((i) => i.id === id);
+  if (!item) return;
+  if (item.clip) playClip(item.clip);
+  else toast('Sample clip – record a take to play your own here');
+}
+
+function bindCommon(root) {
+  $$('[data-item]', root).forEach((el) => el.addEventListener('click', () => openItem(el.dataset.item)));
+  $$('[data-soon]', root).forEach((el) => el.addEventListener('click', () => toast(`${el.dataset.soon} is coming soon`)));
+  $$('[data-go]', root).forEach((el) => el.addEventListener('click', () => go(el.dataset.go)));
+  $$('[data-premium]', root).forEach((el) => el.addEventListener('click', () => showPremium()));
+  $$('[data-about]', root).forEach((el) => el.addEventListener('click', showAbout));
+}
+
+function thumbHTML(item) {
+  const img = item.img ? `<img src="${item.img}" alt="" />` : '';
+  return `${img}${item.baked ? '' : `<span class="v5-dur">${esc(item.duration)}</span>`}`;
+}
+
+const brand = (cls = '') => `<div class="v5-brand ${cls}">Dual<span>Shots</span></div>`;
+
+/* ---------------------------------------------------------------- home */
+
+const QUICK_ACTIONS = [
+  { go: 'GALLERY', title: 'My Recordings', sub: 'View and manage<br>your videos', icon: ICONS.layers },
+  { go: 'SETTINGS', title: 'Settings', sub: 'Customize your<br>experience', icon: ICONS.gear },
+  { premium: true, title: 'Premium', sub: 'Unlock more<br>features', icon: ICONS.crown },
+  { tips: true, title: 'Tips', sub: 'Get the most<br>out of DualShots', icon: ICONS.bulb },
+];
+
+function showTips() {
+  openSheet(`
+    <div class="grabber"></div>
+    <div class="sheet-title">Tips</div>
+    <div class="option-list">${ONBOARD_STEPS.map((s) => `
+      <div class="option"><span class="t">${s.title}</span><span class="d">${s.body}</span></div>`).join('')}
+    </div>
+    <button class="btn-primary" data-close type="button">Got it</button>`);
+}
+
+function renderHome() {
+  const recent = libraryItems().slice(0, 3);
+  screenEl.innerHTML = `
+    <div class="v5 v5-home">
+      <section class="h-hero">
+        <img class="h-art" src="assets/hero.webp" alt="" />
+        ${brand('h-brand')}
+        <button class="v5-circle h-profile" data-about type="button" aria-label="About">${ICONS.user}</button>
+        <p class="h-kicker">RECORD BOTH SIDES.<br><span>AT ONCE.</span></p>
+        <h1 class="h-title">Two<br>Perspectives.<br><span>One Story.</span></h1>
+        <p class="h-sub">Capture more. Create better.</p>
+      </section>
+
+      <button class="h-start" id="start-btn" type="button">
+        <span class="h-start-ico">${ICONS.video}</span>
+        <span class="h-start-label">START RECORDING</span>
+        <span class="h-start-chev">${ICONS.chevron}</span>
+      </button>
+
+      <div class="h-quick">
+        ${QUICK_ACTIONS.map((q) => `
+          <button class="h-qcard" type="button" ${q.go ? `data-go="${q.go}"` : ''} ${q.premium ? 'data-premium' : ''} ${q.tips ? 'data-tips' : ''}>
+            <span class="h-qico">${q.icon}</span>
+            <b>${q.title}</b>
+            <span class="h-qsub">${q.premium && state.premium ? 'Premium<br>active' : q.sub}</span>
+            <span class="h-qchev">${ICONS.chevron}</span>
           </button>`).join('')}
       </div>
 
-      <div class="section-label">CAMERA FORMATS</div>
-      <div class="card-stack">
-        <div class="card">
-          <div class="card-title">Front Camera</div>
-          <div class="chips">
-            ${ASPECT_ORDER.map((k) => `
-              <button class="chip ${state.frontAspect === k ? 'active' : ''}" data-front="${k}" type="button">${ASPECTS[k].label}</button>`).join('')}
+      <section class="h-panel">
+        <h2>Recent Recordings</h2>
+        <button class="v5-seeall h-seeall" data-go="GALLERY" type="button">See All ${ICONS.chevron}</button>
+        <div class="h-items">
+          ${recent.map((i) => `
+            <button class="h-item" data-item="${i.id}" type="button">
+              <span class="h-thumb">${thumbHTML(i)}</span>
+              <span class="h-ititle">${esc(i.name)}</span>
+              <span class="h-idate">${esc(i.date)}</span>
+              <span class="v5-dots">${ICONS.dots}</span>
+            </button>`).join('')}
+        </div>
+      </section>
+    </div>`;
+
+  $('#start-btn').addEventListener('click', openRecord);
+  $$('[data-tips]', screenEl).forEach((b) => b.addEventListener('click', showTips));
+  bindCommon(screenEl);
+}
+
+/* ------------------------------------------------------------- gallery */
+
+const FILTERS = [
+  ['ALL', 'All', ICONS.grid4],
+  ['VIDEOS', 'Videos', ICONS.video],
+  ['PHOTOS', 'Photos', ICONS.photo],
+  ['FAVORITES', 'Favorites', ICONS.heart],
+  ['DELETED', 'Deleted', ICONS.trash],
+];
+
+const fmtSize = (mbVal) => (mbVal >= 1024 ? `${(mbVal / 1024).toFixed(1)} GB` : `${mbVal} MB`);
+
+function renderGallery() {
+  const items = libraryItems();
+  const demo = isDemo();
+  const filter = state.galleryFilter || 'ALL';
+  const showList = filter === 'ALL' || filter === 'VIDEOS';
+  const totalMb = state.clips.reduce((sum, c) => sum + (c.sizeMb || 0), 0);
+  const folders = [
+    ['All Videos', `<img src="assets/folder-all.webp" alt="" />`, demo ? 86 : state.clips.length, 'photo'],
+    ['Favorites', ICONS.heart, demo ? 12 : 0, 'warm'],
+    ['Trips', ICONS.mountain, demo ? 24 : 0, ''],
+    ['Events', ICONS.calendar, demo ? 8 : 0, ''],
+  ];
+  const storage = demo
+    ? { label: '12.4 GB of 64 GB used', video: 17.5, photo: 1.9, legend: ['Videos (11.2 GB)', 'Photos (1.2 GB)', 'Other (0 GB)'] }
+    : { label: `${fmtSize(totalMb)} recorded`, video: Math.min(100, (totalMb / 1024) * 100), photo: 0, legend: [`Videos (${fmtSize(totalMb)})`, 'Photos (0 MB)', 'Other (0 MB)'] };
+  const filterLabel = (FILTERS.find(([k]) => k === filter) || FILTERS[0])[1];
+
+  screenEl.innerHTML = `
+    <div class="v5 v5-gallery">
+      <header class="g-head">
+        ${brand('g-brand')}
+        <div class="v5-tagline g-tagline">YOUR MOMENTS. TWO PERSPECTIVES.</div>
+        <button class="v5-circle g-search" data-soon="Search" type="button" aria-label="Search">${ICONS.search}</button>
+        <button class="v5-circle g-more" data-about type="button" aria-label="More">${ICONS.dots}</button>
+      </header>
+
+      <div class="g-chips">
+        ${FILTERS.map(([k, label, icon]) => `
+          <button class="g-chip g-chip-${k.toLowerCase()} ${filter === k ? 'active' : ''}" data-filter="${k}" type="button">${icon}<span>${label}</span></button>`).join('')}
+      </div>
+
+      <div class="g-banner">
+        <span class="g-banner-ico">${ICONS.cloud}</span>
+        <b>Back up your recordings</b>
+        <span class="g-banner-sub">Keep your memories safe in the cloud.</span>
+        <button class="g-banner-btn" data-soon="Cloud backup" type="button">Enable Backup ${ICONS.chevron}</button>
+      </div>
+
+      ${showList ? `
+        <div class="g-sechead"><h2>Recent</h2><button class="v5-seeall" data-soon="See all" type="button">See All ${ICONS.chevron}</button></div>
+        <div class="g-grid">
+          ${items.map((i) => `
+            <button class="g-card" data-item="${i.id}" type="button">
+              <span class="g-thumb">${thumbHTML(i)}</span>
+              <span class="g-ctitle">${esc(i.name)}</span>
+              <span class="g-cdate">${esc(i.date)}</span>
+              <span class="v5-dots">${ICONS.dots}</span>
+            </button>`).join('')}
+        </div>
+
+        <div class="g-sechead g-folders-head"><h2>Folders</h2><button class="v5-seeall" data-soon="Folders" type="button">See All ${ICONS.chevron}</button></div>
+        <div class="g-folders">
+          ${folders.map(([name, icon, n, tone]) => `
+            <button class="g-folder" data-soon="Folders" type="button">
+              <span class="g-fico ${tone}">${icon}</span>
+              <b>${name}</b>
+              <span class="g-fcount">${n} items</span>
+              <span class="g-fchev">${ICONS.chevron}</span>
+            </button>`).join('')}
+        </div>
+
+        <div class="g-storage">
+          <h2>Storage</h2>
+          <span class="g-sused">${storage.label}</span>
+          <div class="g-bar"><i class="v" style="width:${storage.video}%"></i><i class="p" style="width:${storage.photo}%"></i></div>
+          <div class="g-legend">
+            <span><i class="dot o"></i>${storage.legend[0]}</span>
+            <span><i class="dot g"></i>${storage.legend[1]}</span>
+            <span><i class="dot d"></i>${storage.legend[2]}</span>
           </div>
+          <button class="g-manage" data-soon="Storage management" type="button">Manage Storage ${ICONS.chevron}</button>
+        </div>` : `
+        <div class="g-empty">
+          <span class="g-empty-ico">${filter === 'DELETED' ? ICONS.trash : filter === 'PHOTOS' ? ICONS.photo : ICONS.heart}</span>
+          <b>No ${filterLabel.toLowerCase()} yet</b>
+          <span>Nothing to show here yet.</span>
+        </div>`}
+    </div>`;
+
+  $$('[data-filter]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    state.galleryFilter = b.dataset.filter;
+    renderGallery();
+  }));
+  bindCommon(screenEl);
+}
+
+/* --------------------------------------------------------------- stats */
+
+const DEMO_STATS = {
+  total: 24, totalDelta: '+60%',
+  cards: [
+    ['camera', 'RECORDING TIME', '52 min', '+32%'],
+    ['database', 'STORAGE USED', '2.4 GB', '+18%'],
+    ['film', 'AVERAGE LENGTH', '2:10', '+12%'],
+    ['star', 'FAVORITES', '8 clips', '+100%'],
+  ],
+  days: [['Mon', '12 Aug'], ['Tue', '13 Aug'], ['Wed', '14 Aug'], ['Thu', '15 Aug'], ['Fri', '16 Aug'], ['Sat', '17 Aug'], ['Sun', '18 Aug']],
+  series: {
+    clips: [3, 5, 8, 6, 4, 7, 9],
+    minutes: [6, 11, 17, 13, 9, 15, 19],
+    storage: [0.3, 0.5, 0.8, 0.6, 0.4, 0.7, 0.9],
+  },
+  usage: [75, 15, 10],
+  storage: { label: '2.4 GB of 64 GB used', pct: 40, rows: ['2.1 GB', '0.3 GB', '0.0 GB'] },
+};
+
+function realStats() {
+  const clips = state.clips;
+  const secs = clips.map(clipSeconds);
+  const totalSec = secs.reduce((a, b) => a + b, 0);
+  const totalMb = clips.reduce((s, c) => s + (c.sizeMb || 0), 0);
+  const avg = clips.length ? Math.round(totalSec / clips.length) : 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = [];
+  const series = { clips: [], minutes: [], storage: [] };
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const same = clips.filter((c) => c.when instanceof Date && c.when.toDateString() === d.toDateString());
+    days.push([d.toLocaleDateString('en-GB', { weekday: 'short' }), d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })]);
+    series.clips.push(same.length);
+    series.minutes.push(Math.round(same.reduce((s, c) => s + clipSeconds(c), 0) / 60));
+    series.storage.push(Math.round(same.reduce((s, c) => s + (c.sizeMb || 0), 0) / 102.4) / 10);
+  }
+  const by = (k) => clips.filter((c) => c.name.includes(`_${k}_`)).length;
+  const n = clips.length || 1;
+  const both = by('combined');
+  const front = by('front');
+  return {
+    total: clips.length, totalDelta: '',
+    cards: [
+      ['camera', 'RECORDING TIME', `${Math.round(totalSec / 60)} min`, ''],
+      ['database', 'STORAGE USED', fmtSize(totalMb), ''],
+      ['film', 'AVERAGE LENGTH', `${Math.floor(avg / 60)}:${String(avg % 60).padStart(2, '0')}`, ''],
+      ['star', 'FAVORITES', '0 clips', ''],
+    ],
+    days,
+    series,
+    usage: [Math.round((both / n) * 100), Math.round((front / n) * 100), Math.round(((n - both - front) / n) * 100)],
+    storage: { label: `${fmtSize(totalMb)} recorded`, pct: Math.min(100, (totalMb / 1024) * 100), rows: [fmtSize(totalMb), '0 MB', '0 MB'] },
+  };
+}
+
+function chartScale(values) {
+  const max = Math.max(...values, 0);
+  if (max <= 10) return 10;
+  const step = Math.ceil(max / 5);
+  return step * 5;
+}
+
+function renderStats() {
+  const s = isDemo() ? DEMO_STATS : realStats();
+  const metric = state.statsMetric || 'clips';
+  const values = s.series[metric];
+  const top = chartScale(values);
+  const ticks = [5, 4, 3, 2, 1, 0].map((k) => +(top * k / 5).toFixed(1));
+  const delta = (d) => (d ? `<span class="s-delta">${ICONS.arrowUpRight}${d}</span>` : '<span class="s-delta none">–</span>');
+  const [both, front, back] = s.usage;
+
+  screenEl.innerHTML = `
+    <div class="v5 v5-stats">
+      <header class="s-head">
+        ${brand('s-brand')}
+        <h1 class="s-title">Stats</h1>
+        <p class="s-sub">Your DualShots recording history</p>
+        <button class="s-range" data-soon="Date range" type="button">${ICONS.calendar}<span>Last 7 days</span>${ICONS.chevDown}</button>
+      </header>
+
+      <section class="s-total">
+        <span class="s-total-tile">${ICONS.trend}</span>
+        <span class="s-label s-total-label">TOTAL RECORDINGS</span>
+        <span class="s-total-value">${s.total} clips</span>
+        <span class="s-total-delta">${s.totalDelta ? `${ICONS.arrowUpRight}<b>${s.totalDelta}</b> vs. last week` : 'Last 7 days'}</span>
+        <span class="s-total-tag">RECORD BOTH SIDES.<br><em>AT ONCE.</em></span>
+        <svg class="s-wave" viewBox="0 0 500 100" aria-hidden="true">
+          <path d="M0 92 C40 90 70 72 110 78 C150 84 160 20 210 22 C250 24 255 80 300 80 C345 80 350 52 385 52 C420 52 430 84 460 60 C480 44 490 22 500 22" />
+        </svg>
+      </section>
+
+      <div class="s-cards">
+        ${s.cards.map(([icon, label, value, d]) => `
+          <div class="s-card">
+            <span class="s-cico">${ICONS[icon]}</span>
+            <span class="s-label">${label}</span>
+            <b>${value}</b>
+            ${delta(d)}
+          </div>`).join('')}
+      </div>
+
+      <section class="s-chart">
+        <span class="s-label s-chart-label">RECORDINGS BY DAY</span>
+        <div class="s-seg">
+          ${[['clips', 'Clips'], ['minutes', 'Minutes'], ['storage', 'Storage']].map(([k, label]) => `
+            <button class="${metric === k ? 'active' : ''}" data-metric="${k}" type="button">${label}</button>`).join('')}
         </div>
-        <div class="card">
-          <div class="card-title">Back Camera</div>
-          <div class="chips">
-            ${ASPECT_ORDER.map((k) => `
-              <button class="chip ${state.backAspect === k ? 'active' : ''}" data-back="${k}" type="button">${ASPECTS[k].label}</button>`).join('')}
+        <div class="s-plot">
+          ${ticks.map((t, i) => `<span class="s-tick" style="top:${i * 30.4}px">${t}</span><i class="s-grid" style="top:${i * 30.4}px"></i>`).join('')}
+          ${values.map((v, i) => {
+            const h = top ? (v / top) * 152 : 0;
+            return `<span class="s-bar" style="left:${109 + i * 123.8}px;height:${h}px"><em>${v}</em></span>
+              <span class="s-day" style="left:${109 + i * 123.8}px"><b>${s.days[i][0]}</b>${s.days[i][1]}</span>`;
+          }).join('')}
+        </div>
+      </section>
+
+      <div class="s-bottom">
+        <section class="s-usage">
+          <h2>Camera Usage</h2>
+          <div class="s-donut" style="background:conic-gradient(from 0deg, #ff5a0a 0 ${both * 0.6}%, #ff8a1c ${both * 0.6}% ${both}%, #ffa53a ${both}% ${both + front}%, #2a3245 ${both + front}% 100%)">
+            <span><b>${s.total}</b>clips</span>
           </div>
-        </div>
+          <ul class="s-legend">
+            <li><i class="dot o"></i>Both cameras<em>${both}%</em></li>
+            <li><i class="dot l"></i>Front camera<em>${front}%</em></li>
+            <li><i class="dot d"></i>Back camera<em>${back}%</em></li>
+          </ul>
+        </section>
+        <section class="s-store">
+          <h2>Storage Overview</h2>
+          <span class="s-store-used">${s.storage.label}</span>
+          <div class="s-store-bar"><i style="width:${s.storage.pct}%"></i></div>
+          <ul class="s-store-rows">
+            <li><i class="dot o"></i>Videos<em>${s.storage.rows[0]}</em></li>
+            <li><i class="dot b"></i>Photos<em>${s.storage.rows[1]}</em></li>
+            <li><i class="dot d"></i>Other<em>${s.storage.rows[2]}</em></li>
+          </ul>
+        </section>
       </div>
 
-      <div class="section-label">VIDEO QUALITY</div>
-      <div class="card row-between">
-        <span class="row-label">Resolution</span>
-        <div class="seg">
-          ${QUALITY_ORDER.map((k) => `
-            <button class="seg-btn ${state.quality === k ? 'active' : ''}" data-quality="${k}" type="button">${QUALITIES[k].label}</button>`).join('')}
-        </div>
-      </div>
-
-      <div class="section-label">CONTAINER / CODEC</div>
-      <div class="card row-between">
-        <span class="row-label">Format</span>
-        <div class="seg">
-          ${CODEC_ORDER.map((k) => `
-            <button class="seg-btn ${state.codec === k ? 'active' : ''}" data-codec="${k}" type="button">${CODECS[k].label}</button>`).join('')}
-        </div>
-      </div>
-
-      <div class="card premium-card">
-        <div class="premium-head">${ICONS.crown}<span>PREMIUM FEATURES</span></div>
-        <div class="premium-list">
-          ${['More format options (4K, HEVC)', '60fps & custom bitrate', 'Per-camera aspect control', 'No watermark']
-            .map((f) => `<div class="premium-item">${ICONS.check}<span>${f}</span></div>`).join('')}
-        </div>
+      <section class="s-prem">
+        <span class="s-prem-ico">${ICONS.crown}</span>
+        <b>Unlock deeper insights</b>
+        <span class="s-prem-sub">Get advanced stats, export data and more.</span>
         ${state.premium
-          ? '<div class="premium-active">Premium active</div>'
-          : `<button class="gold-btn" id="settings-premium" type="button">${ICONS.crown}<span>GO PREMIUM</span></button>`}
+          ? '<span class="s-prem-active">Premium active</span>'
+          : `<button class="s-prem-btn" data-premium type="button">GO PREMIUM ${ICONS.chevron}</button>`}
+      </section>
+    </div>`;
+
+  $$('[data-metric]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    state.statsMetric = b.dataset.metric;
+    renderStats();
+  }));
+  bindCommon(screenEl);
+}
+
+/* ------------------------------------------------------------ settings */
+
+const MODE_ICONS = {
+  DUAL_VIEW: ICONS.video,
+  SEPARATE: svg('<rect x="2.5" y="4.5" width="8.5" height="15" rx="1.8"/><rect x="13" y="4.5" width="8.5" height="15" rx="1.8"/>'),
+  BOTH: svg('<rect x="2.5" y="3" width="13" height="13" rx="2.2"/><rect x="8.5" y="8.5" width="13" height="13" rx="2.2"/>'),
+};
+
+const MODE_SUBS = {
+  DUAL_VIEW: 'Both cameras<br>in one video',
+  SEPARATE: 'Two files, one<br>for each',
+  BOTH: 'Combined +<br>two separate files',
+};
+
+const SETTING_TOGGLES = [
+  ['stabilize', 'Stabilization', 'Reduce camera shake', ICONS.stabilize],
+  ['grid', 'Grid', 'Show grid while recording', ICONS.grid4],
+  ['audio', 'Record Audio', 'Include audio from both cameras', ICONS.audio],
+  ['location', 'Save Location', 'Add location info to your videos', ICONS.pin],
+];
+
+const CAMERA_ASPECTS = ['R_9_16', 'R_16_9', 'R_1_1'];
+
+function cameraCardHTML(title, icon, key, attr) {
+  return `
+    <div class="st-cam">
+      <span class="st-cam-ico">${icon}</span>
+      <b>${title}</b>
+      <div class="st-chips">
+        ${CAMERA_ASPECTS.map((k) => {
+          const [short, word] = ASPECTS[k].label.split(' ');
+          return `<button class="st-chip ${state[key] === k ? 'active' : ''}" data-${attr}="${k}" type="button"><b>${short}</b><span>${word}</span></button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function renderSettings() {
+  screenEl.innerHTML = `
+    <div class="v5 v5-settings">
+      <header class="st-head">
+        ${brand('st-brand')}
+        <div class="v5-tagline st-tagline">CUSTOMIZE YOUR EXPERIENCE</div>
+        <span class="st-version">SETTINGS<br><em>V1.0.0</em></span>
+        <button class="v5-circle st-gear" data-about type="button" aria-label="About">${ICONS.gear}</button>
+      </header>
+
+      <div class="st-sec"><span class="v5-label">RECORDING MODE</span><span class="st-hint">RECORD BOTH SIDES. <em>AT ONCE.</em></span></div>
+      <div class="st-modes">
+        ${MODE_ORDER.map((m) => `
+          <button class="st-mode ${state.mode === m ? 'sel' : ''}" data-mode="${m}" type="button">
+            <span class="st-mico">${MODE_ICONS[m]}</span>
+            <b>${MODES[m].title}</b>
+            <span class="st-msub">${MODE_SUBS[m]}</span>
+            <span class="st-radio"></span>
+          </button>`).join('')}
+      </div>
+
+      <div class="st-sec"><span class="v5-label">CAMERA FORMATS</span></div>
+      <div class="st-cams">
+        ${cameraCardHTML('Front Camera', ICONS.user, 'frontAspect', 'front')}
+        ${cameraCardHTML('Back Camera', ICONS.camera, 'backAspect', 'back')}
+      </div>
+
+      <div class="st-sec"><span class="v5-label">VIDEO QUALITY</span><span class="st-hint">HIGHER QUALITY. BETTER STORIES.</span></div>
+      <div class="st-row st-res">
+        <span class="st-rico st-hd">HD</span>
+        <b>Resolution</b>
+        <span class="st-rsub">Choose video resolution</span>
+        <div class="st-seg">
+          ${QUALITY_ORDER.map((k) => `<button class="${state.quality === k ? 'active' : ''}" data-quality="${k}" type="button">${QUALITIES[k].label}</button>`).join('')}
+        </div>
+        <span class="st-rchev">${ICONS.chevron}</span>
+      </div>
+
+      <div class="st-sec"><span class="v5-label">CONTAINER / CODEC</span></div>
+      <div class="st-row st-fmt">
+        <span class="st-rico">${ICONS.file}</span>
+        <b>Format</b>
+        <span class="st-rsub">Choose file format</span>
+        <div class="st-seg">
+          ${CODEC_ORDER.map((k) => `<button class="${state.codec === k ? 'active' : ''}" data-codec="${k}" type="button">${CODECS[k].label}</button>`).join('')}
+        </div>
+        <span class="st-rchev">${ICONS.chevron}</span>
+      </div>
+
+      <div class="st-sec"><span class="v5-label">ADDITIONAL SETTINGS</span></div>
+      <div class="st-toggles">
+        ${SETTING_TOGGLES.map(([key, title, sub, icon]) => `
+          <div class="st-tg">
+            <span class="st-tico">${icon}</span>
+            <b>${title}</b>
+            <span class="st-rsub">${sub}</span>
+            <button class="st-switch ${state[key] ? 'on' : ''}" data-toggle="${key}" type="button" role="switch" aria-checked="${!!state[key]}" aria-label="${title}"></button>
+          </div>`).join('')}
+      </div>
+
+      <div class="st-prem">
+        <span class="st-prem-ico">${ICONS.crown}</span>
+        <b>Premium Features</b>
+        <span class="st-rsub">Unlock 4K, 60fps, more formats and more.</span>
+        ${state.premium
+          ? '<span class="st-prem-active">Premium active</span>'
+          : `<button class="st-prem-btn" data-premium type="button">GO PREMIUM ${ICONS.chevron}</button>`}
       </div>
     </div>`;
 
@@ -2021,53 +2441,14 @@ function renderSettings() {
     renderSettings();
   }));
 
-  const premiumBtn = $('#settings-premium');
-  if (premiumBtn) premiumBtn.addEventListener('click', () => showPremium());
-}
-
-/* GalleryScreen.kt: large title, clip rows with the gradient play tile. */
-function renderGallery() {
-  screenEl.innerHTML = `
-    <div class="page gallery">
-      <header class="screen-header">
-        <h1>Gallery</h1>
-        <p>Saved to Movies/DualShots</p>
-      </header>
-
-      ${state.clips.length
-        ? `<div class="clip-list">${state.clips.map(clipCardHTML).join('')}</div>`
-        : `<div class="empty">
-             <span class="empty-ico">${ICONS.gallery}</span>
-             <span class="empty-title">No recordings yet</span>
-             <span class="empty-sub">Start a recording from Home</span>
-           </div>`}
-    </div>`;
-
-  $$('.clip', screenEl).forEach((el) => el.addEventListener('click', () => {
-    const clip = state.clips.find((c) => c.id === el.dataset.clip);
-    if (clip) playClip(clip);
+  $$('[data-toggle]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    const key = b.dataset.toggle;
+    state[key] = !state[key];
+    savePrefs();
+    renderSettings();
   }));
-}
 
-function clipMetaLine(c) {
-  const when = c.when instanceof Date && !Number.isNaN(c.when.getTime())
-    ? c.when.toLocaleString(undefined, {
-      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    })
-    : '';
-  return `${c.sizeMb} MB${when ? ` · ${when}` : ''}`;
-}
-
-function clipCardHTML(c) {
-  return `
-    <button class="clip" data-clip="${c.id}" type="button">
-      <span class="clip-tile">${c.poster ? `<img src="${c.poster}" alt="" />` : ICONS.play}</span>
-      <span class="clip-body">
-        <span class="clip-name">${esc(c.name)}</span>
-        <span class="clip-meta">${esc(clipMetaLine(c))}</span>
-      </span>
-      <span class="clip-chev">${ICONS.chevron}</span>
-    </button>`;
+  bindCommon(screenEl);
 }
 
 /* GalleryScreen.kt: spelare i dialog med Share / Delete / Close. */
@@ -2217,6 +2598,14 @@ function init() {
   loadPrefs();
   tickClock();
   setInterval(tickClock, 15000);
+  // ?ref[&page=gallery]: frameless 1:1 view used to compare against design/reference/*.png
+  const params = new URLSearchParams(location.search);
+  if (params.has('ref')) {
+    document.body.classList.add('ref');
+    state.onboarded = true;
+    state.page = (params.get('page') || 'HOME').toUpperCase();
+  }
+  if (window.ResizeObserver) new ResizeObserver(fitZoom).observe(screenEl);
   render();
 }
 
