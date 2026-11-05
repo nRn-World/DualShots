@@ -134,7 +134,9 @@ private fun HeroCard(d: StatsData) {
                     Text("ALL-TIME RECORDINGS", color = DuelTextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, letterSpacing = 0.8.sp)
                     Text(
                         "${d.count} ${if (d.count == 1) "clip" else "clips"}",
-                        color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp,
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, brush = countBrush
+                        ),
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
@@ -217,7 +219,7 @@ private fun HourDistributionCard(byHour: IntArray) {
 @Composable
 private fun FolderBreakdownCard(folders: List<Pair<String, Int>>, total: Int) {
     val unassigned = (total - folders.sumOf { it.second }).coerceAtLeast(0)
-    val rows = mutableListOf<Pair<String, Int>>(folders.map { it.first to it.second })
+    val rows = folders.toMutableList()
     if (unassigned > 0) rows.add("Unassigned" to unassigned)
     val rowMax = rows.maxOf { it.second }.coerceAtLeast(1)
     GlassCard(modifier = Modifier.fillMaxWidth()) {
