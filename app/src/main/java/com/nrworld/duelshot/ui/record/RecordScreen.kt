@@ -457,7 +457,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 }
                 if (fallbackFrom == RecordingMode.DUAL_VIEW) {
                     Text(
-                        "Dual View isn't supported on this phone – both cameras stay in the Separate layout and keep recording.",
+                        "This phone can't compose the two cameras into one file, so Dual and Both save separate BACK and FRONT files – exactly like Separate.",
                         color = DuelOrangeLight, fontSize = 11.sp
                     )
                 }

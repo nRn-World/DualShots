@@ -131,6 +131,10 @@ class DualCameraController(private val context: Context) {
     var singleFallback = false
         private set
 
+    /** Senaste felet från en misslyckad sammansättning, för statusraden. */
+    var lastBindError: String? = null
+        private set
+
     suspend fun init(): String {
         return try {
             val p = ProcessCameraProvider.getInstance(context.applicationContext).get()
@@ -214,9 +218,12 @@ class DualCameraController(private val context: Context) {
             // Fallback: rapportera att läget inte stöds och låt skärmen binda om i
             // Separate med de ytor som faktiskt är kvar. Att binda här skulle binda
             // till ytor som kastas när layouten byts – det gav svarta rutor.
+            // Orsaken tas med i statusraden så att den syns utan logcat.
             runCatching { p.unbindAll() }
             activeMode = RecordingMode.SEPARATE
-            "Advanced mode not supported here – recording as Separate files instead."
+            val why = (e.localizedMessage ?: e.javaClass.simpleName).take(140)
+            lastBindError = why
+            "Composing the two cameras failed ($why) – recording as Separate files instead."
         }
     }
 
