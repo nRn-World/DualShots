@@ -113,31 +113,15 @@ const ICONS = {
   trash: svg('<path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1.1 13h8.8L17.5 7"/><path d="M10.5 10.5 11 16.5M13.5 10.5 13 16.5"/>'),
 };
 
-/* Samma logotyp som appens launcher-ikon: orange squircle + svart kamera. */
-const LOGO_MARK = `
-  <svg class="logo-mark" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <defs>
-      <linearGradient id="logoGrad" x1="6" y1="4" x2="102" y2="106" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stop-color="#ff4d00" />
-        <stop offset="1" stop-color="#ff9a2e" />
-      </linearGradient>
-    </defs>
-    <rect width="108" height="108" rx="26" fill="url(#logoGrad)" />
-    <g fill="none" stroke="#0a0a0a" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="25" y="42" width="58" height="32" rx="9" />
-      <path d="M44 42v-2a7 7 0 0 1 7-7h6a7 7 0 0 1 7 7v2" />
-      <circle cx="54" cy="58" r="10.5" />
-    </g>
-    <circle cx="70" cy="51" r="1.8" fill="#0a0a0a" />
-  </svg>`;
-
 /* Samma markering som launcher-ikonen: två linser på navy-botten. */
 const LENS_MARK = `
   <svg class="logo-mark" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect width="108" height="108" rx="26" fill="#0e1626" />
+    <rect width="108" height="108" rx="26" fill="#0e1626" stroke="#1c2942" stroke-width="1.5" />
     <path fill-rule="evenodd" fill="#e4552b" d="M40 54m-20 0a20 20 0 1 0 40 0a20 20 0 1 0-40 0M40 54m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0" />
     <path fill-rule="evenodd" fill="#f2a03f" stroke="#0e1626" stroke-width="4.5" d="M66 54m-20 0a20 20 0 1 0 40 0a20 20 0 1 0-40 0M66 54m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0" />
   </svg>`;
+
+const LOGO_MARK = LENS_MARK;
 
 const logoTile = () => `
   <div class="logo-tile">

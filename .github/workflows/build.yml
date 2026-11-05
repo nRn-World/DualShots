@@ -58,17 +58,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.2-debug.apk
-          NOTES="Uppdaterad DualShots v1.2 (live flyttbar & skalbar bild-i-bild-kamera i realtid):
-          - Ny OpenGL ES 2.0 realtidskompositör (DualGlComposer): lilla kameran (framkameran) följer med ramen mjukt i 60 fps när du drar och ändrar storlek
-          - Rundade hörn på kamerabilden som matchar bild-i-bild-ramen exakt
-          - Flytta, ändra storlek, byt plats (swap), zooma, pausa och stäng lilla kameran live – även mitt under pågående inspelning – allt i EN sammansatt MP4-fil"
+          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.3-debug.apk
+          NOTES="Uppdaterad DualShots v1.3:
+          - Riktiga DualShots-logotypen (dubbla linser) vid appstart, i onboarding-stegen och på behörighetsskärmen
+          - OpenGL ES 2.0 realtidskompositör (DualGlComposer): lilla kameran följer med ramen mjukt i 60 fps när du drar och ändrar storlek
+          - Flytta, ändra storlek, byt plats (swap), zooma, pausa och stäng lilla kameran live – även under inspelning – i EN sammansatt MP4-fil"
           if gh release view v0.2.0 >/dev/null 2>&1; then
-            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.2-debug.apk --clobber
-            gh release edit v0.2.0 --title "DualShots v1.2" --notes "$NOTES"
+            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.3-debug.apk --clobber
+            gh release edit v0.2.0 --title "DualShots v1.3" --notes "$NOTES"
           else
-            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.2-debug.apk \
+            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.3-debug.apk \
               --target "${{ github.sha }}" \
-              --title "DualShots v1.2" \
+              --title "DualShots v1.3" \
               --notes "$NOTES"
           fi

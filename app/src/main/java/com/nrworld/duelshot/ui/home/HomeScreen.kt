@@ -118,7 +118,7 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
             title = { Text("DualShots", color = DuelText, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Version 1.2 · Dual lens recording engine",
+                    "Version 1.3 · Dual lens recording engine",
                     color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp
                 )
             },

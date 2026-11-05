@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.painterResource
@@ -49,6 +50,7 @@ import com.nrworld.duelshot.ui.onboarding.OnboardingScreen
 import com.nrworld.duelshot.ui.theme.DuelBg
 import com.nrworld.duelshot.ui.theme.DuelGradient
 import com.nrworld.duelshot.ui.theme.DuelLine
+import com.nrworld.duelshot.ui.theme.DuelOrange
 import com.nrworld.duelshot.ui.theme.DuelShotsTheme
 import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
@@ -138,11 +140,23 @@ private fun PermissionsScreen(denied: Boolean, onRequest: () -> Unit, onOpenSett
     ) {
         Spacer(Modifier.weight(0.25f))
 
-        Image(
-            painter = painterResource(R.drawable.ic_logo),
-            contentDescription = null,
-            modifier = Modifier.size(96.dp)
-        )
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(136.dp)) {
+            Box(
+                Modifier
+                    .size(136.dp)
+                    .clip(RoundedCornerShape(68.dp))
+                    .background(
+                        Brush.radialGradient(
+                            listOf(DuelOrange.copy(alpha = .40f), Color.Transparent)
+                        )
+                    )
+            )
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_art),
+                contentDescription = "DualShots",
+                modifier = Modifier.size(96.dp)
+            )
+        }
 
         Spacer(Modifier.height(26.dp))
         Text(

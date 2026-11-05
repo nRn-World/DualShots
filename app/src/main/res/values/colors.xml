@@ -1,6 +1,6 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="ic_launcher_background">#FF5A00</color>
+    <color name="ic_launcher_background">#0E1626</color>
     <color name="splash_bg">#07080C</color>
 </resources>
