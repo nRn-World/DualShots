@@ -2711,7 +2711,7 @@ function renderOnboarding() {
   screenEl.innerHTML = `
     <div class="onboarding">
       <div class="onb-top">
-        <div class="onb-tile">${LOGO_MARK}</div>
+        <div class="onb-tile"><img class="logo-mark" src="assets/icon.png" alt="DualShots" /></div>
         <h1 class="onb-title">${step.title}</h1>
         <p class="onb-body">${step.body}</p>
       </div>
