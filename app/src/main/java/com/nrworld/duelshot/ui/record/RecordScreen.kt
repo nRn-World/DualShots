@@ -105,6 +105,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     var ready by remember { mutableStateOf(false) }
     var renderedMode by remember { mutableStateOf(vm.mode) }
     var boundFor by remember { mutableStateOf<RecordingMode?>(null) }
+    // Satt när valt läge inte stöds och vi bundit om i ett enklare läge.
+    var fallbackFrom by remember { mutableStateOf<RecordingMode?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var elapsed by remember { mutableStateOf(0) }
     var savedNames by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -144,12 +146,18 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
 
     // Bind när förhandsvisningarna finns. Ändras något under inspelning avslutas klippet,
     // kameran binds om och nästa del (_p2, _p3 …) startar direkt.
-    LaunchedEffect(camReady, ready, backView, frontView, composedView, vm.mode, vm.frontAspect, vm.backAspect, vm.quality, pip, isRecording) {
+    LaunchedEffect(
+        camReady, ready, backView, frontView, composedView, vm.mode, vm.frontAspect,
+        vm.backAspect, vm.quality, pip, isRecording, fallbackFrom
+    ) {
         if (!camReady) return@LaunchedEffect
         // En take = en fil: ändringar under inspelning väntar till nästa take.
         if (isRecording) return@LaunchedEffect
+        // Dual View kan saknas på enheten. Bind då om i det läge som faktiskt
+        // stöds i stället för att försöka igen – annars blir rutorna svarta.
+        val wanted = if (fallbackFrom == vm.mode) renderedMode else vm.mode
         if (controller.supported) {
-            when (vm.mode) {
+            when (wanted) {
                 RecordingMode.DUAL_VIEW -> if (composedView == null || backView == null || frontView == null) return@LaunchedEffect
                 RecordingMode.SEPARATE -> if (backView == null || frontView == null) return@LaunchedEffect
                 RecordingMode.BOTH -> if (backView == null || frontView == null || composedView == null) return@LaunchedEffect
@@ -157,7 +165,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         } else if (backView == null && frontView == null) return@LaunchedEffect
 
         status = controller.bind(
-            wanted = vm.mode,
+            wanted = wanted,
             frontAspect = vm.frontAspect,
             backAspect = vm.backAspect,
             quality = vm.quality,
@@ -169,6 +177,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         )
         renderedMode = controller.activeMode
         boundFor = vm.mode
+        fallbackFrom = if (controller.activeMode != vm.mode) vm.mode else null
         ready = true
     }
 
@@ -446,6 +455,12 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                         onSelect = { vm.mode = RecordingMode.values()[it] }
                     )
                 }
+                if (fallbackFrom == RecordingMode.DUAL_VIEW) {
+                    Text(
+                        "Dual View isn't supported on this phone – both cameras stay in the Separate layout and keep recording.",
+                        color = DuelOrangeLight, fontSize = 11.sp
+                    )
+                }
                 TuneRow("QUALITY") {
                     SegmentedControl(
                         options = listOf("720p", "1080p", "4K"),
@@ -581,7 +596,9 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                         off = !pipLive.visible,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            if (displayMode != RecordingMode.DUAL_VIEW) {
+                            if (displayMode != RecordingMode.DUAL_VIEW && fallbackFrom == RecordingMode.DUAL_VIEW) {
+                                status = "Dual View isn't supported on this phone – use Separate or Both"
+                            } else if (displayMode != RecordingMode.DUAL_VIEW) {
                                 // I Separate/Both finns ingen liten kamera – byt till Dual View.
                                 vm.mode = RecordingMode.DUAL_VIEW
                                 pipLive = pipLive.copy(visible = true, paused = false)

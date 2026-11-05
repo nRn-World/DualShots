@@ -211,15 +211,12 @@ class DualCameraController(private val context: Context) {
                 cropEnabled = false
                 return bind(wanted, frontAspect, backAspect, quality, lifecycleOwner, backView, frontView, composedView, pip)
             }
-            // Fallback: försök enklare läge så användaren alltid kan spela in.
-            try {
-                p.unbindAll()
-                bindSeparate(p, bs, fs, frontAspect, backAspect, qs, lifecycleOwner, backView, frontView)
-                activeMode = RecordingMode.SEPARATE
-                "Advanced mode not supported here – recording as Separate files instead."
-            } catch (e2: Exception) {
-                "Could not bind cameras: ${e2.localizedMessage}"
-            }
+            // Fallback: rapportera att läget inte stöds och låt skärmen binda om i
+            // Separate med de ytor som faktiskt är kvar. Att binda här skulle binda
+            // till ytor som kastas när layouten byts – det gav svarta rutor.
+            runCatching { p.unbindAll() }
+            activeMode = RecordingMode.SEPARATE
+            "Advanced mode not supported here – recording as Separate files instead."
         }
     }
 
