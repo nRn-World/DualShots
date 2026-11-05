@@ -343,12 +343,16 @@ class DualCameraController(private val context: Context) {
      *
      * Skalan är andel av bildens bredd och höjden följer den lilla kamerans format,
      * så en porträttkamera i en liggande inspelning blir högre än en "scale"-ruta.
+     *
+     * NDC har positiv Y uppåt medan skärmen har Y nedåt. X räknas därför som
+     * (2·cx − 1) men Y måste vändas: (1 − 2·cy), annars hamnar rutan spegelvänd
+     * vertikalt jämfört med ramen på skärmen.
      */
     private fun insetComposition(pip: PipLayout): CompositionSettings {
         val scale = pip.scale.coerceIn(0.18f, 0.6f)
         val limit = 1f - scale
         val ox = (2f * pip.cx - 1f).coerceIn(-limit, limit)
-        val oy = (2f * pip.cy - 1f).coerceIn(-limit, limit)
+        val oy = (1f - 2f * pip.cy).coerceIn(-limit, limit)
         // Avstängd eller pausad liten kamera: alpha 0 så att stora kameran fyller rutan.
         val alpha = if (pip.visible && !pip.paused) 1f else 0f
         return CompositionSettings.Builder().setAlpha(alpha).setOffset(ox, oy).setScale(scale, scale).build()
