@@ -1,5 +1,6 @@
 package com.nrworld.duelshot.ui.record
 
+import android.view.TextureView
 import androidx.activity.compose.BackHandler
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.RepeatMode
@@ -44,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -77,6 +79,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nrworld.duelshot.camera.DualCameraController
+import com.nrworld.duelshot.camera.DualGlComposer
 import com.nrworld.duelshot.camera.PipLayout
 import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.QualityOption
@@ -178,7 +181,6 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     var status by remember { mutableStateOf("Starting cameras…") }
     var camReady by remember { mutableStateOf(false) }
     var ready by remember { mutableStateOf(false) }
-    var hardwareComposeUnsupported by remember { mutableStateOf(false) }
     var singleFlipTick by remember { mutableIntStateOf(0) }
 
     var isRecording by remember { mutableStateOf(false) }
@@ -235,6 +237,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
 
     var backZoom by remember { mutableFloatStateOf(1f) }
     var frontZoom by remember { mutableFloatStateOf(1f) }
+    var backHwZoom by remember { mutableFloatStateOf(1f) }
+    var frontHwZoom by remember { mutableFloatStateOf(1f) }
 
     // Staplad vy i Separate / Both (front överst eller bak överst, precis som webb-previewn).
     var frontFirst by remember { mutableStateOf(true) }
@@ -249,7 +253,6 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     val effectiveBackAspect = takeBackAspect ?: vm.backAspect
     val effectiveQuality = takeQuality ?: vm.quality
     val isSingleCamera = camReady && (!controller.supported || controller.singleFallback)
-    val useComposedSurface = effectiveMode == RecordingMode.DUAL_VIEW && !hardwareComposeUnsupported && !isSingleCamera
 
     BackHandler {
         if (showSetupSheet) {
@@ -258,6 +261,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             if (isRecording) controller.stopRecording()
             onExit()
         }
+    }
+
+    DisposableEffect(controller) {
+        onDispose { controller.release() }
     }
 
     DisposableEffect(isRecording) {
@@ -270,8 +277,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         camReady = controller.canBind
     }
 
-    // Ombind i hårdvaru-Dual View endast när [pip] ändras; i live-overlay-läget är PiP ren UI-state.
-    val bindPipTrigger = if (useComposedSurface) pip else null
+    // I Dual View hanterar DualGlComposer PiP i realtid i OpenGL utan kamera-ombindning.
+    val bindPipTrigger = if (effectiveMode == RecordingMode.BOTH) pip else null
 
     LaunchedEffect(
         camReady,
@@ -284,7 +291,6 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         vm.backAspect,
         vm.quality,
         bindPipTrigger,
-        hardwareComposeUnsupported,
         singleFlipTick,
         isRecording
     ) {
@@ -310,42 +316,21 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
 
         when (vm.mode) {
             RecordingMode.DUAL_VIEW -> {
-                if (!hardwareComposeUnsupported) {
-                    if (composedView == null) return@LaunchedEffect
-                    val msg = controller.bind(
-                        wanted = RecordingMode.DUAL_VIEW,
-                        frontAspect = vm.frontAspect,
-                        backAspect = vm.backAspect,
-                        quality = vm.quality,
-                        lifecycleOwner = lifecycleOwner,
-                        backView = null,
-                        frontView = null,
-                        composedView = composedView,
-                        pip = pip,
-                        forceOverlayPip = false
-                    )
-                    if (controller.dualOverlayFallback) {
-                        hardwareComposeUnsupported = true
-                        return@LaunchedEffect
-                    }
-                    status = msg
-                    ready = true
-                } else {
-                    if (backView == null || frontView == null) return@LaunchedEffect
-                    status = controller.bind(
-                        wanted = RecordingMode.DUAL_VIEW,
-                        frontAspect = vm.frontAspect,
-                        backAspect = vm.backAspect,
-                        quality = vm.quality,
-                        lifecycleOwner = lifecycleOwner,
-                        backView = backView,
-                        frontView = frontView,
-                        composedView = null,
-                        pip = pipLive,
-                        forceOverlayPip = true
-                    )
-                    ready = true
-                }
+                status = controller.bind(
+                    wanted = RecordingMode.DUAL_VIEW,
+                    frontAspect = vm.frontAspect,
+                    backAspect = vm.backAspect,
+                    quality = vm.quality,
+                    lifecycleOwner = lifecycleOwner,
+                    backView = singleView,
+                    frontView = singleView,
+                    composedView = null,
+                    pip = pipLive
+                )
+                val (bz, fz) = controller.setZoom(back = backZoom, front = frontZoom)
+                backHwZoom = bz
+                frontHwZoom = fz
+                ready = true
             }
 
             RecordingMode.SEPARATE -> {
@@ -495,334 +480,89 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 } else if (effectiveMode == RecordingMode.DUAL_VIEW) {
                     val swap = pipLive.swapCameras
                     val smallAspect = if (swap) effectiveBackAspect else effectiveFrontAspect
+                    val backShaderZoom = (backZoom / backHwZoom.coerceAtLeast(1f)).coerceIn(1f, 3f)
+                    val frontShaderZoom = (frontZoom / frontHwZoom.coerceAtLeast(1f)).coerceIn(1f, 3f)
 
-                    if (!hardwareComposeUnsupported) {
-                        // Hårdvarusammansatt ström (1 MP4-fil) i fullhöjdskortet + exakt bild-i-bild-ram.
-                        BoxWithConstraints(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(10.dp))
-                        ) {
-                            val stageW = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-                            val stageH = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-                            val rect = computePipRect(stageW, stageH, smallAspect, pipLive)
-
-                            // Håll normaliserad höjdskala i synk med skärmens verkliga bildruta.
-                            LaunchedEffect(stageW, stageH, smallAspect) {
-                                val synced = pipLive.copy(
-                                    cx = rect.normCx,
-                                    cy = rect.normCy,
-                                    scale = rect.normScaleX,
-                                    scaleY = rect.normScaleY
-                                )
-                                pipLive = synced
-                                if (!isRecording && (
-                                        kotlin.math.abs(pip.scaleY - synced.scaleY) > 0.015f ||
-                                            kotlin.math.abs(pip.cx - synced.cx) > 0.015f ||
-                                            kotlin.math.abs(pip.cy - synced.cy) > 0.015f
-                                        )
-                                ) {
-                                    pip = synced
-                                }
+                    DualGlViewStage(
+                        controller = controller,
+                        pipLive = pipLive,
+                        smallAspect = smallAspect,
+                        mainZoom = if (swap) frontZoom else backZoom,
+                        smallZoom = if (swap) backZoom else frontZoom,
+                        backShaderZoom = backShaderZoom,
+                        frontShaderZoom = frontShaderZoom,
+                        showPipHint = showPipHint,
+                        onUpdateLive = { updated ->
+                            showPipHint = false
+                            pipLive = updated
+                        },
+                        onCommitLive = { committed ->
+                            persistPip(committed, commitToCamera = false)
+                        },
+                        onMainZoom = { factor ->
+                            if (swap) {
+                                val desired = (frontZoom * factor).coerceIn(1f, 3f)
+                                val (_, hwFz) = controller.setZoom(front = desired)
+                                frontZoom = desired
+                                frontHwZoom = hwFz
+                            } else {
+                                val desired = (backZoom * factor).coerceIn(1f, 3f)
+                                val (hwBz, _) = controller.setZoom(back = desired)
+                                backZoom = desired
+                                backHwZoom = hwBz
                             }
-
-                            FeedTile(
-                                view = composedView,
-                                badge = if (swap) "FRONT" else "BACK",
-                                zoom = if (swap) frontZoom else backZoom,
-                                onZoom = { factor ->
-                                    if (swap) {
-                                        val (_, fz) = controller.setZoom(front = (frontZoom * factor).coerceIn(1f, 3f))
-                                        frontZoom = fz
-                                    } else {
-                                        val (bz, _) = controller.setZoom(back = (backZoom * factor).coerceIn(1f, 3f))
-                                        backZoom = bz
-                                    }
-                                },
-                                onFocus = { nx, ny ->
-                                    controller.focusAt(isFront = swap, nx = nx, ny = ny, view = composedView)
-                                },
-                                onRelease = { if (composedView === it) composedView = null },
-                                onView = { composedView = it },
-                                modifier = Modifier.fillMaxSize()
+                        },
+                        onSmallZoom = { factor ->
+                            showPipHint = false
+                            if (swap) {
+                                val desired = (backZoom * factor).coerceIn(1f, 3f)
+                                val (hwBz, _) = controller.setZoom(back = desired)
+                                backZoom = desired
+                                backHwZoom = hwBz
+                            } else {
+                                val desired = (frontZoom * factor).coerceIn(1f, 3f)
+                                val (_, hwFz) = controller.setZoom(front = desired)
+                                frontZoom = desired
+                                frontHwZoom = hwFz
+                            }
+                        },
+                        onMainFocus = { nx, ny ->
+                            controller.focusAt(isFront = swap, nx = nx, ny = ny, view = null)
+                        },
+                        onSmallFocus = { nx, ny ->
+                            controller.focusAt(isFront = !swap, nx = nx, ny = ny, view = null)
+                        },
+                        onReset = { stageW, stageH ->
+                            val defRaw = pipLive.copy(
+                                cx = PIP_DEFAULT_CX,
+                                cy = PIP_DEFAULT_CY,
+                                scale = PIP_DEFAULT_SCALE
                             )
-
-                            if (pipLive.visible) {
-                                PipFrameOverlay(
-                                    rect = rect,
-                                    stageW = stageW,
-                                    stageH = stageH,
-                                    paused = pipLive.paused,
-                                    zoom = if (swap) backZoom else frontZoom,
-                                    onDragDelta = { dx, dy ->
-                                        showPipHint = false
-                                        val nextRaw = pipLive.copy(
-                                            cx = (pipLive.cx + dx / stageW).coerceIn(0.05f, 0.95f),
-                                            cy = (pipLive.cy + dy / stageH).coerceIn(0.05f, 0.95f)
-                                        )
-                                        val clamped = computePipRect(stageW, stageH, smallAspect, nextRaw)
-                                        pipLive = nextRaw.copy(
-                                            cx = clamped.normCx,
-                                            cy = clamped.normCy,
-                                            scale = clamped.normScaleX,
-                                            scaleY = clamped.normScaleY
-                                        )
-                                    },
-                                    onResizeScale = { rawScale ->
-                                        showPipHint = false
-                                        val nextRaw = pipLive.copy(scale = rawScale.coerceIn(PIP_MIN, PIP_MAX))
-                                        val clamped = computePipRect(stageW, stageH, smallAspect, nextRaw)
-                                        pipLive = nextRaw.copy(
-                                            cx = clamped.normCx,
-                                            cy = clamped.normCy,
-                                            scale = clamped.normScaleX,
-                                            scaleY = clamped.normScaleY
-                                        )
-                                    },
-                                    onPinchZoom = { factor ->
-                                        showPipHint = false
-                                        if (swap) {
-                                            val (bz, _) = controller.setZoom(back = (backZoom * factor).coerceIn(1f, 3f))
-                                            backZoom = bz
-                                        } else {
-                                            val (_, fz) = controller.setZoom(front = (frontZoom * factor).coerceIn(1f, 3f))
-                                            frontZoom = fz
-                                        }
-                                    },
-                                    onCommit = {
-                                        persistPip(pipLive, commitToCamera = !isRecording)
-                                        if (isRecording) showToast("Position saved for next take")
-                                    },
-                                    onReset = {
-                                        val defRaw = pipLive.copy(
-                                            cx = PIP_DEFAULT_CX,
-                                            cy = PIP_DEFAULT_CY,
-                                            scale = PIP_DEFAULT_SCALE
-                                        )
-                                        val clamped = computePipRect(stageW, stageH, smallAspect, defRaw)
-                                        persistPip(
-                                            defRaw.copy(
-                                                cx = clamped.normCx,
-                                                cy = clamped.normCy,
-                                                scale = clamped.normScaleX,
-                                                scaleY = clamped.normScaleY
-                                            ),
-                                            commitToCamera = !isRecording
-                                        )
-                                        showToast("Overlay reset")
-                                    },
-                                    onTogglePause = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        val next = pipLive.copy(paused = !pipLive.paused)
-                                        persistPip(next, commitToCamera = !isRecording)
-                                        showToast(if (next.paused) "Small camera paused" else "Small camera running")
-                                    },
-                                    onClose = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        val next = pipLive.copy(visible = false, paused = false)
-                                        persistPip(next, commitToCamera = !isRecording)
-                                        showToast("Small camera off — main camera only")
-                                    }
-                                )
-
-                                if (showPipHint) {
-                                    PipHintPill(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .padding(bottom = 14.dp)
-                                    )
-                                }
-                            }
+                            val clamped = computePipRect(stageW, stageH, smallAspect, defRaw)
+                            persistPip(
+                                defRaw.copy(
+                                    cx = clamped.normCx,
+                                    cy = clamped.normCy,
+                                    scale = clamped.normScaleX,
+                                    scaleY = clamped.normScaleY
+                                ),
+                                commitToCamera = false
+                            )
+                            showToast("Overlay reset")
+                        },
+                        onTogglePause = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val next = pipLive.copy(paused = !pipLive.paused)
+                            persistPip(next, commitToCamera = false)
+                            showToast(if (next.paused) "Small camera paused" else "Small camera running")
+                        },
+                        onClose = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val next = pipLive.copy(visible = false, paused = false)
+                            persistPip(next, commitToCamera = false)
+                            showToast("Small camera off — main camera only")
                         }
-                    } else {
-                        // Live bild-i-bild-överlägg (båda kamerorna strömmar i fullskärm + flytande ruta).
-                        BoxWithConstraints(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(10.dp))
-                        ) {
-                            val density = LocalDensity.current
-                            val stageW = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-                            val stageH = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-                            val rect = computePipRect(stageW, stageH, smallAspect, pipLive)
-
-                            listOf(false, true).forEach { isFrontCam ->
-                                key(if (isFrontCam) "front_dual" else "back_dual") {
-                                    val isLarge = if (swap) isFrontCam else !isFrontCam
-                                    if (isLarge) {
-                                        FeedTile(
-                                            view = if (isFrontCam) frontView else backView,
-                                            badge = if (isFrontCam) "FRONT" else "BACK",
-                                            zoom = if (isFrontCam) frontZoom else backZoom,
-                                            onZoom = { factor ->
-                                                if (isFrontCam) {
-                                                    val (_, fz) = controller.setZoom(front = (frontZoom * factor).coerceIn(1f, 3f))
-                                                    frontZoom = fz
-                                                } else {
-                                                    val (bz, _) = controller.setZoom(back = (backZoom * factor).coerceIn(1f, 3f))
-                                                    backZoom = bz
-                                                }
-                                            },
-                                            onFocus = { nx, ny ->
-                                                controller.focusAt(
-                                                    isFront = isFrontCam,
-                                                    nx = nx,
-                                                    ny = ny,
-                                                    view = if (isFrontCam) frontView else backView
-                                                )
-                                            },
-                                            onRelease = { v ->
-                                                if (isFrontCam) {
-                                                    if (frontView === v) frontView = null
-                                                } else {
-                                                    if (backView === v) backView = null
-                                                }
-                                            },
-                                            onView = { v ->
-                                                if (isFrontCam) frontView = v else backView = v
-                                            },
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .zIndex(0f)
-                                        )
-                                    } else {
-                                        val visible = pipLive.visible
-                                        Box(
-                                            modifier = if (visible) {
-                                                Modifier
-                                                    .zIndex(1f)
-                                                    .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
-                                                    .size(
-                                                        with(density) { rect.width.toDp() },
-                                                        with(density) { rect.height.toDp() }
-                                                    )
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(Color.Black)
-                                            } else {
-                                                Modifier
-                                                    .zIndex(-1f)
-                                                    .size(1.dp)
-                                                    .alpha(0f)
-                                            }
-                                        ) {
-                                            AndroidView(
-                                                modifier = Modifier.fillMaxSize(),
-                                                factory = { ctx ->
-                                                    PreviewView(ctx).apply {
-                                                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                                                        scaleType = PreviewView.ScaleType.FILL_CENTER
-                                                        if (isFrontCam) frontView = this else backView = this
-                                                    }
-                                                },
-                                                onRelease = { v ->
-                                                    if (isFrontCam) {
-                                                        if (frontView === v) frontView = null
-                                                    } else {
-                                                        if (backView === v) backView = null
-                                                    }
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (pipLive.visible) {
-                                PipFrameOverlay(
-                                    rect = rect,
-                                    stageW = stageW,
-                                    stageH = stageH,
-                                    paused = pipLive.paused,
-                                    zoom = if (swap) backZoom else frontZoom,
-                                    modifier = Modifier.zIndex(2f),
-                                    onDragDelta = { dx, dy ->
-                                        showPipHint = false
-                                        val nextRaw = pipLive.copy(
-                                            cx = (pipLive.cx + dx / stageW).coerceIn(0.05f, 0.95f),
-                                            cy = (pipLive.cy + dy / stageH).coerceIn(0.05f, 0.95f)
-                                        )
-                                        val clamped = computePipRect(stageW, stageH, smallAspect, nextRaw)
-                                        pipLive = nextRaw.copy(
-                                            cx = clamped.normCx,
-                                            cy = clamped.normCy,
-                                            scale = clamped.normScaleX,
-                                            scaleY = clamped.normScaleY
-                                        )
-                                    },
-                                    onResizeScale = { rawScale ->
-                                        showPipHint = false
-                                        val nextRaw = pipLive.copy(scale = rawScale.coerceIn(PIP_MIN, PIP_MAX))
-                                        val clamped = computePipRect(stageW, stageH, smallAspect, nextRaw)
-                                        pipLive = nextRaw.copy(
-                                            cx = clamped.normCx,
-                                            cy = clamped.normCy,
-                                            scale = clamped.normScaleX,
-                                            scaleY = clamped.normScaleY
-                                        )
-                                    },
-                                    onPinchZoom = { factor ->
-                                        showPipHint = false
-                                        if (swap) {
-                                            val (bz, _) = controller.setZoom(back = (backZoom * factor).coerceIn(1f, 3f))
-                                            backZoom = bz
-                                        } else {
-                                            val (_, fz) = controller.setZoom(front = (frontZoom * factor).coerceIn(1f, 3f))
-                                            frontZoom = fz
-                                        }
-                                    },
-                                    onCommit = {
-                                        persistPip(pipLive, commitToCamera = false)
-                                    },
-                                    onReset = {
-                                        val defRaw = pipLive.copy(
-                                            cx = PIP_DEFAULT_CX,
-                                            cy = PIP_DEFAULT_CY,
-                                            scale = PIP_DEFAULT_SCALE
-                                        )
-                                        val clamped = computePipRect(stageW, stageH, smallAspect, defRaw)
-                                        persistPip(
-                                            defRaw.copy(
-                                                cx = clamped.normCx,
-                                                cy = clamped.normCy,
-                                                scale = clamped.normScaleX,
-                                                scaleY = clamped.normScaleY
-                                            ),
-                                            commitToCamera = false
-                                        )
-                                        showToast("Overlay reset")
-                                    },
-                                    onTogglePause = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        val nextPaused = !pipLive.paused
-                                        if (isRecording) {
-                                            val smallIsBack = swap
-                                            if (nextPaused) controller.pauseCamera(back = smallIsBack)
-                                            else controller.resumeCamera(back = smallIsBack)
-                                        }
-                                        persistPip(pipLive.copy(paused = nextPaused), commitToCamera = false)
-                                        showToast(if (nextPaused) "Small camera paused" else "Small camera running")
-                                    },
-                                    onClose = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        if (isRecording) {
-                                            controller.stopCamera(back = swap)
-                                        }
-                                        persistPip(pipLive.copy(visible = false, paused = false), commitToCamera = false)
-                                        showToast("Small camera off — main camera only")
-                                    }
-                                )
-
-                                if (showPipHint) {
-                                    PipHintPill(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .padding(bottom = 14.dp)
-                                            .zIndex(3f)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    )
                 } else {
                     // Staplade rutor uppifrån och ner i Separate / Both (exakt som webb-previewn).
                     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -1048,11 +788,13 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                             else -> false
                         }
                         if (useFront) {
-                            val (_, fz) = controller.setZoom(front = next)
-                            frontZoom = fz
+                            val (_, hwFz) = controller.setZoom(front = next)
+                            frontZoom = if (effectiveMode == RecordingMode.DUAL_VIEW) next else hwFz
+                            frontHwZoom = hwFz
                         } else {
-                            val (bz, _) = controller.setZoom(back = next)
-                            backZoom = bz
+                            val (hwBz, _) = controller.setZoom(back = next)
+                            backZoom = if (effectiveMode == RecordingMode.DUAL_VIEW) next else hwBz
+                            backHwZoom = hwBz
                         }
                         showToast("Zoom ${formatZoom(next)}")
                     }
@@ -1074,8 +816,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                 takeBackAspect = vm.backAspect
                                 takeQuality = vm.quality
                                 controller.startRecording(
+                                    quality = vm.quality,
                                     audioEnabled = vm.audioEnabled,
-                                    pip = pipLive,
                                     onStarted = { names ->
                                         savedNames = emptyList()
                                         isRecording = true
@@ -1086,10 +828,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                         hideFront = false
                                         status = "Recording · ${vm.mode.title.lowercase()}" +
                                             if (isSingleCamera) " · single camera" else ""
-                                        val startedNames = names
-                                        savedNames = emptyList()
-                                        // Spara listan för visning vid stopp
-                                        pendingClipNames = startedNames
+                                        pendingClipNames = names
                                     },
                                     onError = { err ->
                                         takeMode = null
@@ -1130,12 +869,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             if (effectiveMode == RecordingMode.DUAL_VIEW) {
                                 val next = pipLive.copy(swapCameras = !pipLive.swapCameras)
-                                persistPip(next, commitToCamera = !isRecording && !hardwareComposeUnsupported)
-                                showToast(
-                                    if (isRecording && !hardwareComposeUnsupported) "Swap applies to next take"
-                                    else if (next.swapCameras) "Front camera large"
-                                    else "Back camera large"
-                                )
+                                persistPip(next, commitToCamera = false)
+                                showToast(if (next.swapCameras) "Front camera large" else "Back camera large")
                             } else {
                                 frontFirst = !frontFirst
                                 showToast("Swapped camera order")
@@ -1151,12 +886,12 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                             if (effectiveMode != RecordingMode.DUAL_VIEW) {
                                 vm.mode = RecordingMode.DUAL_VIEW
                                 val next = pipLive.copy(visible = true, paused = false)
-                                persistPip(next, commitToCamera = !isRecording)
+                                persistPip(next, commitToCamera = false)
                                 showToast(if (isRecording) "Dual View starts next take" else "Dual View")
                             } else {
                                 val nextVisible = !pipLive.visible
                                 val next = pipLive.copy(visible = nextVisible, paused = false)
-                                persistPip(next, commitToCamera = !isRecording && !hardwareComposeUnsupported)
+                                persistPip(next, commitToCamera = false)
                                 showToast(
                                     if (nextVisible) "Small camera on"
                                     else "Small camera off — main camera only"
@@ -1221,7 +956,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                         cy = PIP_DEFAULT_CY,
                         scale = PIP_DEFAULT_SCALE
                     )
-                    persistPip(next, commitToCamera = !isRecording && !hardwareComposeUnsupported)
+                    persistPip(next, commitToCamera = !isRecording)
                     showToast("Overlay reset")
                 },
                 onToast = { showToast(it) }
@@ -1422,54 +1157,358 @@ private fun FeedTile(
 }
 
 /**
- * Ram, kontroller och gester för den lilla kameran i Dual View (matchar .pip i webb-previewn:
- * rundade hörn, paus/stäng uppe till vänster och diagonalt randigt storlekshandtag nere till höger).
+ * Realtids OpenGL Dual View-scen där BÅDE videoströmmen och den rundade ramen
+ * flyttas, skalas, byter plats och pausas i exakt samma koordinatsystem i 60 fps.
  */
 @Composable
-private fun PipFrameOverlay(
-    rect: PipBoxRect,
-    stageW: Float,
-    stageH: Float,
-    paused: Boolean,
-    zoom: Float,
-    modifier: Modifier = Modifier,
-    onDragDelta: (Float, Float) -> Unit,
-    onResizeScale: (Float) -> Unit,
-    onPinchZoom: (Float) -> Unit,
-    onCommit: () -> Unit,
-    onReset: () -> Unit,
+private fun DualGlViewStage(
+    controller: DualCameraController,
+    pipLive: PipLayout,
+    smallAspect: AspectOption,
+    mainZoom: Float,
+    smallZoom: Float,
+    backShaderZoom: Float,
+    frontShaderZoom: Float,
+    showPipHint: Boolean,
+    onUpdateLive: (PipLayout) -> Unit,
+    onCommitLive: (PipLayout) -> Unit,
+    onMainZoom: (Float) -> Unit,
+    onSmallZoom: (Float) -> Unit,
+    onMainFocus: (Float, Float) -> Unit,
+    onSmallFocus: (Float, Float) -> Unit,
+    onReset: (Float, Float) -> Unit,
     onTogglePause: () -> Unit,
     onClose: () -> Unit
 ) {
     val density = LocalDensity.current
-    var activeGesture by remember { mutableStateOf(false) }
-    val liveScale = rememberUpdatedState(rect.normScaleX)
-    val dragCb = rememberUpdatedState(onDragDelta)
-    val pinchCb = rememberUpdatedState(onPinchZoom)
-    val commitCb = rememberUpdatedState(onCommit)
-    val resetCb = rememberUpdatedState(onReset)
+    val haptic = LocalHapticFeedback.current
+    var activePipGesture by remember { mutableStateOf(false) }
+    var focusPoint by remember { mutableStateOf<Offset?>(null) }
 
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF05060A))
+    ) {
+        val stageW = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        val stageH = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+        val rect = computePipRect(stageW, stageH, smallAspect, pipLive)
+        val cornerNorm = with(density) { 10.dp.toPx() } / stageW
+
+        // Skicka exakta bild-i-bild-koordinater till OpenGL-kompositören på varje frame.
+        SideEffect {
+            controller.updateDualScene(
+                DualGlComposer.SceneState(
+                    pipLeftNorm = rect.left / stageW,
+                    pipTopNorm = rect.top / stageH,
+                    pipWidthNorm = rect.width / stageW,
+                    pipHeightNorm = rect.height / stageH,
+                    pipCxNorm = rect.normCx,
+                    pipCyNorm = rect.normCy,
+                    pipCornerNorm = cornerNorm,
+                    smallAspectRatio = smallAspect.ratio(),
+                    swapCameras = pipLive.swapCameras,
+                    pipVisible = pipLive.visible,
+                    pipPaused = pipLive.paused,
+                    backZoom = backShaderZoom,
+                    frontZoom = frontShaderZoom
+                )
+            )
+        }
+
+        // 1. Live sammansatt OpenGL-vy (både stor + liten kamera renderas här)
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                TextureView(ctx).also { tv ->
+                    controller.attachDualTextureView(tv)
+                }
+            }
+        )
+
+        // 2. Stationärt gestlager i fasta scenkoordinater (eliminerar gummiband/förskjutning vid drag)
+        val livePipState = rememberUpdatedState(pipLive)
+        val liveRectState = rememberUpdatedState(rect)
+        val liveAspectState = rememberUpdatedState(smallAspect)
+        val updateCb = rememberUpdatedState(onUpdateLive)
+        val commitCb = rememberUpdatedState(onCommitLive)
+        val mainZoomCb = rememberUpdatedState(onMainZoom)
+        val smallZoomCb = rememberUpdatedState(onSmallZoom)
+        val mainFocusCb = rememberUpdatedState(onMainFocus)
+        val smallFocusCb = rememberUpdatedState(onSmallFocus)
+        val resetCb = rememberUpdatedState(onReset)
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(stageW, stageH) {
+                    var lastPipTapAt = 0L
+                    val resizeHitPx = 42.dp.toPx()
+                    val resizePadPx = 14.dp.toPx()
+
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = true)
+                        val startPip = livePipState.value
+                        val startRect = liveRectState.value
+                        val aspect = liveAspectState.value
+                        val ratio = aspect.ratio()
+                        val downPos = down.position
+
+                        val pipRight = startRect.left + startRect.width
+                        val pipBottom = startRect.top + startRect.height
+
+                        val onResizeCorner = startPip.visible &&
+                            downPos.x in (pipRight - resizeHitPx)..(pipRight + resizePadPx) &&
+                            downPos.y in (pipBottom - resizeHitPx)..(pipBottom + resizePadPx)
+
+                        val insidePip = startPip.visible &&
+                            downPos.x in startRect.left..pipRight &&
+                            downPos.y in startRect.top..pipBottom
+
+                        when {
+                            onResizeCorner -> {
+                                activePipGesture = true
+                                val anchorLeft = startRect.left
+                                val anchorTop = startRect.top
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val ch = event.changes.firstOrNull { it.id == down.id }
+                                        ?: event.changes.firstOrNull()
+                                    if (ch != null && ch.pressed) {
+                                        val dx = ch.position.x - downPos.x
+                                        val dy = ch.position.y - downPos.y
+                                        val deltaW = (dx + dy * ratio) * 0.5f
+                                        val rawScale = ((startRect.width + deltaW) / stageW)
+                                            .coerceIn(PIP_MIN, PIP_MAX)
+                                        var pw = stageW * rawScale
+                                        var ph = pw / ratio
+                                        val maxH = stageH * 0.72f
+                                        val maxW = stageW * 0.56f
+                                        if (ph > maxH) { ph = maxH; pw = ph * ratio }
+                                        if (pw > maxW) { pw = maxW; ph = pw / ratio }
+
+                                        val rawCx = ((anchorLeft + pw / 2f) / stageW).coerceIn(0.05f, 0.95f)
+                                        val rawCy = ((anchorTop + ph / 2f) / stageH).coerceIn(0.05f, 0.95f)
+                                        val cur = livePipState.value
+                                        val clamped = computePipRect(
+                                            stageW,
+                                            stageH,
+                                            aspect,
+                                            cur.copy(cx = rawCx, cy = rawCy, scale = pw / stageW)
+                                        )
+                                        updateCb.value(
+                                            cur.copy(
+                                                cx = clamped.normCx,
+                                                cy = clamped.normCy,
+                                                scale = clamped.normScaleX,
+                                                scaleY = clamped.normScaleY
+                                            )
+                                        )
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                    if (event.changes.none { it.pressed }) break
+                                }
+                                activePipGesture = false
+                                commitCb.value(livePipState.value)
+                            }
+
+                            insidePip -> {
+                                activePipGesture = true
+                                val grabOffsetX = downPos.x - (startRect.left + startRect.width / 2f)
+                                val grabOffsetY = downPos.y - (startRect.top + startRect.height / 2f)
+                                var moved = false
+                                var pinching = false
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val pressed = event.changes.filter { it.pressed }
+                                    if (event.changes.size >= 2) {
+                                        val zFactor = event.calculateZoom()
+                                        if (zFactor != 1f) {
+                                            pinching = true
+                                            smallZoomCb.value(zFactor)
+                                        }
+                                    } else if (!pinching && pressed.size == 1) {
+                                        val pos = pressed[0].position
+                                        if (kotlin.math.hypot(pos.x - downPos.x, pos.y - downPos.y) > 5f) {
+                                            moved = true
+                                        }
+                                        if (moved) {
+                                            val targetCx = ((pos.x - grabOffsetX) / stageW).coerceIn(0.05f, 0.95f)
+                                            val targetCy = ((pos.y - grabOffsetY) / stageH).coerceIn(0.05f, 0.95f)
+                                            val cur = livePipState.value
+                                            val clamped = computePipRect(
+                                                stageW,
+                                                stageH,
+                                                aspect,
+                                                cur.copy(cx = targetCx, cy = targetCy)
+                                            )
+                                            updateCb.value(
+                                                cur.copy(
+                                                    cx = clamped.normCx,
+                                                    cy = clamped.normCy,
+                                                    scale = clamped.normScaleX,
+                                                    scaleY = clamped.normScaleY
+                                                )
+                                            )
+                                        }
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                    if (pressed.isEmpty()) break
+                                }
+                                activePipGesture = false
+                                if (moved) {
+                                    commitCb.value(livePipState.value)
+                                    lastPipTapAt = 0L
+                                } else if (!pinching) {
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastPipTapAt < 320L) {
+                                        resetCb.value(stageW, stageH)
+                                        lastPipTapAt = 0L
+                                    } else {
+                                        lastPipTapAt = now
+                                        focusPoint = downPos
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        smallFocusCb.value(
+                                            (downPos.x - startRect.left) / startRect.width.coerceAtLeast(1f),
+                                            (downPos.y - startRect.top) / startRect.height.coerceAtLeast(1f)
+                                        )
+                                    }
+                                }
+                            }
+
+                            else -> {
+                                var moved = false
+                                var pinching = false
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val pressed = event.changes.filter { it.pressed }
+                                    if (event.changes.size >= 2) {
+                                        val zFactor = event.calculateZoom()
+                                        if (zFactor != 1f) {
+                                            pinching = true
+                                            mainZoomCb.value(zFactor)
+                                        }
+                                    } else if (!pinching && pressed.size == 1) {
+                                        val pos = pressed[0].position
+                                        if (kotlin.math.hypot(pos.x - downPos.x, pos.y - downPos.y) > 12f) {
+                                            moved = true
+                                        }
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                    if (pressed.isEmpty()) break
+                                }
+                                if (!moved && !pinching) {
+                                    focusPoint = downPos
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    mainFocusCb.value(downPos.x / stageW, downPos.y / stageH)
+                                }
+                            }
+                        }
+                    }
+                }
+        )
+
+        // 3. Fokusring vid tryck
+        val ring = focusPoint
+        if (ring != null) {
+            LaunchedEffect(ring) {
+                delay(1100)
+                focusPoint = null
+            }
+            Canvas(Modifier.fillMaxSize()) {
+                drawCircle(
+                    color = DuelGold,
+                    radius = 24.dp.toPx(),
+                    center = ring,
+                    style = Stroke(width = 1.6.dp.toPx())
+                )
+            }
+        }
+
+        // 4. Huvudkamerans brickor (BACK/FRONT + zoom)
+        Text(
+            text = if (pipLive.swapCameras) "FRONT" else "BACK",
+            color = DuelOrangeLight,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            letterSpacing = 0.6.sp,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(10.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.Black.copy(alpha = .48f))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        )
+
+        if (mainZoom > 1.01f) {
+            Text(
+                text = formatZoom(mainZoom),
+                color = DuelText,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = .5f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+
+        // 5. Lilla kamerans ram, paus/stäng-knappar och visuellt storlekshandtag
+        if (pipLive.visible) {
+            PipChromeBox(
+                rect = rect,
+                activeGesture = activePipGesture,
+                paused = pipLive.paused,
+                zoom = smallZoom,
+                onTogglePause = onTogglePause,
+                onClose = onClose
+            )
+
+            if (showPipHint) {
+                PipHintPill(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 14.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PipChromeBox(
+    rect: PipBoxRect,
+    activeGesture: Boolean,
+    paused: Boolean,
+    zoom: Float,
+    onTogglePause: () -> Unit,
+    onClose: () -> Unit
+) {
+    val density = LocalDensity.current
     Box(
-        modifier = modifier
+        modifier = Modifier
             .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
             .size(with(density) { rect.width.toDp() }, with(density) { rect.height.toDp() })
             .clip(RoundedCornerShape(10.dp))
             .border(
-                width = 1.dp,
-                color = if (activeGesture) DuelGold else Color.White.copy(alpha = .58f),
+                width = if (activeGesture) 1.6.dp else 1.dp,
+                color = if (activeGesture) DuelGold else Color.White.copy(alpha = .62f),
                 shape = RoundedCornerShape(10.dp)
             )
     ) {
         if (paused) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xEE080A10)),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "PAUSED",
-                    color = Color.White.copy(alpha = .85f),
+                    color = Color.White.copy(alpha = .88f),
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 9.sp,
@@ -1477,50 +1516,6 @@ private fun PipFrameOverlay(
                 )
             }
         }
-
-        // Gestlager: ett finger flyttar, två fingrar zoomar, dubbeltryck nollställer.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(stageW, stageH) {
-                    var lastTapAt = 0L
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = true)
-                        activeGesture = true
-                        var moved = false
-                        var pinching = false
-                        var totalPan = 0f
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val factor = event.calculateZoom()
-                            val pan = event.calculatePan()
-                            if (event.changes.size >= 2 && factor != 1f) {
-                                pinching = true
-                                pinchCb.value(factor)
-                            } else if (!pinching && pan != Offset.Zero) {
-                                totalPan += kotlin.math.hypot(pan.x, pan.y)
-                                if (totalPan > 6f) moved = true
-                                dragCb.value(pan.x, pan.y)
-                            }
-                            event.changes.forEach { it.consume() }
-                            if (event.changes.none { it.pressed }) break
-                        }
-                        activeGesture = false
-                        if (moved) {
-                            commitCb.value()
-                            lastTapAt = 0L
-                        } else if (!pinching) {
-                            val now = System.currentTimeMillis()
-                            if (now - lastTapAt < 320L) {
-                                resetCb.value()
-                                lastTapAt = 0L
-                            } else {
-                                lastTapAt = now
-                            }
-                        }
-                    }
-                }
-        )
 
         if (zoom > 1.01f) {
             Text(
@@ -1538,7 +1533,7 @@ private fun PipFrameOverlay(
             )
         }
 
-        // Paus / Stäng uppe till vänster (precis som .pip-controls i webb-previewn)
+        // Paus / Stäng uppe till vänster (konsumerar endast tryck på dessa två cirklar)
         Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -1549,8 +1544,7 @@ private fun PipFrameOverlay(
             PipSmallButton(DuelIconKind.CLOSE, onClick = onClose)
         }
 
-        // Diagonalt randigt storlekshandtag nere till höger (precis som .pip-resize i webb-previewn)
-        val resizeCb = rememberUpdatedState(onResizeScale)
+        // Visuellt diagonalt storlekshandtag nere till höger
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -1559,32 +1553,9 @@ private fun PipFrameOverlay(
                 .background(Color.Black.copy(alpha = .5f))
                 .border(
                     width = 1.dp,
-                    color = Color.White.copy(alpha = .28f),
+                    color = if (activeGesture) DuelGold.copy(alpha = .75f) else Color.White.copy(alpha = .28f),
                     shape = RoundedCornerShape(topStart = 8.dp)
                 )
-                .pointerInput(stageW) {
-                    var startScale = liveScale.value
-                    var accum = 0f
-                    detectDragGestures(
-                        onDragStart = {
-                            startScale = liveScale.value
-                            accum = 0f
-                            activeGesture = true
-                        },
-                        onDragEnd = {
-                            activeGesture = false
-                            commitCb.value()
-                        },
-                        onDragCancel = {
-                            activeGesture = false
-                            commitCb.value()
-                        }
-                    ) { change, drag ->
-                        change.consume()
-                        accum += (drag.x + drag.y) * 0.5f
-                        resizeCb.value((startScale + accum / stageW).coerceIn(PIP_MIN, PIP_MAX))
-                    }
-                }
         ) {
             Canvas(Modifier.fillMaxSize()) {
                 val w = size.width
