@@ -2,8 +2,8 @@ package com.nrworld.duelshot.ui.onboarding
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,17 +28,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import com.nrworld.duelshot.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nrworld.duelshot.ui.components.DuelIcon
+import com.nrworld.duelshot.R
 import com.nrworld.duelshot.ui.components.DuelIconKind
 import com.nrworld.duelshot.ui.theme.DuelBg
 import com.nrworld.duelshot.ui.theme.DuelGradient
+import com.nrworld.duelshot.ui.theme.DuelOrange
 import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
 
@@ -66,18 +69,36 @@ fun OnboardingScreen(onDone: () -> Unit) {
     val step = STEPS[index]
 
     Column(
-        modifier = Modifier.fillMaxSize().background(DuelBg).padding(horizontal = 28.dp, vertical = 24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DuelBg)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 28.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.weight(0.22f))
 
-        Image(
-            painter = painterResource(R.drawable.ic_logo),
-            contentDescription = null,
-            modifier = Modifier.size(112.dp)
-        )
+        // Riktiga DualShots-logotypen med samma subtila orange glöd som på startsidan
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(148.dp)) {
+            Box(
+                Modifier
+                    .size(148.dp)
+                    .clip(RoundedCornerShape(74.dp))
+                    .background(
+                        Brush.radialGradient(
+                            listOf(DuelOrange.copy(alpha = .40f), Color.Transparent)
+                        )
+                    )
+            )
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_art),
+                contentDescription = "DualShots",
+                modifier = Modifier.size(108.dp)
+            )
+        }
 
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(26.dp))
         Text(
             step.title, color = DuelText, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp,
             textAlign = TextAlign.Center
@@ -90,7 +111,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
 
         Spacer(Modifier.weight(0.28f))
 
-        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(7.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             STEPS.indices.forEach { i ->
                 Box(
                     Modifier
@@ -104,7 +125,9 @@ fun OnboardingScreen(onDone: () -> Unit) {
 
         Spacer(Modifier.height(26.dp))
         Box(
-            modifier = Modifier.fillMaxWidth().height(56.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(DuelGradient)
                 .clickable { if (index < STEPS.lastIndex) index++ else onDone() },

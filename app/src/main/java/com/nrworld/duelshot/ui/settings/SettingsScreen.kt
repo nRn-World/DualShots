@@ -161,7 +161,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 if (vm.isPremium) {
                     Text("Premium active", color = DuelGold, fontWeight = FontWeight.Bold)
                 } else {
-                    GoldButton(onClick = { vm.grantPremium() }, text = "Go Premium")
+                    GoldButton(onClick = { premiumFeature = "DualShots Premium" }, text = "Go Premium")
                 }
             }
         }
@@ -178,7 +178,10 @@ fun SettingsScreen(vm: AppViewModel) {
 
 @Composable
 private fun RadioRow(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
-    SurfaceCard(onClick = onClick) {
+    SurfaceCard(
+        onClick = onClick,
+        borderColor = if (selected) DuelAccent.copy(alpha = .5f) else DuelLine
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(title, color = DuelText, fontWeight = FontWeight.SemiBold)
@@ -191,23 +194,29 @@ private fun RadioRow(title: String, subtitle: String, selected: Boolean, onClick
 
 @Composable
 private fun AspectChips(selected: AspectOption, onSelect: (AspectOption) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        AspectOption.values().forEach { opt ->
-            val isSel = opt == selected
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSel) DuelAccent.copy(alpha = .16f) else DuelSurface2)
-                    .border(1.dp, if (isSel) DuelAccent.copy(alpha = .5f) else DuelLine, RoundedCornerShape(10.dp))
-                    .clickable { onSelect(opt) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    opt.label,
-                    color = if (isSel) DuelText else DuelTextMuted,
-                    fontSize = 12.sp,
-                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal
-                )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        AspectOption.values().toList().chunked(2).forEach { rowOptions ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                rowOptions.forEach { opt ->
+                    val isSel = opt == selected
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSel) DuelAccent.copy(alpha = .16f) else DuelSurface2)
+                            .border(1.dp, if (isSel) DuelAccent.copy(alpha = .5f) else DuelLine, RoundedCornerShape(10.dp))
+                            .clickable { onSelect(opt) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            opt.label,
+                            color = if (isSel) DuelText else DuelTextMuted,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
             }
         }
     }

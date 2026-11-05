@@ -29,9 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ExperimentalGraphicsApi
 import androidx.compose.ui.res.painterResource
 import com.nrworld.duelshot.R
 import androidx.compose.ui.text.font.FontFamily
@@ -42,45 +44,45 @@ import androidx.compose.ui.unit.sp
 import com.nrworld.duelshot.ui.AppViewModel
 import com.nrworld.duelshot.ui.components.DuelIcon
 import com.nrworld.duelshot.ui.components.DuelIconKind
+import com.nrworld.duelshot.ui.components.GlassCard
 import com.nrworld.duelshot.ui.theme.DuelBg
 import com.nrworld.duelshot.ui.theme.DuelGold
 import com.nrworld.duelshot.ui.theme.DuelGradient
 import com.nrworld.duelshot.ui.theme.DuelLine
 import com.nrworld.duelshot.ui.theme.DuelOrange
+import com.nrworld.duelshot.ui.theme.DuelOrangeLight
+import com.nrworld.duelshot.ui.theme.DuelPremiumBackground
 import com.nrworld.duelshot.ui.theme.DuelSurface
 import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextFaint
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
+import com.nrworld.duelshot.ui.theme.GlassBorder
+import com.nrworld.duelshot.ui.theme.GlassFill
+import com.nrworld.duelshot.ui.theme.DuelViolet
 
 private val Ink = Color(0xFF04060D)
 
 /** Startmenyn i studiodesignen: logotyp, titel och menyknappar. */
 @Composable
-fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit, onOpenSettings: () -> Unit) {
+fun HomeScreen(
+    vm: AppViewModel,
+    onStart: () -> Unit,
+    onOpenPremium: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenStats: () -> Unit,
+    onOpenGallery: () -> Unit
+) {
     var showAbout by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF0E1018), Color(0xFF121522), Color(0xFF0A0C13))))
-    ) {
-        // Orange glöd överst
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.radialGradient(
-                    colors = listOf(DuelOrange.copy(alpha = .22f), Color.Transparent),
-                    radius = 900f
-                )
-            )
-        )
-
+    DuelPremiumBackground {
         Column(
             modifier = Modifier.fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
             LogoTile()
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -98,12 +100,14 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
                 letterSpacing = 1.sp, modifier = Modifier.padding(top = 6.dp)
             )
 
-            Spacer(Modifier.height(44.dp))
+            Spacer(Modifier.height(40.dp))
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 PrimaryMenuButton(onClick = onStart)
-                MenuButton(DuelIconKind.SETTINGS, "Settings", onClick = onOpenSettings)
+                LastSetupTile(vm = vm, onStart = onStart)
+                GlassMenuButton(DuelIconKind.STATS, "Stats", DuelViolet, onClick = onOpenStats)
+                GlassMenuButton(DuelIconKind.SETTINGS, "Settings", DuelOrange, onClick = onOpenSettings)
                 PremiumMenuButton(isPremium = vm.isPremium, onClick = onOpenPremium)
-                MenuButton(DuelIconKind.INFO, "About", onClick = { showAbout = true })
+                GlassMenuButton(DuelIconKind.INFO, "About", DuelTextMuted, onClick = { showAbout = true })
             }
 
             Spacer(Modifier.height(32.dp))
@@ -118,7 +122,7 @@ fun HomeScreen(vm: AppViewModel, onStart: () -> Unit, onOpenPremium: () -> Unit,
             title = { Text("DualShots", color = DuelText, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Version 1.0 · Dual lens recording engine",
+                    "Version 1.6 · Glass & premium design",
                     color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp
                 )
             },
@@ -185,12 +189,15 @@ private fun CreditFooter() {
     }
 }
 
+@OptIn(ExperimentalGraphicsApi::class)
 @Composable
 private fun LogoTile() {
     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
         Box(
             Modifier.size(120.dp).clip(RoundedCornerShape(60.dp))
-                .background(Brush.radialGradient(listOf(DuelOrange.copy(alpha = .45f), Color.Transparent)))
+                .background(GlassFill)
+                .blur(18.dp)
+                .border(1.dp, GlassBorder, RoundedCornerShape(60.dp))
         )
         Image(
             painter = painterResource(R.drawable.ic_launcher_art),
@@ -224,41 +231,58 @@ private fun PrimaryMenuButton(onClick: () -> Unit) {
     }
 }
 
+/** "Senaste setupen" – glass-kort med sparade inställningar och genväg till inspelning. */
 @Composable
-private fun MenuButton(icon: DuelIconKind, label: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF161A29))
-            .border(1.dp, Color.White.copy(alpha = .1f), RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 15.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        DuelIcon(icon, DuelOrange, 18.dp)
-        Spacer(Modifier.width(14.dp))
-        Text(label, color = Color(0xFFE2E8F0), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        DuelIcon(DuelIconKind.CHEVRON, DuelTextFaint, 16.dp)
+private fun LastSetupTile(vm: AppViewModel, onStart: () -> Unit) {
+    val summary = "${vm.mode.title} · ${vm.quality.label} · ${vm.codec.label} · " +
+        "${vm.frontAspect.label} / ${vm.backAspect.label}"
+    GlassCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onStart)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DuelIcon(DuelIconKind.GEM, DuelOrangeLight, 18.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("LAST SETUP", color = DuelTextFaint, fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 1.sp)
+                Text(summary, color = Color(0xFFE8E8F0), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            DuelIcon(DuelIconKind.VIDEO, DuelOrangeLight, 18.dp)
+        }
     }
 }
 
+/** Frostat glass-menyknapp. */
+@Composable
+private fun GlassMenuButton(icon: DuelIconKind, label: String, tint: Color, onClick: () -> Unit) {
+    GlassCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DuelIcon(icon, tint, 18.dp)
+            Spacer(Modifier.width(14.dp))
+            Text(label, color = Color(0xFFE8E8F0), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            DuelIcon(DuelIconKind.CHEVRON, DuelTextFaint, 16.dp)
+        }
+    }
+}
+
+/** Premium glass-kort med guldaccent. */
 @Composable
 private fun PremiumMenuButton(isPremium: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Brush.horizontalGradient(listOf(DuelOrange.copy(alpha = .15f), DuelGold.copy(alpha = .15f))))
-            .border(1.dp, DuelOrange.copy(alpha = .4f), RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 15.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        DuelIcon(DuelIconKind.CROWN, DuelGold, 18.dp)
-        Spacer(Modifier.width(14.dp))
-        Text(
-            if (isPremium) "Premium active" else "Premium Features",
-            color = DuelGold, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f)
-        )
-        DuelIcon(DuelIconKind.CHEVRON, DuelGold, 16.dp)
+    GlassCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DuelIcon(DuelIconKind.CROWN, DuelGold, 18.dp)
+            Spacer(Modifier.width(14.dp))
+            Text(
+                if (isPremium) "Premium active" else "Premium Features",
+                color = DuelGold, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f)
+            )
+            DuelIcon(DuelIconKind.CHEVRON, DuelGold, 16.dp)
+        }
     }
 }

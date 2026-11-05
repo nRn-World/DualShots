@@ -19,7 +19,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /** Egna linjeikoner – avsiktligt inga standard-mobilikoner. */
-enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, PLAY, PAUSE, CAMERA, VIDEO, CROWN, INFO, PIP, COPY, GRID, SHARE, TRASH }
+enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, SWAP, PLAY, PAUSE, CAMERA, VIDEO, CROWN, INFO, PIP, COPY, GRID, SHARE, TRASH, FOLDER, STATS, PLUS }
 
 /** Ritar en ikon på en 24×24-yta, skalad till [size]. */
 @Composable
@@ -67,6 +67,10 @@ fun DuelIcon(kind: DuelIconKind, tint: Color, size: Dp = 22.dp, modifier: Modifi
                     topLeft = Offset(c.x - r, c.y - r), size = Size(r * 2, r * 2), style = stroke)
                 arrowAt(c, r, 340f, tint, s)
                 arrowAt(c, r, 160f, tint, s)
+            }
+            DuelIconKind.SWAP -> {
+                drawPath(pathOf(listOf(p(4.5f, 8.5f), p(17.5f, 8.5f), p(14.5f, 5.5f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(19.5f, 15.5f), p(6.5f, 15.5f), p(9.5f, 18.5f))), tint, style = stroke)
             }
             DuelIconKind.PLAY -> drawPath(pathOf(listOf(p(8f, 5.5f), p(19f, 12f), p(8f, 18.5f)), close = true), tint)
             DuelIconKind.PAUSE -> {
@@ -144,6 +148,28 @@ fun DuelIcon(kind: DuelIconKind, tint: Color, size: Dp = 22.dp, modifier: Modifi
                 drawCircle(tint, radius = 9f * s, center = p(12f, 12f), style = stroke)
                 drawPath(pathOf(listOf(p(12f, 11f), p(12f, 16.5f))), tint, style = stroke)
                 drawCircle(tint, radius = 1.2f * s, center = p(12f, 7.8f))
+            }
+            DuelIconKind.FOLDER -> {
+                drawPath(
+                    pathOf(
+                        listOf(
+                            p(3f, 6f), p(10.5f, 6f), p(13f, 8.6f), p(21f, 8.6f),
+                            p(21f, 19f), p(3f, 19f)
+                        ),
+                        close = true
+                    ),
+                    tint, style = stroke
+                )
+            }
+            DuelIconKind.STATS -> {
+                // Uppåtgående trendlinje med noder – raffinerad analytics-glyf.
+                drawPath(pathOf(listOf(p(4f, 18f), p(9f, 12.5f), p(13.5f, 15f), p(20f, 4.5f))), tint, style = stroke)
+                drawCircle(tint, radius = 2.5f * s, center = p(20f, 4.5f))
+                drawCircle(tint, radius = 1.5f * s, center = p(4f, 18f))
+            }
+            DuelIconKind.PLUS -> {
+                drawPath(pathOf(listOf(p(12f, 4f), p(12f, 20f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(4f, 12f), p(20f, 12f))), tint, style = stroke)
             }
         }
     }

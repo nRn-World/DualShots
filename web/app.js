@@ -72,6 +72,11 @@ const state = {
   pipPaused: false,
   swap: false,
   clips: [],
+  gallerySelectMode: false,
+  selectedClipIds: [],
+  folders: [],
+  clipFolders: {},
+  activeFolder: null,
 };
 
 /* --------------------------------------------------------------- elements */
@@ -111,33 +116,20 @@ const ICONS = {
   grid: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>'),
   share: svg('<path d="M12 3.5v11"/><path d="m8 7.5 4-4 4 4"/><path d="M6 12v8h12v-8"/>'),
   trash: svg('<path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1.1 13h8.8L17.5 7"/><path d="M10.5 10.5 11 16.5M13.5 10.5 13 16.5"/>'),
+  folder: svg('<path d="M3 6h7l2 2.5H21v9.5H3z" /><path d="M3 9.5h18" />'),
+  stats: svg('<path d="M4 18 L9 12.5 L13.5 15 L20 4.5"/><circle cx="20" cy="4.5" r="2.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/>'),
+  plus: svg('<path d="M12 4v16M4 12h16"/>'),
 };
-
-/* Samma logotyp som appens launcher-ikon: orange squircle + svart kamera. */
-const LOGO_MARK = `
-  <svg class="logo-mark" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <defs>
-      <linearGradient id="logoGrad" x1="6" y1="4" x2="102" y2="106" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stop-color="#ff4d00" />
-        <stop offset="1" stop-color="#ff9a2e" />
-      </linearGradient>
-    </defs>
-    <rect width="108" height="108" rx="26" fill="url(#logoGrad)" />
-    <g fill="none" stroke="#0a0a0a" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="25" y="42" width="58" height="32" rx="9" />
-      <path d="M44 42v-2a7 7 0 0 1 7-7h6a7 7 0 0 1 7 7v2" />
-      <circle cx="54" cy="58" r="10.5" />
-    </g>
-    <circle cx="70" cy="51" r="1.8" fill="#0a0a0a" />
-  </svg>`;
 
 /* Samma markering som launcher-ikonen: två linser på navy-botten. */
 const LENS_MARK = `
   <svg class="logo-mark" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect width="108" height="108" rx="26" fill="#0e1626" />
+    <rect width="108" height="108" rx="26" fill="#0e1626" stroke="#1c2942" stroke-width="1.5" />
     <path fill-rule="evenodd" fill="#e4552b" d="M40 54m-20 0a20 20 0 1 0 40 0a20 20 0 1 0-40 0M40 54m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0" />
     <path fill-rule="evenodd" fill="#f2a03f" stroke="#0e1626" stroke-width="4.5" d="M66 54m-20 0a20 20 0 1 0 40 0a20 20 0 1 0-40 0M66 54m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0" />
   </svg>`;
+
+const LOGO_MARK = LENS_MARK;
 
 const logoTile = () => `
   <div class="logo-tile">
@@ -237,6 +229,8 @@ function savePrefs() {
       pip: state.pip,
       swap: state.swap,
       onboarded: !!state.onboarded,
+      folders: state.folders,
+      clipFolders: state.clipFolders,
     }));
   } catch (_) { /* private mode */ }
 }
@@ -262,6 +256,8 @@ function loadPrefs() {
         scale: clamp(p.pip.scale, PIP_MIN, PIP_MAX),
       };
     }
+    if (Array.isArray(p.folders)) state.folders = p.folders.filter((f) => typeof f === 'string');
+    if (p.clipFolders && typeof p.clipFolders === 'object') state.clipFolders = p.clipFolders;
   } catch (_) { /* ignore */ }
 }
 
@@ -1830,6 +1826,7 @@ function render() {
   document.body.dataset.screen = 'page';
   if (!state.onboarded) { renderOnboarding(); renderNav(); return; }
   if (state.page === 'SETTINGS') renderSettings();
+  else if (state.page === 'STATS') renderStats();
   else if (state.page === 'GALLERY') renderGallery();
   else renderHome();
   renderNav();
@@ -1843,6 +1840,7 @@ function renderNav() {
   const tabs = [
     ['HOME', 'Home', ICONS.home],
     ['GALLERY', 'Gallery', ICONS.gallery],
+    ['STATS', 'Stats', ICONS.stats],
     ['SETTINGS', 'Settings', ICONS.settings],
   ];
   nav.innerHTML = tabs.map(([key, label, icon]) => `
@@ -1868,7 +1866,22 @@ function renderHome() {
           <span class="start-chev">${ICONS.chevron}</span>
         </button>
 
-        <button class="menu-btn" id="home-settings" type="button">
+        <button class="menu-btn last-setup" id="last-setup" type="button">
+          <span class="menu-ico">${ICONS.crown}</span>
+          <span class="menu-label">
+            <span class="ls-title">LAST SETUP</span>
+            <span class="ls-summary">${MODES[state.mode].title} · ${QUALITIES[state.quality].label} · ${CODECS[state.codec].label} · ${ASPECTS[state.frontAspect].label} / ${ASPECTS[state.backAspect].label}</span>
+          </span>
+          <span class="menu-chev">${ICONS.video}</span>
+        </button>
+
+        <button class="menu-btn stats" id="home-stats" type="button">
+          <span class="menu-ico">${ICONS.stats}</span>
+          <span class="menu-label">Stats</span>
+          <span class="menu-chev">${ICONS.chevron}</span>
+        </button>
+
+        <button class="menu-btn settings" id="home-settings" type="button">
           <span class="menu-ico">${ICONS.settings}</span>
           <span class="menu-label">Settings</span>
           <span class="menu-chev">${ICONS.chevron}</span>
@@ -1880,7 +1893,7 @@ function renderHome() {
           <span class="menu-chev">${ICONS.chevron}</span>
         </button>
 
-        <button class="menu-btn" id="menu-about" type="button">
+        <button class="menu-btn info" id="menu-about" type="button">
           <span class="menu-ico">${ICONS.info}</span>
           <span class="menu-label">About</span>
           <span class="menu-chev">${ICONS.chevron}</span>
@@ -1898,6 +1911,8 @@ function renderHome() {
     </div>`;
 
   $('#start-btn').addEventListener('click', openRecord);
+  $('#last-setup').addEventListener('click', openRecord);
+  $('#home-stats').addEventListener('click', () => go('STATS'));
   $('#home-settings').addEventListener('click', () => go('SETTINGS'));
   $('#menu-premium').addEventListener('click', () => showPremium());
   $('#menu-about').addEventListener('click', showAbout);
@@ -2025,28 +2040,363 @@ function renderSettings() {
   if (premiumBtn) premiumBtn.addEventListener('click', () => showPremium());
 }
 
-/* GalleryScreen.kt: large title, clip rows with the gradient play tile. */
-function renderGallery() {
+/* GalleryScreen.kt: large title, long-press multi-select, batch Share / Delete. */
+/* StatsScreen.kt: all-time totals, saved storage, recordings by hour. */
+function renderStats() {
+  const clips = state.clips;
+  const totalMb = clips.reduce((a, c) => a + (Number(c.sizeMb) || 0), 0);
+  const totalMs = clips.reduce((a, c) => a + parseDurationMs(c.duration), 0);
+  const byHour = new Array(24).fill(0);
+  clips.forEach((c) => {
+    if (c.when instanceof Date && !Number.isNaN(c.when.getTime())) {
+      byHour[c.when.getHours()]++;
+    }
+  });
+  const gb = totalMb / 1024;
+  const savedGb = gb * 0.5;
+  const peak = byHour.indexOf(Math.max(...byHour));
+
+  const folders = (state.folders || []).map((f) => {
+    const n = clips.filter((c) => state.clipFolders[c.id] === f).length;
+    return { name: f, n };
+  }).filter((x) => x.n > 0);
+  const unassigned = clips.filter((c) => !state.clipFolders[c.id]).length;
+  const folderRows = folders.map((f) => ({ name: f.name, n: f.n }));
+  if (unassigned > 0) folderRows.push({ name: 'Unassigned', n: unassigned });
+  const folderMax = Math.max(1, ...folderRows.map((r) => r.n));
+
   screenEl.innerHTML = `
-    <div class="page gallery">
+    <div class="page stats">
       <header class="screen-header">
-        <h1>Gallery</h1>
-        <p>Saved to Movies/DualShots</p>
+        <h1>Stats</h1>
+        <p>Your DualShots recording history</p>
       </header>
 
-      ${state.clips.length
-        ? `<div class="clip-list">${state.clips.map(clipCardHTML).join('')}</div>`
-        : `<div class="empty">
+      <div class="stats-hero">
+        <div class="stats-hero-row">
+          <div class="stats-hero-ico">${ICONS.stats}</div>
+          <div class="stats-hero-body">
+            <div class="stats-hero-label">ALL-TIME RECORDINGS</div>
+            <div class="stats-hero-value">${clips.length} ${clips.length === 1 ? 'clip' : 'clips'}</div>
+          </div>
+        </div>
+        <div class="stats-mini">
+          <div class="stats-mini-card"><div class="stats-mini-label">Duration</div><div class="stats-mini-value">${formatDuration(totalMs)}</div></div>
+          <div class="stats-mini-card"><div class="stats-mini-label">Size</div><div class="stats-mini-value">${gb >= 1 ? gb.toFixed(2) + ' GB' : totalMb + ' MB'}</div></div>
+        </div>
+      </div>
+
+      <div class="stats-saved">
+        <span class="stats-saved-ico">${ICONS.crown}</span>
+        <div>
+          <div class="stats-saved-title">Storage saved</div>
+          <div class="stats-saved-text">Dual View puts both cameras in one file instead of two — you've saved about ${savedGb.toFixed(2)} GB of separate dual recordings.</div>
+        </div>
+      </div>
+
+      <div class="stats-hours">
+        <div class="section-label">RECORDINGS BY TIME OF DAY</div>
+        <div class="hour-bars">
+          ${byHour.map((c, h) => {
+            const max = Math.max(...byHour, 1);
+            const frac = c / max;
+            return `<div class="hour-col">
+              <span class="hour-count">${c > 0 ? c : ''}</span>
+              <span class="hour-bar" style="height:${Math.max(frac * 60, frac > 0 ? 8 : 0)}px"></span>
+              <span class="hour-label">${h % 3 === 0 ? h : ''}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="stats-peak">${peak >= 0 && byHour[peak] > 0 ? `Most active around ${peak}:00` : 'Record something to see your pattern'}</div>
+      </div>
+
+      ${folderRows.length > 0 ? `
+      <div class="stats-folders">
+        <div class="section-label">CLIPS BY FOLDER</div>
+        ${folderRows.map((r) => `
+          <div class="stats-folder-row">
+            <span class="stats-folder-name">${esc(r.name)}</span>
+            <span class="stats-folder-bar"><i style="width:${(r.n / folderMax * 100).toFixed(1)}%"></i></span>
+            <span class="stats-folder-count">${r.n} ${r.n === 1 ? 'clip' : 'clips'}</span>
+          </div>`).join('')}
+      </div>` : ''}
+    </div>`;
+}
+
+function parseDurationMs(d) {
+  if (!d) return 0;
+  const parts = String(d).split(':').map((x) => parseInt(x, 10));
+  if (parts.some((x) => Number.isNaN(x))) return 0;
+  let s = 0;
+  parts.forEach((p) => { s = s * 60 + p; });
+  return s * 1000;
+}
+
+function formatDuration(ms) {
+  if (!ms || ms <= 0) return '0m';
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m} min`;
+}
+
+function renderGallery() {
+  if (!state.clips.length) {
+    state.gallerySelectMode = false;
+    state.selectedClipIds = [];
+  }
+  const existingIds = new Set(state.clips.map((c) => c.id));
+  state.selectedClipIds = (state.selectedClipIds || []).filter((id) => existingIds.has(id));
+
+  const selMode = !!state.gallerySelectMode;
+  const selSet = new Set(state.selectedClipIds);
+  const selCount = selSet.size;
+  const folders = state.folders || [];
+  const folderOf = (id) => state.clipFolders[id] || null;
+  const activeFolder = state.activeFolder;
+  const shown = state.clips.filter((c) => activeFolder == null || folderOf(c.id) === activeFolder);
+  const allSelected = shown.length > 0 && shown.every((c) => selSet.has(c.id));
+  const totalMb = shown
+    .filter((c) => selSet.has(c.id))
+    .reduce((acc, c) => acc + (Number(c.sizeMb) || 0), 0);
+
+  screenEl.innerHTML = `
+    <div class="page gallery">
+      ${selMode
+        ? `<div class="gal-sel-header">
+             <button class="gal-sel-close" id="gal-sel-cancel" type="button" aria-label="Cancel">${ICONS.close}</button>
+             <div class="gal-sel-titles">
+               <strong>${selCount === 0 ? 'Select clips' : `${selCount} selected`}</strong>
+               <span>Tap clips to mark or unmark</span>
+             </div>
+             <button class="gal-sel-all" id="gal-sel-all" type="button">${allSelected ? 'Deselect all' : 'Select all'}</button>
+           </div>`
+        : `<div class="gal-head-row">
+             <header class="screen-header">
+               <h1>Gallery</h1>
+               <p>${state.clips.length ? 'Saved to Movies/DualShots · Hold to select' : 'Saved to Movies/DualShots'}</p>
+             </header>
+             ${state.clips.length ? `<button class="gal-select-btn" id="gal-enter-select" type="button">Select</button>` : ''}
+           </div>`}
+
+      ${!selMode && state.clips.length ? folderChipsHTML(folders, activeFolder, folderOf) : ''}
+
+      ${state.clips.length === 0
+        ? `<div class="empty">
              <span class="empty-ico">${ICONS.gallery}</span>
              <span class="empty-title">No recordings yet</span>
              <span class="empty-sub">Start a recording from Home</span>
-           </div>`}
+           </div>`
+        : shown.length === 0
+          ? `<div class="empty">
+             <span class="empty-ico">${ICONS.folder}</span>
+             <span class="empty-title">Nothing in this folder</span>
+             <span class="empty-sub">Record something or move clips here</span>
+           </div>`
+          : `<div class="clip-list">${shown.map((c) => clipCardHTML(c, selMode, selSet.has(c.id), folderOf(c.id))).join('')}</div>`}
+
+      ${selMode && state.clips.length
+        ? `<div class="gal-action-bar">
+             ${selCount > 0 ? `<div class="gal-action-meta">${selCount} ${selCount === 1 ? 'FILE' : 'FILES'} SELECTED${totalMb > 0 ? ` · ${totalMb.toFixed(1)} MB` : ''}</div>` : ''}
+             <div class="gal-action-btns">
+               <button class="gal-btn-share" id="gal-share-selected" type="button" ${selCount === 0 ? 'disabled' : ''}>
+                 ${ICONS.share}<span>${selCount > 0 ? `Share (${selCount})` : 'Share'}</span>
+               </button>
+               <button class="gal-btn-move" id="gal-move-selected" type="button" ${selCount === 0 ? 'disabled' : ''}>
+                 ${ICONS.folder}<span>${selCount > 0 ? `Move (${selCount})` : 'Move'}</span>
+               </button>
+               <button class="gal-btn-delete" id="gal-delete-selected" type="button" ${selCount === 0 ? 'disabled' : ''}>
+                 ${ICONS.trash}<span>${selCount > 0 ? `Delete (${selCount})` : 'Delete'}</span>
+               </button>
+             </div>
+           </div>`
+        : ''}
     </div>`;
 
-  $$('.clip', screenEl).forEach((el) => el.addEventListener('click', () => {
-    const clip = state.clips.find((c) => c.id === el.dataset.clip);
-    if (clip) playClip(clip);
+  const enterBtn = $('#gal-enter-select', screenEl);
+  if (enterBtn) {
+    enterBtn.addEventListener('click', () => {
+      state.gallerySelectMode = true;
+      renderGallery();
+    });
+  }
+  const cancelBtn = $('#gal-sel-cancel', screenEl);
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      state.gallerySelectMode = false;
+      state.selectedClipIds = [];
+      renderGallery();
+    });
+  }
+  const allBtn = $('#gal-sel-all', screenEl);
+  if (allBtn) {
+    allBtn.addEventListener('click', () => {
+      state.selectedClipIds = allSelected ? [] : state.clips.map((c) => c.id);
+      renderGallery();
+    });
+  }
+  const shareSelBtn = $('#gal-share-selected', screenEl);
+  if (shareSelBtn) {
+    shareSelBtn.addEventListener('click', () => {
+      const chosen = state.clips.filter((c) => selSet.has(c.id));
+      if (chosen.length) shareMultipleClips(chosen);
+    });
+  }
+  const delSelBtn = $('#gal-delete-selected', screenEl);
+  if (delSelBtn) {
+    delSelBtn.addEventListener('click', () => {
+      const chosen = state.clips.filter((c) => selSet.has(c.id));
+      if (chosen.length) confirmDeleteClips(chosen);
+    });
+  }
+
+  $$('.clip', screenEl).forEach((el) => {
+    const id = el.dataset.clip;
+    let holdTimer = null;
+    let longFired = false;
+
+    const clearHold = () => {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    };
+
+    el.addEventListener('pointerdown', () => {
+      longFired = false;
+      clearHold();
+      holdTimer = setTimeout(() => {
+        longFired = true;
+        if (!state.gallerySelectMode) {
+          state.gallerySelectMode = true;
+          state.selectedClipIds = [id];
+        } else {
+          toggleClipSelection(id);
+        }
+        renderGallery();
+      }, 750);
+    });
+    el.addEventListener('pointerup', clearHold);
+    el.addEventListener('pointercancel', clearHold);
+    el.addEventListener('pointerleave', clearHold);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    el.addEventListener('click', (e) => {
+      if (longFired) {
+        e.preventDefault();
+        longFired = false;
+        return;
+      }
+      if (state.gallerySelectMode) {
+        toggleClipSelection(id);
+        renderGallery();
+      } else {
+        const clip = state.clips.find((c) => c.id === id);
+        if (clip) playClip(clip);
+      }
+    });
+  });
+
+  $$('[data-folder]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    const f = b.dataset.folder;
+    if (f === '__new__') { openNewFolderDialog(); return; }
+    state.activeFolder = f === '' ? null : f;
+    renderGallery();
   }));
+
+  const moveBtn = $('#gal-move-selected', screenEl);
+  if (moveBtn) {
+    moveBtn.addEventListener('click', () => {
+      const chosen = shown.filter((c) => selSet.has(c.id));
+      if (chosen.length) openMoveSheet(chosen.length);
+    });
+  }
+}
+
+/* Flytta-kontroll för markerade klipp. */
+function openMoveSheet(count) {
+  const folders = state.folders || [];
+  const folderOf = (id) => state.clipFolders[id] || null;
+  const rows = folders.map((f) => {
+    const c = state.clips.filter((x) => folderOf(x.id) === f).length;
+    return `<button class="folder-row" data-move="${esc(f)}" type="button">
+      <span class="folder-row-ico">${ICONS.folder}</span>
+      <span class="folder-row-name">${esc(f)}</span>
+      <span class="folder-row-count">${c}</span>
+      <span class="folder-row-chev">${ICONS.chevron}</span>
+    </button>`;
+  }).join('');
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog confirm-dialog">
+        <div class="confirm-title">Move $count clips</div>
+        <p class="confirm-text">Marked clips will move here.</p>
+        <div class="folder-rows">${rows || '<div class="folder-empty">No folders yet — create one below.</div>'}
+          <button class="folder-row" data-move="__new__" type="button">
+            <span class="folder-row-ico">${ICONS.plus}</span>
+            <span class="folder-row-name">New folder…</span>
+            <span class="folder-row-chev">${ICONS.chevron}</span>
+          </button>
+        </div>
+        <div class="confirm-actions">
+          <button class="confirm-delete" data-move="__none__" type="button">No folder</button>
+          <button class="confirm-cancel" data-close type="button">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  wireSheet();
+  $$('[data-move]', modalRoot).forEach((b) => b.addEventListener('click', () => {
+    const f = b.dataset.move;
+    if (f === '__new__') { openNewFolderDialog(() => openMoveSheet(count)); return; }
+    if (f === '__none__') {
+      state.selectedClipIds.forEach((id) => { delete state.clipFolders[id]; });
+    } else {
+      state.selectedClipIds.forEach((id) => { state.clipFolders[id] = f; });
+    }
+    savePrefs();
+    closeSheet();
+    toast(f === '__none__' ? `${count} clips unassigned` : `Moved ${count} clips to ${f}`);
+    if (state.page === 'GALLERY') renderGallery();
+  }));
+}
+
+/* Ny mapp: skriver in namn och skapar. */
+function openNewFolderDialog(after) {
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog confirm-dialog">
+        <div class="confirm-title">New folder</div>
+        <p class="confirm-text">Give the folder a name to organize clips.</p>
+        <input class="folder-input" id="folder-name" type="text" placeholder="Folder name" maxlength="40" />
+        <div class="confirm-actions">
+          <button class="confirm-delete" id="folder-create" type="button">Create</button>
+          <button class="confirm-cancel" data-close type="button">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+  wireSheet();
+  const input = $('#folder-name', modalRoot);
+  if (input) input.focus();
+  $('#folder-create', modalRoot).addEventListener('click', () => {
+    const name = (input.value || '').trim();
+    if (!name) return;
+    if (!state.folders.includes(name)) state.folders.push(name);
+    savePrefs();
+    closeSheet();
+    toast(`Created folder "${name}"`);
+    if (after) after();
+    else if (state.page === 'GALLERY') renderGallery();
+  });
+}
+
+function toggleClipSelection(id) {
+  const list = state.selectedClipIds || [];
+  if (list.includes(id)) {
+    state.selectedClipIds = list.filter((x) => x !== id);
+  } else {
+    state.selectedClipIds = [...list, id];
+  }
 }
 
 function clipMetaLine(c) {
@@ -2058,25 +2408,48 @@ function clipMetaLine(c) {
   return `${c.sizeMb} MB${when ? ` · ${when}` : ''}`;
 }
 
-function clipCardHTML(c) {
+function clipCardHTML(c, selMode = false, selected = false, folder = null) {
   return `
-    <button class="clip" data-clip="${c.id}" type="button">
+    <button class="clip ${selected ? 'selected' : ''}" data-clip="${c.id}" type="button">
+      ${selMode
+        ? `<span class="clip-check ${selected ? 'checked' : ''}">${selected ? ICONS.check : ''}</span>`
+        : ''}
       <span class="clip-tile">${c.poster ? `<img src="${c.poster}" alt="" />` : ICONS.play}</span>
       <span class="clip-body">
         <span class="clip-name">${esc(c.name)}</span>
         <span class="clip-meta">${esc(clipMetaLine(c))}</span>
+        ${folder ? `<span class="clip-folder">${ICONS.folder}${esc(folder)}</span>` : ''}
       </span>
-      <span class="clip-chev">${ICONS.chevron}</span>
+      ${selMode ? '' : `<span class="clip-chev">${ICONS.chevron}</span>`}
     </button>`;
 }
 
-/* GalleryScreen.kt: spelare i dialog med Share / Delete / Close. */
+/* Mappchips över galleriet: All, egna mappar + ny. */
+function folderChipsHTML(folders, activeFolder, folderOf) {
+  const chips = [
+    `<button class="folder-chip ${activeFolder == null ? 'active' : ''}" data-folder="" type="button">${ICONS.grid}<span>All</span></button>`,
+    folders.map((f) => {
+      const count = state.clips.filter((c) => folderOf(c.id) === f).length;
+      return `<button class="folder-chip ${activeFolder === f ? 'active' : ''}" data-folder="${esc(f)}" type="button">${ICONS.folder}<span>${esc(f)}</span><em>${count}</em></button>`;
+    }).join(''),
+    `<button class="folder-chip new" data-folder="__new__" type="button">${ICONS.plus}<span>New</span></button>`,
+  ];
+  return `<div class="folder-chips">${chips.join('')}</div>`;
+}
+
+/* GalleryScreen.kt: spelare med tidslinje + thumbnail-filmstrip, Share / Delete / Close. */
 function playClip(clip) {
   modalRoot.innerHTML = `
     <div class="modal">
       <div class="dialog clip-dialog">
         <div class="clip-dialog-name">${esc(clip.name)}</div>
-        <video class="clip-video" src="${clip.url}" controls autoplay playsinline></video>
+        <video class="clip-video" src="${clip.url}" preload="metadata" playsinline></video>
+        <div class="clip-timeline">
+          <span class="clip-time" id="clip-time">0:00</span>
+          <input class="clip-scrub" id="clip-scrub" type="range" min="0" max="100" value="0" step="0.1" />
+          <span class="clip-time" id="clip-time-total">0:00</span>
+        </div>
+        <div class="clip-thumbs" id="clip-thumbs"></div>
         <div class="clip-dialog-meta">${esc(clipMetaLine(clip))} · ${esc(clip.duration || '')}</div>
         <div class="pill-row">
           <button class="pill" data-share type="button">${ICONS.share}<span>Share</span></button>
@@ -2089,19 +2462,83 @@ function playClip(clip) {
   const backdrop = $('.modal', modalRoot);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
   wireSheet();
-  $('[data-share]', modalRoot).addEventListener('click', () => shareClip(clip));
-  $('[data-delete]', modalRoot).addEventListener('click', () => confirmDeleteClip(clip));
+  $('[data-share]', modalRoot).addEventListener('click', () => shareMultipleClips([clip]));
+  $('[data-delete]', modalRoot).addEventListener('click', () => confirmDeleteClips([clip]));
+
+  const video = $('video', modalRoot);
+  const scrub = $('#clip-scrub', modalRoot);
+  const timeEl = $('#clip-time', modalRoot);
+  const totalEl = $('#clip-time-total', modalRoot);
+  const thumbsEl = $('#clip-thumbs', modalRoot);
+
+  const fmt = (s) => {
+    s = Math.max(0, Math.floor(s));
+    const m = Math.floor(s / 60);
+    const ss = s % 60;
+    return m + ':' + String(ss).padStart(2, '0');
+  };
+
+  video.addEventListener('loadedmetadata', () => {
+    const dur = video.duration;
+    if (!Number.isFinite(dur) || dur <= 0) return;
+    totalEl.textContent = fmt(dur);
+    scrub.max = String(dur);
+    video.play().catch(() => {});
+    buildThumbs(video, dur, thumbsEl);
+  });
+  video.addEventListener('timeupdate', () => {
+    scrub.value = String(video.currentTime);
+    timeEl.textContent = fmt(video.currentTime);
+  });
+  scrub.addEventListener('input', () => { video.currentTime = parseFloat(scrub.value); });
 }
 
-/* Samma bekräftelsedialog som GalleryScreen.kt. */
-function confirmDeleteClip(clip) {
+/* Fångar frame vid jämna intervall för thumbnail-filmstripen. */
+function buildThumbs(video, dur, container) {
+  const n = 6;
+  const canvas = document.createElement('canvas');
+  canvas.width = 120; canvas.height = 68;
+  const ctx = canvas.getContext('2d');
+  const thumbs = [];
+  let i = 1;
+  function grab() {
+    if (i > n) {
+      container.innerHTML = thumbs.map((t, idx) => {
+        const tMs = dur * (idx + 1) / (n + 1);
+        return `<button class="clip-thumb" data-seek="${tMs}" type="button">${t ? `<img src="${t}" alt="" />` : ''}</button>`;
+      }).join('');
+      $$('[data-seek]', container).forEach((b) => b.addEventListener('click', () => {
+        video.currentTime = parseFloat(b.dataset.seek);
+      }));
+      return;
+    }
+    const t = dur * i / (n + 1);
+    const onSeeked = () => {
+      video.removeEventListener('seeked', onSeeked);
+      try {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        thumbs.push(canvas.toDataURL('image/jpeg', 0.6));
+      } catch (_) { thumbs.push(''); }
+      i++; grab();
+    };
+    video.addEventListener('seeked', onSeeked, { once: true });
+    video.currentTime = t;
+  }
+  grab();
+}
+
+/* Samma bekräftelsedialog som GalleryScreen.kt (stödjer 1 eller flera klipp). */
+function confirmDeleteClips(clipsToDelete) {
+  const count = clipsToDelete.length;
   modalRoot.innerHTML = `
     <div class="modal">
       <div class="dialog confirm-dialog">
-        <div class="confirm-title">Delete clip?</div>
-        <p class="confirm-text">${esc(clip.name)} is removed from Movies/DualShots.</p>
+        <div class="confirm-title">${count === 1 ? 'Delete clip?' : `Delete ${count} clips?`}</div>
+        <p class="confirm-text">${count === 1
+          ? `${esc(clipsToDelete[0].name)} is removed from Movies/DualShots.`
+          : `${count} selected recordings will be removed from Movies/DualShots.`}</p>
         <div class="confirm-actions">
-          <button class="confirm-delete" data-confirm type="button">Delete</button>
+          <button class="confirm-delete" data-confirm type="button">${count === 1 ? 'Delete' : `Delete (${count})`}</button>
           <button class="confirm-cancel" data-close type="button">Cancel</button>
         </div>
       </div>
@@ -2111,34 +2548,44 @@ function confirmDeleteClip(clip) {
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
   wireSheet();
   $('[data-confirm]', modalRoot).addEventListener('click', () => {
-    URL.revokeObjectURL(clip.url);
-    state.clips = state.clips.filter((c) => c.id !== clip.id);
+    const delIds = new Set(clipsToDelete.map((c) => c.id));
+    clipsToDelete.forEach((c) => URL.revokeObjectURL(c.url));
+    state.clips = state.clips.filter((c) => !delIds.has(c.id));
+    state.selectedClipIds = (state.selectedClipIds || []).filter((id) => !delIds.has(id));
+    if (!state.selectedClipIds.length) state.gallerySelectMode = false;
     closeSheet();
-    toast('Clip deleted');
+    toast(count === 1 ? 'Clip deleted' : `${count} clips deleted`);
     if (state.page === 'GALLERY') renderGallery();
   });
 }
 
-/* Delar filen via systemets delningsark; nedladdning om det inte stöds. */
-async function shareClip(clip) {
+/* Delar en eller flera filer via systemets delningsark; nedladdning om det inte stöds. */
+async function shareMultipleClips(clipsToShare) {
   try {
     if (navigator.share) {
-      const blob = await (await fetch(clip.url)).blob();
-      const file = new File([blob], clip.name, { type: clip.mime || blob.type || 'video/webm' });
-      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: clip.name });
+      const files = await Promise.all(clipsToShare.map(async (clip) => {
+        const blob = await (await fetch(clip.url)).blob();
+        return new File([blob], clip.name, { type: clip.mime || blob.type || 'video/webm' });
+      }));
+      if (!navigator.canShare || navigator.canShare({ files })) {
+        await navigator.share({
+          files,
+          title: files.length === 1 ? files[0].name : `${files.length} DualShots clips`,
+        });
         return;
       }
     }
   } catch (_) { /* avbruten eller ostödd – faller tillbaka */ }
 
-  const a = document.createElement('a');
-  a.href = clip.url;
-  a.download = clip.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  toast('Downloaded ' + clip.name);
+  clipsToShare.forEach((clip) => {
+    const a = document.createElement('a');
+    a.href = clip.url;
+    a.download = clip.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+  toast(clipsToShare.length === 1 ? 'Downloaded ' + clipsToShare[0].name : `Downloaded ${clipsToShare.length} clips`);
 }
 
 /* OnboardingScreen.kt: tre steg, logotyp, prickar och gradient-CTA. */
