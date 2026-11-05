@@ -1,0 +1,42 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Orange squircle -->
+    <path android:pathData="M26,0 L82,0 A26,26 0 0 1 108,26 L108,82 A26,26 0 0 1 82,108 L26,108 A26,26 0 0 1 0,82 L0,26 A26,26 0 0 1 26,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="6"
+                android:startY="4"
+                android:endX="102"
+                android:endY="106"
+                android:startColor="#FF4D00"
+                android:endColor="#FF9A2E" />
+        </aapt:attr>
+    </path>
+
+    <!-- Camera glyph -->
+    <path
+        android:pathData="M34,42 h40 a9,9 0 0 1 9,9 v14 a9,9 0 0 1 -9,9 h-40 a9,9 0 0 1 -9,-9 v-14 a9,9 0 0 1 9,-9 z"
+        android:strokeColor="#0A0A0A"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M44,42 v-2 a7,7 0 0 1 7,-7 h6 a7,7 0 0 1 7,7 v2"
+        android:strokeColor="#0A0A0A"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M54,58 m-10.5,0 a10.5,10.5 0 1,0 21,0 a10.5,10.5 0 1,0 -21,0"
+        android:strokeColor="#0A0A0A"
+        android:strokeWidth="5.5" />
+    <path
+        android:fillColor="#0A0A0A"
+        android:pathData="M70,51 m-1.8,0 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0" />
+</vector>

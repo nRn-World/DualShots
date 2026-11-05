@@ -1,5 +1,6 @@
 package com.nrworld.duelshot.ui.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import com.nrworld.duelshot.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -189,12 +192,11 @@ private fun LogoTile() {
             Modifier.size(120.dp).clip(RoundedCornerShape(60.dp))
                 .background(Brush.radialGradient(listOf(DuelOrange.copy(alpha = .45f), Color.Transparent)))
         )
-        Box(
-            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(24.dp)).background(DuelGradient),
-            contentAlignment = Alignment.Center
-        ) {
-            DuelIcon(DuelIconKind.CAMERA, Ink, 42.dp)
-        }
+        Image(
+            painter = painterResource(R.drawable.ic_logo),
+            contentDescription = "DualShots",
+            modifier = Modifier.size(84.dp)
+        )
     }
 }
 

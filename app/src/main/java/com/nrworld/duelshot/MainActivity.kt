@@ -9,6 +9,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -136,12 +138,11 @@ private fun PermissionsScreen(denied: Boolean, onRequest: () -> Unit, onOpenSett
     ) {
         Spacer(Modifier.weight(0.25f))
 
-        Box(
-            modifier = Modifier.size(96.dp).clip(RoundedCornerShape(28.dp)).background(DuelGradient),
-            contentAlignment = Alignment.Center
-        ) {
-            DuelIcon(DuelIconKind.CAMERA, Color(0xFF04060D), 42.dp)
-        }
+        Image(
+            painter = painterResource(R.drawable.ic_logo),
+            contentDescription = null,
+            modifier = Modifier.size(96.dp)
+        )
 
         Spacer(Modifier.height(26.dp))
         Text(

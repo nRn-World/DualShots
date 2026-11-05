@@ -1,5 +1,6 @@
 package com.nrworld.duelshot.ui.onboarding
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,8 +26,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import com.nrworld.duelshot.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,12 +71,11 @@ fun OnboardingScreen(onDone: () -> Unit) {
     ) {
         Spacer(Modifier.weight(0.22f))
 
-        Box(
-            modifier = Modifier.size(112.dp).clip(RoundedCornerShape(32.dp)).background(DuelGradient),
-            contentAlignment = Alignment.Center
-        ) {
-            DuelIcon(DuelIconKind.CAMERA, Color(0xFF04060D), 48.dp)
-        }
+        Image(
+            painter = painterResource(R.drawable.ic_logo),
+            contentDescription = null,
+            modifier = Modifier.size(112.dp)
+        )
 
         Spacer(Modifier.height(30.dp))
         Text(

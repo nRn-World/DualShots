@@ -282,6 +282,15 @@ svg { display: block; }
 }
 .logo-tile-inner svg { width: 42px; height: 42px; }
 
+/* Den riktiga logotypen (orange squircle + svart kamera) */
+.logo-mark {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 16px 30px rgba(255, 68, 0, .5));
+}
+
 .wordmark {
   margin: 20px 0 0;
   font-size: 34px;
@@ -1382,6 +1391,8 @@ svg { display: block; }
   place-items: center;
 }
 .onb-tile svg { width: 48px; height: 48px; }
+.onb-tile { background: none; border-radius: 0; }
+.onb-tile .logo-mark { width: 112px; height: 112px; }
 .onb-title {
   margin: 30px 0 0;
   font-size: 26px;
