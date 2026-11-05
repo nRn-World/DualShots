@@ -12,8 +12,8 @@ android {
         applicationId = "com.nrworld.duelshot"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.1.1"
     }
 
     buildTypes {
@@ -62,6 +62,4 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-video:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
-    // OverlayEffect: ritar svart över en pausad kamera direkt i bild och fil.
-    implementation("androidx.camera:camera-effects:$cameraxVersion")
 }

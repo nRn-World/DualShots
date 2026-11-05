@@ -158,7 +158,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     // kameran binds om och nästa del (_p2, _p3 …) startar direkt.
     LaunchedEffect(
         camReady, ready, backView, frontView, composedView, vm.mode, vm.frontAspect,
-        vm.backAspect, vm.quality, vm.saveAspect, pip, isRecording, fallbackFrom
+        vm.backAspect, vm.quality, vm.saveAspect, pip, mainPaused, isRecording, fallbackFrom
     ) {
         if (!camReady) return@LaunchedEffect
         // En take = en fil: ändringar under inspelning väntar till nästa take.
@@ -175,6 +175,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         } else if (backView == null && frontView == null) return@LaunchedEffect
 
         controller.recordAudio = vm.recordAudio
+        controller.mainPaused = mainPaused
         status = controller.bind(
             wanted = wanted,
             frontAspect = vm.frontAspect,
@@ -193,11 +194,6 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         ready = true
     }
 
-    // Svart-vid-paus följer knapparna direkt, även mitt i en inspelning.
-    LaunchedEffect(mainPaused, pipLive, vm.frontAspect, vm.backAspect) {
-        val smallAspect = if (pipLive.swapCameras) vm.backAspect else vm.frontAspect
-        controller.setPaused(mainPaused, pipLive.paused && pipLive.visible, pipLive, smallAspect)
-    }
 
     // Stillbild av det som syns: sammansatt bild i Dual View, annars en per kamera.
     fun takePhoto() {
@@ -350,9 +346,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                     pipLive = pipLive.copy(paused = !pipLive.paused)
                                     pip = pipLive
                                     status = when {
-                                        !isRecording -> if (pipLive.paused) "Small camera paused – black" else "Small camera running"
-                                        controller.effectsActive -> if (pipLive.paused) "Small camera paused – black in the video"
-                                        else "Small camera running – same file"
+                                        !isRecording -> if (pipLive.paused) "Small camera paused" else "Small camera running"
                                         else -> if (pipLive.paused) "Small camera paused – applies to the next take"
                                         else "Small camera running – applies to the next take"
                                     }
@@ -370,9 +364,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     mainPaused = !mainPaused
                                     status = when {
-                                        !isRecording -> if (mainPaused) "Large camera paused – black" else "Large camera running"
-                                        controller.effectsActive -> if (mainPaused) "Large camera paused – black in the video"
-                                        else "Large camera running – same file"
+                                        !isRecording -> if (mainPaused) "Large camera paused" else "Large camera running"
                                         else -> if (mainPaused) "Large camera paused – applies to the next take"
                                         else "Large camera running – applies to the next take"
                                     }
@@ -923,7 +915,6 @@ private fun PipOutline(
                 .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
                 .size(with(density) { pipW.toDp() }, with(density) { pipH.toDp() })
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (layout.paused) Color.Black else Color.Transparent)
                 .border(1.5.dp, Color.White.copy(alpha = if (layout.paused) .28f else .6f), RoundedCornerShape(12.dp))
                 .pointerInput(aspect) {
                     detectDragGestures(

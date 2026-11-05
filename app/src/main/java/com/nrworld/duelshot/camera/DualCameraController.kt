@@ -35,14 +35,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.os.Environment
-import android.os.Handler
-import android.os.Looper
-import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.RectF
-import androidx.camera.core.CameraEffect
-import androidx.camera.effects.OverlayEffect
 
 /**
  * Bild-i-bild-placering för Dual View. [cx] och [cy] är mitten av den lilla
@@ -56,7 +48,7 @@ data class PipLayout(
     val swapCameras: Boolean = false,
     /** false = lilla kameran avstängd; bara stora kameran syns i inspelningen. */
     val visible: Boolean = true,
-    /** true = lilla kameran pausad; dess ruta blir svart i inspelningen. */
+    /** true = lilla kameran pausad; dess ruta döljs i inspelningen. */
     val paused: Boolean = false
 )
 
@@ -88,30 +80,13 @@ class DualCameraController(private val context: Context) {
     /** Beskärning per kamera via ViewPort; stängs av om enheten inte klarar den. */
     private var cropEnabled = true
 
-    // Paus i Dual View: en OverlayEffect ritar svart över den pausade kameran i
-    // både förhandsvisning och fil, utan ombindning – inspelningen fortsätter i
-    // samma fil. Klarar enheten inte effekten stängs den av och bindningen görs om.
-    private var effectsEnabled = true
-    private var overlay: OverlayEffect? = null
-    /** Sant när svart-vid-paus ritas live i Dual View-filen. */
-    var effectsActive = false
-        private set
-    @Volatile var mainPaused = false
-    @Volatile var smallPaused = false
-    @Volatile private var overlayPip = PipLayout()
-    @Volatile private var smallRatio = 9f / 16f
-    private val black = Paint().apply { color = android.graphics.Color.BLACK }
+    // OverlayEffect i Dual View-gruppen gjorde den stora kameran svart och den lilla
+    // rutan felplacerad på riktiga telefoner, så paus döljer kameran (alpha 0) i stället.
+    /** Stora kameran pausad i Dual View: döljs vid nästa bindning. */
+    var mainPaused = false
 
     /** Ljud i inspelningen (inställningen Record Audio). */
     var recordAudio = true
-
-    /** Uppdaterar vad som ritas svart; [smallAspect] är lilla kamerans format. */
-    fun setPaused(main: Boolean, small: Boolean, pip: PipLayout, smallAspect: AspectOption) {
-        mainPaused = main
-        smallPaused = small
-        overlayPip = pip
-        smallRatio = smallAspect.ratio()
-    }
 
     // Zoom per kamera (1× = av). Gäller både förhandsvisning och inspelning.
     private var backCamera: Camera? = null
@@ -218,7 +193,6 @@ class DualCameraController(private val context: Context) {
         val p = provider ?: return "Camera is not ready yet."
 
         p.unbindAll()
-        effectsActive = false
         backVideo = null; frontVideo = null; composedVideo = null
         backCamera = null; frontCamera = null
         singleFallback = false
@@ -247,13 +221,6 @@ class DualCameraController(private val context: Context) {
             activeMode = wanted
             "Camera ready – ${wanted.title}."
         } catch (e: Exception) {
-            if (effectsEnabled && overlay != null) {
-                // Svart-vid-paus stöds inte här: bind om utan effekten.
-                effectsEnabled = false
-                runCatching { overlay?.close() }
-                overlay = null
-                return bind(wanted, frontAspect, backAspect, quality, lifecycleOwner, backView, frontView, composedView, pip, saveAspect)
-            }
             if (cropEnabled) {
                 cropEnabled = false
                 return bind(wanted, frontAspect, backAspect, quality, lifecycleOwner, backView, frontView, composedView, pip, saveAspect)
@@ -333,14 +300,10 @@ class DualCameraController(private val context: Context) {
             .addUseCase(composedPreview).addUseCase(composed)
         // Valt filformat (t.ex. 16:9 för YouTube) beskär den sammansatta bilden.
         if (saveAspect != null) viewPortFor(saveAspect)?.let { builder.setViewPort(it) }
-        if (effectsEnabled) builder.addEffect(makeOverlay())
         val group = builder.build()
-        effectsActive = effectsEnabled
         val largeSel = if (pip.swapCameras) fs else bs
         val smallSel = if (pip.swapCameras) bs else fs
         val largeAspect = if (pip.swapCameras) frontAspect else backAspect
-        smallRatio = (if (pip.swapCameras) backAspect else frontAspect).ratio()
-        overlayPip = pip
         rememberCameras(
             p.bindToLifecycle(
                 listOf(
@@ -386,7 +349,7 @@ class DualCameraController(private val context: Context) {
     /**
      * Stora kameran fyller filen. Med ett eget filformat behåller kameran sitt
      * format (t.ex. 9:16 i en 16:9-fil) och resten blir svarta kanter.
-     * Utan överlagringseffekt döljs en pausad stor kamera med alpha 0 (nästa take).
+     * En pausad stor kamera döljs med alpha 0 (gäller från nästa bindning/take).
      */
     private fun fullComposition(large: AspectOption? = null, out: AspectOption? = null): CompositionSettings {
         var sx = 1f
@@ -396,64 +359,8 @@ class DualCameraController(private val context: Context) {
             val ro = out.ratio()
             if (rl < ro) sx = rl / ro else if (rl > ro) sy = ro / rl
         }
-        val alpha = if (!effectsActive && mainPaused) 0f else 1f
+        val alpha = if (mainPaused) 0f else 1f
         return CompositionSettings.Builder().setAlpha(alpha).setOffset(0f, 0f).setScale(sx, sy).build()
-    }
-
-    /** Ny överlagring som ritar svart över pausade kameror varje bildruta. */
-    private fun makeOverlay(): OverlayEffect {
-        runCatching { overlay?.close() }
-        val fx = OverlayEffect(
-            CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE, 0,
-            Handler(Looper.getMainLooper())
-        ) { }
-        fx.setOnDrawListener { frame ->
-            val canvas = frame.overlayCanvas
-            canvas.drawColor(android.graphics.Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-            val main = mainPaused
-            val small = smallPaused
-            if (main || small) {
-                val bw = frame.size.width.toFloat()
-                val bh = frame.size.height.toFloat()
-                val rot = frame.rotationDegrees
-                // Rita i upprätt bild (som på skärmen) och vrid in i bufferten.
-                val w = if (rot % 180 == 0) bw else bh
-                val h = if (rot % 180 == 0) bh else bw
-                val m = Matrix().apply { setRotate(-rot.toFloat()) }
-                val bounds = RectF(0f, 0f, w, h).also { m.mapRect(it) }
-                m.postTranslate(-bounds.left, -bounds.top)
-                canvas.save()
-                canvas.concat(m)
-                val pip = pipRect(w, h)
-                if (main) {
-                    if (pip != null && !small) {
-                        canvas.drawRect(0f, 0f, w, pip.top, black)
-                        canvas.drawRect(0f, pip.bottom, w, h, black)
-                        canvas.drawRect(0f, pip.top, pip.left, pip.bottom, black)
-                        canvas.drawRect(pip.right, pip.top, w, pip.bottom, black)
-                    } else {
-                        canvas.drawRect(0f, 0f, w, h, black)
-                    }
-                }
-                if (small && pip != null) canvas.drawRect(pip, black)
-                canvas.restore()
-            }
-            true
-        }
-        overlay = fx
-        return fx
-    }
-
-    /** Samma placering som ramen på skärmen (PipOutline i RecordScreen). */
-    private fun pipRect(w: Float, h: Float): RectF? {
-        val p = overlayPip
-        if (!p.visible) return null
-        val scale = p.scale.coerceIn(0.18f, 0.6f)
-        val pw = w * scale
-        val ph = pw / smallRatio
-        val left = (p.cx * w - pw / 2f).coerceIn(0f, (w - pw).coerceAtLeast(0f))
-        val top = (p.cy * h - ph / 2f).coerceIn(0f, (h - ph).coerceAtLeast(0f))
-        return RectF(left, top, left + pw, top + ph)
     }
 
     private fun AspectOption.ratio(): Float = when (this) {
@@ -479,9 +386,8 @@ class DualCameraController(private val context: Context) {
         val limit = 1f - scale
         val ox = (2f * pip.cx - 1f).coerceIn(-limit, limit)
         val oy = (1f - 2f * pip.cy).coerceIn(-limit, limit)
-        // Avstängd liten kamera: alpha 0. Pausad ritas svart av överlagringen;
-        // finns ingen överlagring döljs den i stället (alpha 0).
-        val alpha = if (pip.visible && (effectsActive || !pip.paused)) 1f else 0f
+        // Avstängd eller pausad liten kamera: alpha 0 så att stora kameran fyller rutan.
+        val alpha = if (pip.visible && !pip.paused) 1f else 0f
         return CompositionSettings.Builder().setAlpha(alpha).setOffset(ox, oy).setScale(scale, scale).build()
     }
 
