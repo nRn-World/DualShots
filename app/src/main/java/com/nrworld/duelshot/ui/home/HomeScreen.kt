@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ExperimentalGraphicsApi
 import androidx.compose.ui.res.painterResource
 import com.nrworld.duelshot.R
 import androidx.compose.ui.text.font.FontFamily
@@ -188,6 +189,7 @@ private fun CreditFooter() {
     }
 }
 
+@OptIn(ExperimentalGraphicsApi::class)
 @Composable
 private fun LogoTile() {
     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {

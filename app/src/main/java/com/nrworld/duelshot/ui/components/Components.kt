@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ExperimentalGraphicsApi
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -180,6 +181,7 @@ fun SurfaceCard(
 }
 
 /** Frostat glas-kort över en levande gradientbakgrund – glass & premium. */
+@OptIn(ExperimentalGraphicsApi::class)
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
