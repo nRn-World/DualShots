@@ -2,6 +2,7 @@ package com.nrworld.duelshot.ui.theme
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -41,6 +42,43 @@ val DuelGradient = Brush.linearGradient(
 val GoldGradient = Brush.linearGradient(
     colors = listOf(DuelOrangeDeep, DuelOrangeLight, DuelGold2)
 )
+
+// === Glass & Premium palette ===
+val DuelViolet = Color(0xFF8B5CF6)
+val DuelIndigo = Color(0xFF6366F1)
+val DuelMagentaP = Color(0xFFD946EF)
+val DuelCyan = Color(0xFF22D3EE)
+
+/** Levande gradientbakgrund för glass & premium-skärmar. */
+val DuelBgGradient = Brush.verticalGradient(
+    listOf(Color(0xFF1A0B2E), Color(0xFF2A0F4D), Color(0xFF20103C), Color(0xFF0B0B18))
+)
+
+/** Frostningsglas – ljus, translucen. */
+val GlassFill = Color.White.copy(alpha = 0.07f)
+val GlassFillStrong = Color.White.copy(alpha = 0.11f)
+val GlassBorder = Color.White.copy(alpha = 0.18f)
+val GlassHighlight = Color.White.copy(alpha = 0.50f)
+
+/** Premium glass & gradient-bakgrund med flera glödor. */
+@Composable
+fun DuelPremiumBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier.background(DuelBgGradient)) {
+        Box(Modifier.fillMaxSize().background(
+            Brush.radialGradient(listOf(DuelViolet.copy(alpha = 0.42f), Color.Transparent), radius = 820f)
+        ))
+        Box(Modifier.fillMaxSize().background(
+            Brush.radialGradient(listOf(DuelMagentaP.copy(alpha = 0.30f), Color.Transparent), center = Offset(720f, -50f), radius = 740f)
+        ))
+        Box(Modifier.fillMaxSize().background(
+            Brush.radialGradient(listOf(DuelOrange.copy(alpha = 0.24f), Color.Transparent), center = Offset(110f, 920f), radius = 800f)
+        ))
+        Box(Modifier.fillMaxSize().background(
+            Brush.radialGradient(listOf(DuelCyan.copy(alpha = 0.14f), Color.Transparent), center = Offset(920f, 720f), radius = 620f)
+        ))
+        content()
+    }
+}
 
 /** Enkel bakgrund med hela sidans mörka gradient + glöd. */
 @Composable

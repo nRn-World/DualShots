@@ -58,16 +58,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5.1-debug.apk
-          NOTES="Uppdaterad DualShots v1.5.1 (bugfix):
-          - Fixat crash i Gallery/spelaren: appen frågade inte efter läspermission för media, så VideoView/MediaMetadataRetriever kastade SecurityException och stängde ner appen. Läste-tillbaka-permission (READ_EXTERNAL_STORAGE/READ_MEDIA_VIDEO) läggs till och begärs vid start, och alla media-anrop wrappas så att SecurityException aldrig crashar.
-          - Ny Stats-skärm, mappar i Gallery, clipspelare med tidslinje och thumbnail-filmstrip, favorites-genväg — allt från v1.5"
+          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.6-debug.apk
+          NOTES="Uppdaterad DualShots v1.6 — glass & premium design:
+          - Ny glass & premium-design: frostiga glas-kort över en levande violett/magneta/orange gradientbakgrund med glödor (både hemsidan och statssidan)
+          - Stats-skärmen omgjord: hero-kort med gradient, gradient-staplar i timdiagram, NYA mapp-fördelning med proportionella staplar, raffinerad analytics-ikon (uppåtgående trendlinje med noder istället för trista staplar)
+          - Hemskärm omgjord till glass & premium: logo-glas, glass-menyknappar med color-kodade iconer
+          - Fixat Gallery-crash (v1.5.1): läspermission för media + wrappade media-anrop"
           if gh release view v0.2.0 >/dev/null 2>&1; then
-            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5.1-debug.apk --clobber
-            gh release edit v0.2.0 --title "DualShots v1.5.1" --notes "$NOTES"
+            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.6-debug.apk --clobber
+            gh release edit v0.2.0 --title "DualShots v1.6" --notes "$NOTES"
           else
-            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5.1-debug.apk \
+            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.6-debug.apk \
               --target "${{ github.sha }}" \
-              --title "DualShots v1.5.1" \
+              --title "DualShots v1.6" \
               --notes "$NOTES"
           fi

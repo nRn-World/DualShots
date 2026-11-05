@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -51,6 +53,8 @@ import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextFaint
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
 import com.nrworld.duelshot.ui.theme.GoldGradient
+import com.nrworld.duelshot.ui.theme.GlassBorder
+import com.nrworld.duelshot.ui.theme.GlassFill
 
 /** Logotyp: två linser i en orbital. */
 @Composable
@@ -173,6 +177,24 @@ fun SurfaceCard(
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(16.dp)
     ) { content() }
+}
+
+/** Frostat glas-kort över en levande gradientbakgrund – glass & premium. */
+@Composable
+fun GlassCard(
+    modifier: Modifier = Modifier,
+    shape: CornerBasedShape = RoundedCornerShape(24.dp),
+    content: @Composable () -> Unit
+) {
+    Box(modifier = modifier.clip(shape)) {
+        Box(
+            Modifier.matchParentSize()
+                .background(GlassFill)
+                .blur(14.dp)
+        )
+        Box(Modifier.matchParentSize().border(1.dp, GlassBorder, shape))
+        content()
+    }
 }
 
 /** Sidrubrik med undertext. */

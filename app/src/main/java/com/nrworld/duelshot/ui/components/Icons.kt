@@ -162,9 +162,10 @@ fun DuelIcon(kind: DuelIconKind, tint: Color, size: Dp = 22.dp, modifier: Modifi
                 )
             }
             DuelIconKind.STATS -> {
-                drawRoundRect(tint, topLeft = p(4f, 13f), size = Size(3.6f * s, 8f * s), cornerRadius = CornerRadius(1f * s))
-                drawRoundRect(tint, topLeft = p(10.2f, 8f), size = Size(3.6f * s, 13f * s), cornerRadius = CornerRadius(1f * s))
-                drawRoundRect(tint, topLeft = p(16.4f, 16f), size = Size(3.6f * s, 5f * s), cornerRadius = CornerRadius(1f * s))
+                // Uppåtgående trendlinje med noder – raffinerad analytics-glyf.
+                drawPath(pathOf(listOf(p(4f, 18f), p(9f, 12.5f), p(13.5f, 15f), p(20f, 4.5f))), tint, style = stroke)
+                drawCircle(tint, radius = 2.5f * s, center = p(20f, 4.5f))
+                drawCircle(tint, radius = 1.5f * s, center = p(4f, 18f))
             }
             DuelIconKind.PLUS -> {
                 drawPath(pathOf(listOf(p(12f, 4f), p(12f, 20f))), tint, style = stroke)

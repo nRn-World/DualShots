@@ -117,7 +117,7 @@ const ICONS = {
   share: svg('<path d="M12 3.5v11"/><path d="m8 7.5 4-4 4 4"/><path d="M6 12v8h12v-8"/>'),
   trash: svg('<path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1.1 13h8.8L17.5 7"/><path d="M10.5 10.5 11 16.5M13.5 10.5 13 16.5"/>'),
   folder: svg('<path d="M3 6h7l2 2.5H21v9.5H3z" /><path d="M3 9.5h18" />'),
-  stats: svg('<rect x="4" y="13" width="3.6" height="8" rx="1"/><rect x="10.2" y="8" width="3.6" height="13" rx="1"/><rect x="16.4" y="16" width="3.6" height="5" rx="1"/>'),
+  stats: svg('<path d="M4 18 L9 12.5 L13.5 15 L20 4.5"/><circle cx="20" cy="4.5" r="2.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/>'),
   plus: svg('<path d="M12 4v16M4 12h16"/>'),
 };
 
@@ -1875,13 +1875,13 @@ function renderHome() {
           <span class="menu-chev">${ICONS.video}</span>
         </button>
 
-        <button class="menu-btn" id="home-stats" type="button">
+        <button class="menu-btn stats" id="home-stats" type="button">
           <span class="menu-ico">${ICONS.stats}</span>
           <span class="menu-label">Stats</span>
           <span class="menu-chev">${ICONS.chevron}</span>
         </button>
 
-        <button class="menu-btn" id="home-settings" type="button">
+        <button class="menu-btn settings" id="home-settings" type="button">
           <span class="menu-ico">${ICONS.settings}</span>
           <span class="menu-label">Settings</span>
           <span class="menu-chev">${ICONS.chevron}</span>
@@ -1893,7 +1893,7 @@ function renderHome() {
           <span class="menu-chev">${ICONS.chevron}</span>
         </button>
 
-        <button class="menu-btn" id="menu-about" type="button">
+        <button class="menu-btn info" id="menu-about" type="button">
           <span class="menu-ico">${ICONS.info}</span>
           <span class="menu-label">About</span>
           <span class="menu-chev">${ICONS.chevron}</span>
@@ -2056,6 +2056,15 @@ function renderStats() {
   const savedGb = gb * 0.5;
   const peak = byHour.indexOf(Math.max(...byHour));
 
+  const folders = (state.folders || []).map((f) => {
+    const n = clips.filter((c) => state.clipFolders[c.id] === f).length;
+    return { name: f, n };
+  }).filter((x) => x.n > 0);
+  const unassigned = clips.filter((c) => !state.clipFolders[c.id]).length;
+  const folderRows = folders.map((f) => ({ name: f.name, n: f.n }));
+  if (unassigned > 0) folderRows.push({ name: 'Unassigned', n: unassigned });
+  const folderMax = Math.max(1, ...folderRows.map((r) => r.n));
+
   screenEl.innerHTML = `
     <div class="page stats">
       <header class="screen-header">
@@ -2064,10 +2073,12 @@ function renderStats() {
       </header>
 
       <div class="stats-hero">
-        <div class="stats-hero-ico">${ICONS.stats}</div>
-        <div class="stats-hero-body">
-          <div class="stats-hero-label">ALL-TIME RECORDINGS</div>
-          <div class="stats-hero-value">${clips.length} ${clips.length === 1 ? 'clip' : 'clips'}</div>
+        <div class="stats-hero-row">
+          <div class="stats-hero-ico">${ICONS.stats}</div>
+          <div class="stats-hero-body">
+            <div class="stats-hero-label">ALL-TIME RECORDINGS</div>
+            <div class="stats-hero-value">${clips.length} ${clips.length === 1 ? 'clip' : 'clips'}</div>
+          </div>
         </div>
         <div class="stats-mini">
           <div class="stats-mini-card"><div class="stats-mini-label">Duration</div><div class="stats-mini-value">${formatDuration(totalMs)}</div></div>
@@ -2098,6 +2109,17 @@ function renderStats() {
         </div>
         <div class="stats-peak">${peak >= 0 && byHour[peak] > 0 ? `Most active around ${peak}:00` : 'Record something to see your pattern'}</div>
       </div>
+
+      ${folderRows.length > 0 ? `
+      <div class="stats-folders">
+        <div class="section-label">CLIPS BY FOLDER</div>
+        ${folderRows.map((r) => `
+          <div class="stats-folder-row">
+            <span class="stats-folder-name">${esc(r.name)}</span>
+            <span class="stats-folder-bar"><i style="width:${(r.n / folderMax * 100).toFixed(1)}%"></i></span>
+            <span class="stats-folder-count">${r.n} ${r.n === 1 ? 'clip' : 'clips'}</span>
+          </div>`).join('')}
+      </div>` : ''}
     </div>`;
 }
 
