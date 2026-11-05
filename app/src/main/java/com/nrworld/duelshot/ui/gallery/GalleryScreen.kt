@@ -891,7 +891,7 @@ private fun ClipPlayerDialog(
                     vv.setMediaController(MediaController(ctx).apply { setAnchorView(vv) })
                     vv.setOnPreparedListener { mp ->
                         mp.isLooping = true
-                        start()
+                        vv.start()
                         videoView = vv
                     }
                     vv
@@ -919,7 +919,7 @@ private fun ClipPlayerDialog(
                     ) {
                         Box(
                             modifier = Modifier
-                                .width((maxWidth * frac).coerceAtLeast(0.dp))
+                                .width((trackW * frac).coerceAtLeast(0.dp))
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp))
                                 .background(DuelGradient)
@@ -939,7 +939,7 @@ private fun ClipPlayerDialog(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(Color.Transparent)
-                            .pointerInput(maxWidth.value) {
+                            .pointerInput(trackW.value) {
                                 detectTapGestures(onTap = { offset ->
                                     val vv = videoView
                                     if (vv != null && durationMs > 0 && trackW.value > 0) {
