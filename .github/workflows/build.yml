@@ -58,17 +58,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.3-debug.apk
-          NOTES="Uppdaterad DualShots v1.3:
-          - Riktiga DualShots-logotypen (dubbla linser) vid appstart, i onboarding-stegen och på behörighetsskärmen
-          - OpenGL ES 2.0 realtidskompositör (DualGlComposer): lilla kameran följer med ramen mjukt i 60 fps när du drar och ändrar storlek
-          - Flytta, ändra storlek, byt plats (swap), zooma, pausa och stäng lilla kameran live – även under inspelning – i EN sammansatt MP4-fil"
+          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.4-debug.apk
+          NOTES="Uppdaterad DualShots v1.4:
+          - Gallery med flerval: håll inne på en fil (eller tryck på Select) för att markera flera klipp på en gång, med Select all / Deselect all, Share (skicka vidare flera videor samtidigt) och Delete (radera alla markerade)
+          - Riktiga DualShots-logotypen (dubbla linser) vid appstart, i onboarding och på behörighetsskärmen
+          - OpenGL ES 2.0 realtidskompositör (DualGlComposer): lilla kameran följer med ramen mjukt i 60 fps även under inspelning"
           if gh release view v0.2.0 >/dev/null 2>&1; then
-            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.3-debug.apk --clobber
-            gh release edit v0.2.0 --title "DualShots v1.3" --notes "$NOTES"
+            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.4-debug.apk --clobber
+            gh release edit v0.2.0 --title "DualShots v1.4" --notes "$NOTES"
           else
-            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.3-debug.apk \
+            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.4-debug.apk \
               --target "${{ github.sha }}" \
-              --title "DualShots v1.3" \
+              --title "DualShots v1.4" \
               --notes "$NOTES"
           fi

@@ -72,6 +72,8 @@ const state = {
   pipPaused: false,
   swap: false,
   clips: [],
+  gallerySelectMode: false,
+  selectedClipIds: [],
 };
 
 /* --------------------------------------------------------------- elements */
@@ -2009,28 +2011,154 @@ function renderSettings() {
   if (premiumBtn) premiumBtn.addEventListener('click', () => showPremium());
 }
 
-/* GalleryScreen.kt: large title, clip rows with the gradient play tile. */
+/* GalleryScreen.kt: large title, long-press multi-select, batch Share / Delete. */
 function renderGallery() {
+  if (!state.clips.length) {
+    state.gallerySelectMode = false;
+    state.selectedClipIds = [];
+  }
+  const existingIds = new Set(state.clips.map((c) => c.id));
+  state.selectedClipIds = (state.selectedClipIds || []).filter((id) => existingIds.has(id));
+
+  const selMode = !!state.gallerySelectMode;
+  const selSet = new Set(state.selectedClipIds);
+  const selCount = selSet.size;
+  const allSelected = state.clips.length > 0 && selCount === state.clips.length;
+  const totalMb = state.clips
+    .filter((c) => selSet.has(c.id))
+    .reduce((acc, c) => acc + (Number(c.sizeMb) || 0), 0);
+
   screenEl.innerHTML = `
     <div class="page gallery">
-      <header class="screen-header">
-        <h1>Gallery</h1>
-        <p>Saved to Movies/DualShots</p>
-      </header>
+      ${selMode
+        ? `<div class="gal-sel-header">
+             <button class="gal-sel-close" id="gal-sel-cancel" type="button" aria-label="Cancel">${ICONS.close}</button>
+             <div class="gal-sel-titles">
+               <strong>${selCount === 0 ? 'Select clips' : `${selCount} selected`}</strong>
+               <span>Tap clips to mark or unmark</span>
+             </div>
+             <button class="gal-sel-all" id="gal-sel-all" type="button">${allSelected ? 'Deselect all' : 'Select all'}</button>
+           </div>`
+        : `<div class="gal-head-row">
+             <header class="screen-header">
+               <h1>Gallery</h1>
+               <p>${state.clips.length ? 'Saved to Movies/DualShots · Hold to select' : 'Saved to Movies/DualShots'}</p>
+             </header>
+             ${state.clips.length ? `<button class="gal-select-btn" id="gal-enter-select" type="button">Select</button>` : ''}
+           </div>`}
 
       ${state.clips.length
-        ? `<div class="clip-list">${state.clips.map(clipCardHTML).join('')}</div>`
+        ? `<div class="clip-list">${state.clips.map((c) => clipCardHTML(c, selMode, selSet.has(c.id))).join('')}</div>`
         : `<div class="empty">
              <span class="empty-ico">${ICONS.gallery}</span>
              <span class="empty-title">No recordings yet</span>
              <span class="empty-sub">Start a recording from Home</span>
            </div>`}
+
+      ${selMode && state.clips.length
+        ? `<div class="gal-action-bar">
+             ${selCount > 0 ? `<div class="gal-action-meta">${selCount} ${selCount === 1 ? 'FILE' : 'FILES'} SELECTED${totalMb > 0 ? ` · ${totalMb.toFixed(1)} MB` : ''}</div>` : ''}
+             <div class="gal-action-btns">
+               <button class="gal-btn-share" id="gal-share-selected" type="button" ${selCount === 0 ? 'disabled' : ''}>
+                 ${ICONS.share}<span>${selCount > 0 ? `Share (${selCount})` : 'Share'}</span>
+               </button>
+               <button class="gal-btn-delete" id="gal-delete-selected" type="button" ${selCount === 0 ? 'disabled' : ''}>
+                 ${ICONS.trash}<span>${selCount > 0 ? `Delete (${selCount})` : 'Delete'}</span>
+               </button>
+             </div>
+           </div>`
+        : ''}
     </div>`;
 
-  $$('.clip', screenEl).forEach((el) => el.addEventListener('click', () => {
-    const clip = state.clips.find((c) => c.id === el.dataset.clip);
-    if (clip) playClip(clip);
-  }));
+  const enterBtn = $('#gal-enter-select', screenEl);
+  if (enterBtn) {
+    enterBtn.addEventListener('click', () => {
+      state.gallerySelectMode = true;
+      renderGallery();
+    });
+  }
+  const cancelBtn = $('#gal-sel-cancel', screenEl);
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      state.gallerySelectMode = false;
+      state.selectedClipIds = [];
+      renderGallery();
+    });
+  }
+  const allBtn = $('#gal-sel-all', screenEl);
+  if (allBtn) {
+    allBtn.addEventListener('click', () => {
+      state.selectedClipIds = allSelected ? [] : state.clips.map((c) => c.id);
+      renderGallery();
+    });
+  }
+  const shareSelBtn = $('#gal-share-selected', screenEl);
+  if (shareSelBtn) {
+    shareSelBtn.addEventListener('click', () => {
+      const chosen = state.clips.filter((c) => selSet.has(c.id));
+      if (chosen.length) shareMultipleClips(chosen);
+    });
+  }
+  const delSelBtn = $('#gal-delete-selected', screenEl);
+  if (delSelBtn) {
+    delSelBtn.addEventListener('click', () => {
+      const chosen = state.clips.filter((c) => selSet.has(c.id));
+      if (chosen.length) confirmDeleteClips(chosen);
+    });
+  }
+
+  $$('.clip', screenEl).forEach((el) => {
+    const id = el.dataset.clip;
+    let holdTimer = null;
+    let longFired = false;
+
+    const clearHold = () => {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    };
+
+    el.addEventListener('pointerdown', () => {
+      longFired = false;
+      clearHold();
+      holdTimer = setTimeout(() => {
+        longFired = true;
+        if (!state.gallerySelectMode) {
+          state.gallerySelectMode = true;
+          state.selectedClipIds = [id];
+        } else {
+          toggleClipSelection(id);
+        }
+        renderGallery();
+      }, 750);
+    });
+    el.addEventListener('pointerup', clearHold);
+    el.addEventListener('pointercancel', clearHold);
+    el.addEventListener('pointerleave', clearHold);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    el.addEventListener('click', (e) => {
+      if (longFired) {
+        e.preventDefault();
+        longFired = false;
+        return;
+      }
+      if (state.gallerySelectMode) {
+        toggleClipSelection(id);
+        renderGallery();
+      } else {
+        const clip = state.clips.find((c) => c.id === id);
+        if (clip) playClip(clip);
+      }
+    });
+  });
+}
+
+function toggleClipSelection(id) {
+  const list = state.selectedClipIds || [];
+  if (list.includes(id)) {
+    state.selectedClipIds = list.filter((x) => x !== id);
+  } else {
+    state.selectedClipIds = [...list, id];
+  }
 }
 
 function clipMetaLine(c) {
@@ -2042,15 +2170,18 @@ function clipMetaLine(c) {
   return `${c.sizeMb} MB${when ? ` · ${when}` : ''}`;
 }
 
-function clipCardHTML(c) {
+function clipCardHTML(c, selMode = false, selected = false) {
   return `
-    <button class="clip" data-clip="${c.id}" type="button">
+    <button class="clip ${selected ? 'selected' : ''}" data-clip="${c.id}" type="button">
+      ${selMode
+        ? `<span class="clip-check ${selected ? 'checked' : ''}">${selected ? ICONS.check : ''}</span>`
+        : ''}
       <span class="clip-tile">${c.poster ? `<img src="${c.poster}" alt="" />` : ICONS.play}</span>
       <span class="clip-body">
         <span class="clip-name">${esc(c.name)}</span>
         <span class="clip-meta">${esc(clipMetaLine(c))}</span>
       </span>
-      <span class="clip-chev">${ICONS.chevron}</span>
+      ${selMode ? '' : `<span class="clip-chev">${ICONS.chevron}</span>`}
     </button>`;
 }
 
@@ -2073,19 +2204,22 @@ function playClip(clip) {
   const backdrop = $('.modal', modalRoot);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
   wireSheet();
-  $('[data-share]', modalRoot).addEventListener('click', () => shareClip(clip));
-  $('[data-delete]', modalRoot).addEventListener('click', () => confirmDeleteClip(clip));
+  $('[data-share]', modalRoot).addEventListener('click', () => shareMultipleClips([clip]));
+  $('[data-delete]', modalRoot).addEventListener('click', () => confirmDeleteClips([clip]));
 }
 
-/* Samma bekräftelsedialog som GalleryScreen.kt. */
-function confirmDeleteClip(clip) {
+/* Samma bekräftelsedialog som GalleryScreen.kt (stödjer 1 eller flera klipp). */
+function confirmDeleteClips(clipsToDelete) {
+  const count = clipsToDelete.length;
   modalRoot.innerHTML = `
     <div class="modal">
       <div class="dialog confirm-dialog">
-        <div class="confirm-title">Delete clip?</div>
-        <p class="confirm-text">${esc(clip.name)} is removed from Movies/DualShots.</p>
+        <div class="confirm-title">${count === 1 ? 'Delete clip?' : `Delete ${count} clips?`}</div>
+        <p class="confirm-text">${count === 1
+          ? `${esc(clipsToDelete[0].name)} is removed from Movies/DualShots.`
+          : `${count} selected recordings will be removed from Movies/DualShots.`}</p>
         <div class="confirm-actions">
-          <button class="confirm-delete" data-confirm type="button">Delete</button>
+          <button class="confirm-delete" data-confirm type="button">${count === 1 ? 'Delete' : `Delete (${count})`}</button>
           <button class="confirm-cancel" data-close type="button">Cancel</button>
         </div>
       </div>
@@ -2095,34 +2229,44 @@ function confirmDeleteClip(clip) {
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
   wireSheet();
   $('[data-confirm]', modalRoot).addEventListener('click', () => {
-    URL.revokeObjectURL(clip.url);
-    state.clips = state.clips.filter((c) => c.id !== clip.id);
+    const delIds = new Set(clipsToDelete.map((c) => c.id));
+    clipsToDelete.forEach((c) => URL.revokeObjectURL(c.url));
+    state.clips = state.clips.filter((c) => !delIds.has(c.id));
+    state.selectedClipIds = (state.selectedClipIds || []).filter((id) => !delIds.has(id));
+    if (!state.selectedClipIds.length) state.gallerySelectMode = false;
     closeSheet();
-    toast('Clip deleted');
+    toast(count === 1 ? 'Clip deleted' : `${count} clips deleted`);
     if (state.page === 'GALLERY') renderGallery();
   });
 }
 
-/* Delar filen via systemets delningsark; nedladdning om det inte stöds. */
-async function shareClip(clip) {
+/* Delar en eller flera filer via systemets delningsark; nedladdning om det inte stöds. */
+async function shareMultipleClips(clipsToShare) {
   try {
     if (navigator.share) {
-      const blob = await (await fetch(clip.url)).blob();
-      const file = new File([blob], clip.name, { type: clip.mime || blob.type || 'video/webm' });
-      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: clip.name });
+      const files = await Promise.all(clipsToShare.map(async (clip) => {
+        const blob = await (await fetch(clip.url)).blob();
+        return new File([blob], clip.name, { type: clip.mime || blob.type || 'video/webm' });
+      }));
+      if (!navigator.canShare || navigator.canShare({ files })) {
+        await navigator.share({
+          files,
+          title: files.length === 1 ? files[0].name : `${files.length} DualShots clips`,
+        });
         return;
       }
     }
   } catch (_) { /* avbruten eller ostödd – faller tillbaka */ }
 
-  const a = document.createElement('a');
-  a.href = clip.url;
-  a.download = clip.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  toast('Downloaded ' + clip.name);
+  clipsToShare.forEach((clip) => {
+    const a = document.createElement('a');
+    a.href = clip.url;
+    a.download = clip.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+  toast(clipsToShare.length === 1 ? 'Downloaded ' + clipsToShare[0].name : `Downloaded ${clipsToShare.length} clips`);
 }
 
 /* OnboardingScreen.kt: tre steg, logotyp, prickar och gradient-CTA. */
