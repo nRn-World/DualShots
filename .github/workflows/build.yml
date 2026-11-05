@@ -58,20 +58,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5-debug.apk
-          NOTES="Uppdaterad DualShots v1.5:
-          - Gallery med mappar: skapa mappar, flytta klipp mellan dem och filter via mappchips
-          - Clipspelare med tidslinje och thumbnail-filmstrip: skrolla och klicka på en ram för att hoppa
-          - Gallery-flerval: håll inne på en fil för att markera flera, batch Share / Move / Delete
-          - Senaste setup sparas: en genväg tillbaka till din favorit-inställning
-          - Ny Stats-skärm: totala klipp, tid, storlek, tidsfördelning per timme och sparad lagring
-          - Riktiga DualShots-logotypen och OpenGL ES 2.0-kompositören från v1.2-v1.4"
+          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5.1-debug.apk
+          NOTES="Uppdaterad DualShots v1.5.1 (bugfix):
+          - Fixat crash i Gallery/spelaren: appen frågade inte efter läspermission för media, så VideoView/MediaMetadataRetriever kastade SecurityException och stängde ner appen. Läste-tillbaka-permission (READ_EXTERNAL_STORAGE/READ_MEDIA_VIDEO) läggs till och begärs vid start, och alla media-anrop wrappas så att SecurityException aldrig crashar.
+          - Ny Stats-skärm, mappar i Gallery, clipspelare med tidslinje och thumbnail-filmstrip, favorites-genväg — allt från v1.5"
           if gh release view v0.2.0 >/dev/null 2>&1; then
-            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5-debug.apk --clobber
-            gh release edit v0.2.0 --title "DualShots v1.5" --notes "$NOTES"
+            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5.1-debug.apk --clobber
+            gh release edit v0.2.0 --title "DualShots v1.5.1" --notes "$NOTES"
           else
-            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5-debug.apk \
+            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.5.1-debug.apk \
               --target "${{ github.sha }}" \
-              --title "DualShots v1.5" \
+              --title "DualShots v1.5.1" \
               --notes "$NOTES"
           fi

@@ -3,6 +3,11 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Läsa tillbaka inspelade klipp i Movies/DualShots ( gallery, thumbnails, spelare ) -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
     <!-- Declare camera hardware as optional so unsupported devices can still install
          and show an in-app message instead of being blocked from the Play Store. -->

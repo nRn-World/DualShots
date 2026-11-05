@@ -128,7 +128,7 @@ fun HomeScreen(
             title = { Text("DualShots", color = DuelText, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Version 1.5 · Dual lens recording engine",
+                    "Version 1.5.1 · Dual lens recording engine",
                     color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp
                 )
             },

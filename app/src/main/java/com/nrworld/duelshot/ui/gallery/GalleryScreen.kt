@@ -849,6 +849,7 @@ private fun ClipPlayerDialog(
     var positionMs by remember { mutableStateOf(0L) }
     var thumbs by remember { mutableStateOf<List<Bitmap?>>(emptyList()) }
     var videoView by remember { mutableStateOf<VideoView?>(null) }
+    var playerError by remember { mutableStateOf<String?>(null) }
 
     // Ladda thumbnails i bakgrunden
     LaunchedEffect(clip.id) {
@@ -880,23 +881,43 @@ private fun ClipPlayerDialog(
             }
             Spacer(Modifier.height(10.dp))
 
-            AndroidView(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.Black),
-                factory = { ctx ->
-                    val vv = VideoView(ctx).apply { setVideoURI(uriFor(clip.id)) }
-                    vv.setMediaController(MediaController(ctx).apply { setAnchorView(vv) })
-                    vv.setOnPreparedListener { mp ->
-                        mp.isLooping = true
-                        vv.start()
-                        videoView = vv
+            val err = playerError
+            if (err == null) {
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black),
+                    factory = { ctx ->
+                        val vv = VideoView(ctx)
+                        try {
+                            vv.setVideoURI(uriFor(clip.id))
+                            vv.setMediaController(MediaController(ctx).apply { setAnchorView(vv) })
+                            vv.setOnPreparedListener { mp ->
+                                mp.isLooping = true
+                                vv.start()
+                                videoView = vv
+                            }
+                        } catch (_: Exception) {
+                            playerError = "Can't open this clip. Check your storage permissions."
+                        }
+                        vv
                     }
-                    vv
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black)
+                        .padding(20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(err, color = DuelOrangeLight, fontSize = 13.sp)
                 }
-            )
+            }
 
             Spacer(Modifier.height(10.dp))
 
@@ -1047,6 +1068,9 @@ private fun buildThumbs(context: Context, uri: Uri, count: Int): List<Bitmap?> {
             val tMs = if (dur > 0) dur * i / (count + 1) else 0L
             out += runCatching { mr.getFrameAtTime(tMs * 1000L) }.getOrNull()
         }
+    } catch (_: Exception) {
+        // Säkerställ att en SecurityException (saknad läspermission) eller en
+        // otillgänglig fil aldrig crashar spelaren.
     } finally {
         runCatching { mr.release() }
     }

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -62,10 +63,14 @@ import com.nrworld.duelshot.ui.theme.DuelTextMuted
  */
 class MainActivity : ComponentActivity() {
 
-    private val requiredPermissions = arrayOf(
-        Manifest.permission.CAMERA,
-        Manifest.permission.RECORD_AUDIO
-    )
+    private val requiredPermissions: List<String> = buildList {
+        add(Manifest.permission.CAMERA)
+        add(Manifest.permission.RECORD_AUDIO)
+        // Läsa tillbaka inspelade klipp i Gallery. Android 13+ använder READ_MEDIA_VIDEO,
+        // äldre versioner READ_EXTERNAL_STORAGE.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.READ_MEDIA_VIDEO)
+        else add(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
 
     private val permissionGranted = mutableStateOf(false)
     private val askedOnce = mutableStateOf(false)
@@ -160,15 +165,15 @@ private fun PermissionsScreen(denied: Boolean, onRequest: () -> Unit, onOpenSett
 
         Spacer(Modifier.height(26.dp))
         Text(
-            "Camera & microphone", color = DuelText, fontWeight = FontWeight.ExtraBold,
+            "Camera, microphone & photos", color = DuelText, fontWeight = FontWeight.ExtraBold,
             fontSize = 24.sp, textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(10.dp))
         Text(
             if (denied) {
-                "DualShots needs both to record two cameras at once. You can grant them in system settings and come back."
+                "DualShots needs these to record two cameras at once and read your recordings back in Gallery. Grant them in system settings and come back."
             } else {
-                "DualShots records the front and back camera at the same time. Both permissions stay on your device."
+                "DualShots records the front and back camera at the same time and reads recordings back in Gallery. All permissions stay on your device."
             },
             color = DuelTextMuted, fontSize = 14.sp, lineHeight = 21.sp, textAlign = TextAlign.Center
         )
@@ -182,7 +187,7 @@ private fun PermissionsScreen(denied: Boolean, onRequest: () -> Unit, onOpenSett
                 .clickable(onClick = onRequest),
             contentAlignment = Alignment.Center
         ) {
-            Text("Allow camera & mic", color = Color(0xFF04060D), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text("Allow access", color = Color(0xFF04060D), fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
 
         if (denied) {
