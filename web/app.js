@@ -131,9 +131,17 @@ const LOGO_MARK = `
     <circle cx="70" cy="51" r="1.8" fill="#0a0a0a" />
   </svg>`;
 
+/* Samma markering som launcher-ikonen: två linser på navy-botten. */
+const LENS_MARK = `
+  <svg class="logo-mark" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect width="108" height="108" rx="26" fill="#0e1626" />
+    <path fill-rule="evenodd" fill="#e4552b" d="M40 54m-20 0a20 20 0 1 0 40 0a20 20 0 1 0-40 0M40 54m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0" />
+    <path fill-rule="evenodd" fill="#f2a03f" stroke="#0e1626" stroke-width="4.5" d="M66 54m-20 0a20 20 0 1 0 40 0a20 20 0 1 0-40 0M66 54m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0" />
+  </svg>`;
+
 const logoTile = () => `
   <div class="logo-tile">
-    ${LOGO_MARK}
+    ${LENS_MARK}
   </div>`;
 
 /* -------------------------------------------------------------- utilities */

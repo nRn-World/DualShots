@@ -193,7 +193,7 @@ private fun LogoTile() {
                 .background(Brush.radialGradient(listOf(DuelOrange.copy(alpha = .45f), Color.Transparent)))
         )
         Image(
-            painter = painterResource(R.drawable.ic_logo),
+            painter = painterResource(R.drawable.ic_launcher_art),
             contentDescription = "DualShots",
             modifier = Modifier.size(84.dp)
         )
