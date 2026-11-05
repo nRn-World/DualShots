@@ -245,57 +245,67 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 ) { backView = it }
             } else {
                 if (displayMode == RecordingMode.DUAL_VIEW) {
-                    Box(Modifier.fillMaxSize()) {
-                        val swap = pipLive.swapCameras
-                        // Den sammansatta strömmen visas direkt: båda kamerorna i en bild,
-                        // exakt den bild som spelas in. Ingen extra preview behövs.
-                        FramedFeed(
-                            composedView,
-                            if (swap) vm.frontAspect else vm.backAspect,
-                            label = if (swap) "FRONT" else "BACK",
-                            modifier = Modifier.fillMaxSize().padding(3.dp),
-                            zoom = if (swap) frontZoom else backZoom,
-                            onZoom = { f ->
-                                if (swap) {
-                                    val (_, fz) = controller.setZoom(front = frontZoom * f)
-                                    frontZoom = fz
-                                } else {
-                                    val (bz, _) = controller.setZoom(back = backZoom * f)
-                                    backZoom = bz
-                                }
-                            },
-                            onFocus = { nx, ny ->
-                                controller.focusAt(isFront = swap, nx = nx, ny = ny, view = composedView)
-                            },
-                            onRelease = { if (composedView === it) composedView = null }
-                        ) { composedView = it }
+                    val swap = pipLive.swapCameras
+                    val largeAspect = if (swap) vm.frontAspect else vm.backAspect
+                    val smallAspect = if (swap) vm.backAspect else vm.frontAspect
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(3.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Videon och den lilla kamerans ram delar exakt samma yta,
+                        // så ramen hamnar där den faktiskt spelas in.
+                        Box(Modifier.aspectRatio(largeAspect.ratio())) {
+                            Feed(
+                                composedView,
+                                label = if (swap) "FRONT" else "BACK",
+                                ratio = largeAspect.label,
+                                modifier = Modifier.fillMaxSize(),
+                                zoom = if (swap) frontZoom else backZoom,
+                                onZoom = { f ->
+                                    if (swap) {
+                                        val (_, fz) = controller.setZoom(front = frontZoom * f)
+                                        frontZoom = fz
+                                    } else {
+                                        val (bz, _) = controller.setZoom(back = backZoom * f)
+                                        backZoom = bz
+                                    }
+                                },
+                                onFocus = { nx, ny ->
+                                    controller.focusAt(isFront = swap, nx = nx, ny = ny, view = composedView)
+                                },
+                                onRelease = { if (composedView === it) composedView = null }
+                            ) { composedView = it }
 
-                        // Ramen visar var den lilla kameran hamnar i den sammansatta bilden.
-                        if (pipLive.visible) PipOutline(
-                            layout = pipLive,
-                            aspect = if (swap) vm.backAspect else vm.frontAspect,
-                            onDrag = { dx, dy ->
-                                pipLive = pipLive.copy(
-                                    cx = (pipLive.cx + dx).coerceIn(0.12f, 0.88f),
-                                    cy = (pipLive.cy + dy).coerceIn(0.12f, 0.88f)
-                                )
-                            },
-                            onResize = { size -> pipLive = pipLive.copy(scale = size) },
-                            onCommit = { pip = pipLive },
-                            onTogglePause = {
-                                pipLive = pipLive.copy(paused = !pipLive.paused)
-                                pip = pipLive
-                                if (isRecording) {
-                                    status = if (pipLive.paused) "Small camera paused – next clip part"
-                                    else "Small camera running – next clip part"
+                            if (pipLive.visible) PipOutline(
+                                layout = pipLive,
+                                aspect = smallAspect,
+                                onDrag = { dx, dy ->
+                                    pipLive = pipLive.copy(
+                                        cx = (pipLive.cx + dx).coerceIn(0.12f, 0.88f),
+                                        cy = (pipLive.cy + dy).coerceIn(0.12f, 0.88f)
+                                    )
+                                },
+                                onResize = { size -> pipLive = pipLive.copy(scale = size) },
+                                onCommit = {
+                                    pip = pipLive
+                                    status = if (isRecording) "Small camera moved – applies to the next part"
+                                    else "Small camera position saved"
+                                },
+                                onTogglePause = {
+                                    pipLive = pipLive.copy(paused = !pipLive.paused)
+                                    pip = pipLive
+                                    if (isRecording) {
+                                        status = if (pipLive.paused) "Small camera paused – next clip part"
+                                        else "Small camera running – next clip part"
+                                    }
+                                },
+                                onClose = {
+                                    pipLive = pipLive.copy(visible = false, paused = false)
+                                    pip = pipLive
+                                    if (isRecording) status = "Small camera off – next clip part"
                                 }
-                            },
-                            onClose = {
-                                pipLive = pipLive.copy(visible = false, paused = false)
-                                pip = pipLive
-                                if (isRecording) status = "Small camera off – next clip part"
-                            }
-                        )
+                            )
+                        }
                     }
                 } else {
                     // Samma två vyer oavsett layout – delningen går att dra med fingret

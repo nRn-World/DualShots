@@ -339,13 +339,15 @@ class DualCameraController(private val context: Context) {
 
     /**
      * CameraX-offset är normaliserad (-1..1, 0 = mitten) och får max vara 1 - skala,
-     * annars hamnar den lilla rutan utanför bilden.
+     * annars hamnar den lilla rutan utanför bilden. Offset räknas från motsatt hörn
+     * jämfört med skärmens koordinater, så båda axlarna inverteras – annars hamnar
+     * den lilla kameran diagonalt motsatt där användaren ser sin ram.
      */
     private fun insetComposition(pip: PipLayout): CompositionSettings {
         val scale = pip.scale.coerceIn(0.18f, 0.6f)
         val limit = 1f - scale
-        val ox = (2f * pip.cx - 1f).coerceIn(-limit, limit)
-        val oy = (2f * pip.cy - 1f).coerceIn(-limit, limit)
+        val ox = (1f - 2f * pip.cx).coerceIn(-limit, limit)
+        val oy = (1f - 2f * pip.cy).coerceIn(-limit, limit)
         // Avstängd eller pausad liten kamera: alpha 0 så att stora kameran fyller rutan.
         val alpha = if (pip.visible && !pip.paused) 1f else 0f
         return CompositionSettings.Builder().setAlpha(alpha).setOffset(ox, oy).setScale(scale, scale).build()
