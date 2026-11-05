@@ -47,6 +47,7 @@ import com.nrworld.duelshot.ui.theme.DuelGold
 import com.nrworld.duelshot.ui.theme.DuelGradient
 import com.nrworld.duelshot.ui.theme.DuelLine
 import com.nrworld.duelshot.ui.theme.DuelOrange
+import com.nrworld.duelshot.ui.theme.DuelOrangeLight
 import com.nrworld.duelshot.ui.theme.DuelSurface
 import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText

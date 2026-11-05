@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -181,15 +183,18 @@ private fun HourDistributionCard(byHour: IntArray) {
                     )
                     Box(
                         modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(DuelGradient)
-                            .padding(vertical = 0.dp),
-                        contentAlignment = Alignment.Bottom
+                            .background(DuelSurface),
+                        contentAlignment = Alignment.BottomCenter
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height((frac * 46f).dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(DuelGradient)
                         )
                     }
                     Text(
@@ -211,7 +216,7 @@ private fun HourDistributionCard(byHour: IntArray) {
 }
 
 @Composable
-private fun MiniStat(label: String, value: String) {
+private fun RowScope.MiniStat(label: String, value: String) {
     Column(
         modifier = Modifier
             .weight(1f)
@@ -230,7 +235,7 @@ private fun formatDuration(ms: Long): String {
     val totalMin = ms / 60000
     val h = totalMin / 60
     val m = totalMin % 60
-    return if (h > 0) "$hh $mm" else "$m min"
+    return if (h > 0) "$h h $m m" else "$m min"
 }
 
 private fun queryStats(context: Context): StatsData {

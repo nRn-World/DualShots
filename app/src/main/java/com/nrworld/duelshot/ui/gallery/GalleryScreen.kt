@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Size
+import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -23,6 +24,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,7 +43,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -59,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -278,7 +280,7 @@ fun GalleryScreen() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(36.dp)
-                    .horizontalScroll(rememberLazyListState()),
+                    .horizontalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -484,7 +486,7 @@ private fun FolderChip(
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (active) DuelGradient else DuelSurface2)
+            .background(if (active) DuelGradient else Brush.linearGradient(listOf(DuelSurface2)))
             .border(1.dp, if (active) DuelOrange.copy(alpha = 0.5f) else DuelLineStrong, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 11.dp, vertical = 7.dp),
@@ -885,15 +887,14 @@ private fun ClipPlayerDialog(
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color.Black),
                 factory = { ctx ->
-                    VideoView(ctx).apply {
-                        setVideoURI(uriFor(clip.id))
-                        setMediaController(true)
-                        setOnPreparedListener { mp ->
-                            mp.isLooping = true
-                            start()
-                            videoView = this
-                        }
+                    val vv = VideoView(ctx).apply { setVideoURI(uriFor(clip.id)) }
+                    vv.setMediaController(MediaController(ctx).apply { setAnchorView(vv) })
+                    vv.setOnPreparedListener { mp ->
+                        mp.isLooping = true
+                        start()
+                        videoView = vv
                     }
+                    vv
                 }
             )
 
@@ -908,6 +909,7 @@ private fun ClipPlayerDialog(
                 BoxWithConstraints(modifier = Modifier.weight(1f).height(28.dp)) {
                     val frac = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
                     val thumbX = (maxWidth.value * frac - 7.dp.value).coerceAtLeast(0f)
+                    val trackW = maxWidth
                     // spår
                     Box(
                         modifier = Modifier
@@ -940,8 +942,8 @@ private fun ClipPlayerDialog(
                             .pointerInput(maxWidth.value) {
                                 detectTapGestures(onTap = { offset ->
                                     val vv = videoView
-                                    if (vv != null && durationMs > 0 && maxWidth.value > 0) {
-                                        val f = (offset.x / maxWidth.value).coerceIn(0f, 1f)
+                                    if (vv != null && durationMs > 0 && trackW.value > 0) {
+                                        val f = (offset.x / trackW.value).coerceIn(0f, 1f)
                                         vv.seekTo((durationMs * f).toInt())
                                     }
                                 })
@@ -962,7 +964,7 @@ private fun ClipPlayerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .horizontalScroll(rememberLazyListState()),
+                        .horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -1043,7 +1045,7 @@ private fun buildThumbs(context: Context, uri: Uri, count: Int): List<Bitmap?> {
         }.getOrNull() ?: 0L
         for (i in 1..count) {
             val tMs = if (dur > 0) dur * i / (count + 1) else 0L
-            out += runCatching { mr.getFrameAtTime(tMs * 1000L, true) }.getOrNull()
+            out += runCatching { mr.getFrameAtTime(tMs * 1000L) }.getOrNull()
         }
     } finally {
         runCatching { mr.release() }
