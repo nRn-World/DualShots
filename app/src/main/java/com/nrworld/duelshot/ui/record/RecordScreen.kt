@@ -410,10 +410,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             }
         }
 
-        // Kontrollrad
-        Box(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical = 22.dp),
-            contentAlignment = Alignment.Center
+        // Kontrollrad: zoom, slutare och småbildsverktyg – synliga i alla lägen.
+        Column(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(top = 8.dp, bottom = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             RecordButton(
                 recording = isRecording,
@@ -443,30 +443,73 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     }
                 }
             )
-            if (displayMode == RecordingMode.DUAL_VIEW && controller.supported) {
-                SwapButton(
-                    swapped = pipLive.swapCameras,
-                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 20.dp),
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        pipLive = pipLive.copy(swapCameras = !pipLive.swapCameras)
-                        pip = pipLive
-                        if (isRecording) status = "Camera swap – applies to the next take"
-                    }
-                )
-                PipToggleButton(
-                    off = !pipLive.visible,
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 20.dp),
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        pipLive = pipLive.copy(visible = !pipLive.visible, paused = false)
-                        pip = pipLive
-                        if (isRecording) {
-                            status = if (pipLive.visible) "Small camera on – applies to the next take"
-                            else "Small camera off – applies to the next take"
+
+            if (controller.supported) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ZoomChip(
+                        zoom = if (pipLive.swapCameras) frontZoom else backZoom,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val current = if (pipLive.swapCameras) frontZoom else backZoom
+                            val next = when {
+                                current < 1.5f -> 2f
+                                current < 2.5f -> 3f
+                                else -> 1f
+                            }
+                            if (pipLive.swapCameras) {
+                                val (_, fz) = controller.setZoom(front = next)
+                                frontZoom = fz
+                            } else {
+                                val (bz, _) = controller.setZoom(back = next)
+                                backZoom = bz
+                            }
+                            status = "Zoom " + "%.1f".format(next) + "× on the large camera"
                         }
+                    )
+
+                    if (displayMode == RecordingMode.DUAL_VIEW) {
+                        SwapButton(
+                            swapped = pipLive.swapCameras,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                pipLive = pipLive.copy(swapCameras = !pipLive.swapCameras)
+                                pip = pipLive
+                                status = if (isRecording) "Camera swap – applies to the next take"
+                                else if (pipLive.swapCameras) "Front camera large, back camera small"
+                                else "Back camera large, front camera small"
+                            }
+                        )
                     }
-                )
+
+                    PipToggleButton(
+                        off = !pipLive.visible,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (displayMode != RecordingMode.DUAL_VIEW) {
+                                // I Separate/Both finns ingen liten kamera – byt till Dual View.
+                                vm.mode = RecordingMode.DUAL_VIEW
+                                pipLive = pipLive.copy(visible = true, paused = false)
+                                pip = pipLive
+                                status = if (isRecording) "Dual View – applies to the next take"
+                                else "Dual View – drag, resize, pause or close the small camera"
+                            } else {
+                                pipLive = pipLive.copy(visible = !pipLive.visible, paused = false)
+                                pip = pipLive
+                                status = if (isRecording) {
+                                    if (pipLive.visible) "Small camera on – applies to the next take"
+                                    else "Small camera off – applies to the next take"
+                                } else {
+                                    if (pipLive.visible) "Small camera on"
+                                    else "Small camera off – main camera only"
+                                }
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -762,8 +805,8 @@ private fun PipInset(
 
             // Pausa eller stäng av lilla kameran.
             Row(
-                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 PipChip(if (paused) DuelIconKind.PLAY else DuelIconKind.PAUSE, onClick = onTogglePause)
                 PipChip(DuelIconKind.CLOSE, onClick = onClose)
@@ -809,16 +852,38 @@ private fun PipInset(
     }
 }
 
+/** Cyklar zoom på den stora kameran (1× → 2× → 3× → 1×). */
+@Composable
+private fun ZoomChip(zoom: Float, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(DuelSurface2)
+            .border(1.dp, if (zoom > 1.01f) DuelOrange else DuelLine, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            (kotlin.math.round(zoom * 10f) / 10f).toString().removeSuffix(".0") + "×",
+            color = if (zoom > 1.01f) DuelOrangeLight else DuelText,
+            fontWeight = FontWeight.Bold,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontSize = 11.sp
+        )
+    }
+}
+
 @Composable
 private fun PipChip(kind: DuelIconKind, onClick: () -> Unit) {
     Box(
-        modifier = Modifier.size(24.dp).clip(CircleShape)
-            .background(Color.Black.copy(alpha = .55f))
-            .border(1.dp, Color.White.copy(alpha = .28f), CircleShape)
+        modifier = Modifier.size(30.dp).clip(CircleShape)
+            .background(Color.Black.copy(alpha = .62f))
+            .border(1.dp, Color.White.copy(alpha = .34f), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        DuelIcon(kind, Color.White, 12.dp)
+        DuelIcon(kind, Color.White, 15.dp)
     }
 }
 
@@ -837,7 +902,7 @@ private fun PipToggleButton(off: Boolean, modifier: Modifier = Modifier, onClick
         DuelIcon(DuelIconKind.PIP, if (off) DuelTextMuted else DuelOrangeLight, 18.dp)
         Spacer(Modifier.width(8.dp))
         Text(
-            if (off) "OFF" else "PIP",
+            if (off) "OFF" else "SMALL",
             color = DuelText, fontWeight = FontWeight.Bold,
             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
             fontSize = 10.sp, letterSpacing = 1.sp

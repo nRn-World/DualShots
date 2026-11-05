@@ -16,8 +16,20 @@ class AppPrefs(context: Context) {
     private val sp = context.applicationContext
         .getSharedPreferences("duelshot_prefs", Context.MODE_PRIVATE)
 
+    init {
+        // Dual View är standard: det är läget med den lilla kameran.
+        // En gång per installation flyttas det gamla förvalet (Separate) över.
+        if (!sp.getBoolean(KEY_SETUP_DONE, false)) {
+            val stored = sp.getString(KEY_MODE, null)
+            if (stored == null || stored == RecordingMode.SEPARATE.name) {
+                sp.edit().putString(KEY_MODE, RecordingMode.DUAL_VIEW.name).apply()
+            }
+            sp.edit().putBoolean(KEY_SETUP_DONE, true).apply()
+        }
+    }
+
     var mode: RecordingMode
-        get() = RecordingMode.valueOf(sp.getString(KEY_MODE, RecordingMode.SEPARATE.name)!!)
+        get() = RecordingMode.valueOf(sp.getString(KEY_MODE, RecordingMode.DUAL_VIEW.name)!!)
         set(v) = sp.edit().putString(KEY_MODE, v.name).apply()
 
     var frontAspect: AspectOption
@@ -54,6 +66,7 @@ class AppPrefs(context: Context) {
         private const val KEY_CODEC = "codec"
         private const val KEY_PREMIUM = "premium"
         private const val KEY_ONBOARDED = "onboarded"
+        private const val KEY_SETUP_DONE = "setup_done"
     }
 }
 
