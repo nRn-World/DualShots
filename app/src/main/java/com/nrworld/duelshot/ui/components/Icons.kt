@@ -19,7 +19,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /** Egna linjeikoner – avsiktligt inga standard-mobilikoner. */
-enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, PLAY, PAUSE, CAMERA, VIDEO, CROWN, INFO, PIP, COPY, GRID, SHARE, TRASH }
+enum class DuelIconKind { HOME, GALLERY, SETTINGS, GEM, CHECK, CHEVRON, CLOSE, SWITCH, SWAP, PLAY, PAUSE, CAMERA, VIDEO, CROWN, INFO, PIP, COPY, GRID, SHARE, TRASH }
 
 /** Ritar en ikon på en 24×24-yta, skalad till [size]. */
 @Composable
@@ -67,6 +67,10 @@ fun DuelIcon(kind: DuelIconKind, tint: Color, size: Dp = 22.dp, modifier: Modifi
                     topLeft = Offset(c.x - r, c.y - r), size = Size(r * 2, r * 2), style = stroke)
                 arrowAt(c, r, 340f, tint, s)
                 arrowAt(c, r, 160f, tint, s)
+            }
+            DuelIconKind.SWAP -> {
+                drawPath(pathOf(listOf(p(4.5f, 8.5f), p(17.5f, 8.5f), p(14.5f, 5.5f))), tint, style = stroke)
+                drawPath(pathOf(listOf(p(19.5f, 15.5f), p(6.5f, 15.5f), p(9.5f, 18.5f))), tint, style = stroke)
             }
             DuelIconKind.PLAY -> drawPath(pathOf(listOf(p(8f, 5.5f), p(19f, 12f), p(8f, 18.5f)), close = true), tint)
             DuelIconKind.PAUSE -> {
