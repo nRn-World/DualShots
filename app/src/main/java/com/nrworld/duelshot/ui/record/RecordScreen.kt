@@ -355,6 +355,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                     } else if (controller.pauseCamera(back = true)) {
                                         backPaused = true
                                         status = "BACK paused – FRONT keeps recording"
+                                    } else {
+                                        status = "BACK could not pause on its own – use the top pause"
                                     }
                                 },
                                 onHide = {
@@ -390,6 +392,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                     } else if (controller.pauseCamera(back = false)) {
                                         frontPaused = true
                                         status = "FRONT paused – BACK keeps recording"
+                                    } else {
+                                        status = "FRONT could not pause on its own – use the top pause"
                                     }
                                 },
                                 onHide = {
