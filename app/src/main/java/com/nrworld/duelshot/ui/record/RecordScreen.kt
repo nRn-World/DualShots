@@ -158,7 +158,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         val wanted = if (fallbackFrom == vm.mode) renderedMode else vm.mode
         if (controller.supported) {
             when (wanted) {
-                RecordingMode.DUAL_VIEW -> if (composedView == null || backView == null || frontView == null) return@LaunchedEffect
+                RecordingMode.DUAL_VIEW -> if (composedView == null) return@LaunchedEffect
                 RecordingMode.SEPARATE -> if (backView == null || frontView == null) return@LaunchedEffect
                 RecordingMode.BOTH -> if (backView == null || frontView == null || composedView == null) return@LaunchedEffect
             }
@@ -247,9 +247,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 if (displayMode == RecordingMode.DUAL_VIEW) {
                     Box(Modifier.fillMaxSize()) {
                         val swap = pipLive.swapCameras
-                        // Stor bild: fast. Liten bild: flyttbar med fingret.
+                        // Den sammansatta strömmen visas direkt: båda kamerorna i en bild,
+                        // exakt den bild som spelas in. Ingen extra preview behövs.
                         FramedFeed(
-                            if (swap) frontView else backView,
+                            composedView,
                             if (swap) vm.frontAspect else vm.backAspect,
                             label = if (swap) "FRONT" else "BACK",
                             modifier = Modifier.fillMaxSize().padding(3.dp),
@@ -264,38 +265,23 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                 }
                             },
                             onFocus = { nx, ny ->
-                                if (swap) controller.focusAt(isFront = true, nx = nx, ny = ny, view = frontView)
-                                else controller.focusAt(isFront = false, nx = nx, ny = ny, view = backView)
+                                controller.focusAt(isFront = swap, nx = nx, ny = ny, view = composedView)
                             },
-                            onRelease = { v ->
-                                if (swap) { if (frontView === v) frontView = null }
-                                else if (backView === v) backView = null
-                            }
-                        ) { v -> if (swap) frontView = v else backView = v }
+                            onRelease = { if (composedView === it) composedView = null }
+                        ) { composedView = it }
 
-                        if (pipLive.visible) PipInset(
-                            view = if (swap) backView else frontView,
-                            aspect = if (swap) vm.backAspect else vm.frontAspect,
-                            label = if (swap) "BACK" else "FRONT",
+                        // Ramen visar var den lilla kameran hamnar i den sammansatta bilden.
+                        if (pipLive.visible) PipOutline(
                             layout = pipLive,
-                            zoom = if (swap) backZoom else frontZoom,
-                            onZoom = { f ->
-                                if (swap) {
-                                    val (bz, _) = controller.setZoom(back = backZoom * f)
-                                    backZoom = bz
-                                } else {
-                                    val (_, fz) = controller.setZoom(front = frontZoom * f)
-                                    frontZoom = fz
-                                }
-                            },
-                            onResize = { size -> pipLive = pipLive.copy(scale = size) },
+                            aspect = if (swap) vm.backAspect else vm.frontAspect,
                             onDrag = { dx, dy ->
                                 pipLive = pipLive.copy(
                                     cx = (pipLive.cx + dx).coerceIn(0.12f, 0.88f),
                                     cy = (pipLive.cy + dy).coerceIn(0.12f, 0.88f)
                                 )
                             },
-                            paused = pipLive.paused,
+                            onResize = { size -> pipLive = pipLive.copy(scale = size) },
+                            onCommit = { pip = pipLive },
                             onTogglePause = {
                                 pipLive = pipLive.copy(paused = !pipLive.paused)
                                 pip = pipLive
@@ -308,20 +294,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                 pipLive = pipLive.copy(visible = false, paused = false)
                                 pip = pipLive
                                 if (isRecording) status = "Small camera off – next clip part"
-                            },
-                            onCommit = { pip = pipLive },
-                            onRelease = { v ->
-                                if (swap) { if (backView === v) backView = null }
-                                else if (frontView === v) frontView = null
-                            },
-                            onView = { v -> if (swap) backView = v else frontView = v }
-                        )
-
-                        // Dold yta som behövs för den sammansatta inspelningen.
-                        AndroidView(
-                            modifier = Modifier.size(1.dp),
-                            factory = { ctx -> PreviewView(ctx).also { composedView = it } },
-                            onRelease = { if (composedView === it) composedView = null }
+                            }
                         )
                     }
                 } else {
@@ -824,6 +797,69 @@ private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Un
         )
     }
 }
+/** Ram för den lilla kameran i Dual View – bilden ritas av sammansättningen. */
+@Composable
+private fun PipOutline(
+    layout: PipLayout,
+    aspect: AspectOption,
+    onDrag: (Float, Float) -> Unit,
+    onResize: (Float) -> Unit,
+    onCommit: () -> Unit,
+    onTogglePause: () -> Unit,
+    onClose: () -> Unit
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val w = constraints.maxWidth.toFloat()
+        val h = constraints.maxHeight.toFloat()
+        val scale = layout.scale.coerceIn(0.18f, 0.6f)
+        val liveScale = rememberUpdatedState(scale)
+        val pipW = w * scale
+        val pipH = pipW / aspect.ratio()
+        val left = (layout.cx * w - pipW / 2f).coerceIn(0f, (w - pipW).coerceAtLeast(0f))
+        val top = (layout.cy * h - pipH / 2f).coerceIn(0f, (h - pipH).coerceAtLeast(0f))
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
+                .size(with(density) { pipW.toDp() }, with(density) { pipH.toDp() })
+                .clip(RoundedCornerShape(12.dp))
+                .border(1.5.dp, Color.White.copy(alpha = if (layout.paused) .28f else .6f), RoundedCornerShape(12.dp))
+                .pointerInput(aspect) {
+                    detectDragGestures(
+                        onDragEnd = { onCommit() },
+                        onDragCancel = { onCommit() }
+                    ) { change, drag ->
+                        change.consume()
+                        onDrag(drag.x / w, drag.y / h)
+                    }
+                }
+        ) {
+            Row(
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                PipChip(if (layout.paused) DuelIconKind.PLAY else DuelIconKind.PAUSE, onClick = onTogglePause)
+                PipChip(DuelIconKind.CLOSE, onClick = onClose)
+            }
+            Box(
+                modifier = Modifier.align(Alignment.BottomEnd).size(26.dp)
+                    .clip(RoundedCornerShape(topStart = 8.dp))
+                    .background(Color.Black.copy(alpha = .35f))
+                    .pointerInput(aspect) {
+                        detectDragGestures(
+                            onDragEnd = { onCommit() },
+                            onDragCancel = { onCommit() }
+                        ) { change, drag ->
+                            change.consume()
+                            onResize((liveScale.value + drag.x / w).coerceIn(0.18f, 0.6f))
+                        }
+                    }
+            )
+        }
+    }
+}
+
 /** Pausa-/kryssknappar uppe i hörnet på en inspelningsruta. */
 @Composable
 private fun TileChips(

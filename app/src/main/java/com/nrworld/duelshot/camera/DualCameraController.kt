@@ -167,7 +167,8 @@ class DualCameraController(private val context: Context) {
 
     /**
      * Binder kamerorna enligt [wanted]. returnerar statusmeddelande.
-     * [backView]/[frontView] behövs för Separate/Both, [composedView] för Dual View.
+     * [backView]/[frontView] behövs för Separate/Both. Dual View visar den
+     * sammansatta strömmen i [composedView] och behöver inga egna previews.
      */
     fun bind(
         wanted: RecordingMode,
@@ -283,11 +284,11 @@ class DualCameraController(private val context: Context) {
         val composedPreview = previewFor(composedView)
         val composed = VideoCapture.withOutput(Recorder.Builder().setQualitySelector(qs).build())
         composedVideo = composed
-        // Egna previews per kamera så att den stora rutan står still och den lilla
-        // kan flyttas med fingret. Composition-settings styr den inspelade filen.
+        // Sammansättningen tillåter bara en preview + en VideoCapture i gruppen.
+        // Egna previews per kamera här fick bindningen att kasta och då blev
+        // Dual View aldrig en enda fil – det var regressionen.
         val group = UseCaseGroup.Builder()
             .addUseCase(composedPreview).addUseCase(composed)
-            .addUseCase(previewFor(backView)).addUseCase(previewFor(frontView))
             .build()
         val largeSel = if (pip.swapCameras) fs else bs
         val smallSel = if (pip.swapCameras) bs else fs
