@@ -8,9 +8,12 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,13 +24,24 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Accept Android SDK licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        run: yes | sdkmanager --licenses || true
 
       - name: Build Debug APK
+        shell: bash
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+          if ! ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log; then
+            ERR_SUMMARY=$(grep -E "(^e: |FAILURE:|What went wrong:|^\* |Exception|Error)" build.log | tail -n 35 | tr '\n' ' ' | sed 's/%/%25/g')
+            TAIL_LOG=$(tail -n 45 build.log | tr '\n' ' ' | sed 's/%/%25/g')
+            echo "::error title=GradleError::${ERR_SUMMARY}"
+            echo "::error title=GradleTail::${TAIL_LOG}"
+            exit 1
+          fi
 
       - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
@@ -35,3 +49,22 @@ jobs:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk DualShots-v1.1-debug.apk
+          NOTES="Uppdaterad DualShots v1.1 (samma design och bild-i-bild-upplevelse som webb-previewn):
+          - Fullhöjds kamerakort i porträttläge med flyttbar och skalbar bild-i-bild-kamera (PiP)
+          - Robust Dual View som behåller bild-i-bild även på telefoner där hårdvarusammansättning nekas
+          - Enkelradig kameradocka längst ner (1×, inspelning, swap, bild-i-bild)
+          - Camera setup som bottom sheet, 3×3-rutnät, paus/återuppta och mono-statusrad"
+          if gh release view v0.2.0 >/dev/null 2>&1; then
+            gh release upload v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.1-debug.apk --clobber
+          else
+            gh release create v0.2.0 app/build/outputs/apk/debug/app-debug.apk DualShots-v1.1-debug.apk \
+              --target "${{ github.sha }}" \
+              --title "DualShots v1.1" \
+              --notes "$NOTES"
+          fi
