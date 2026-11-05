@@ -63,14 +63,16 @@ import com.nrworld.duelshot.ui.theme.DuelTextMuted
  */
 class MainActivity : ComponentActivity() {
 
-    private val requiredPermissions: List<String> = buildList {
-        add(Manifest.permission.CAMERA)
-        add(Manifest.permission.RECORD_AUDIO)
+    private val requiredPermissions: Array<String> = arrayOf(
+        Manifest.permission.CAMERA,
+        Manifest.permission.RECORD_AUDIO,
         // Läsa tillbaka inspelade klipp i Gallery. Android 13+ använder READ_MEDIA_VIDEO,
         // äldre versioner READ_EXTERNAL_STORAGE.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.READ_MEDIA_VIDEO)
-        else add(Manifest.permission.READ_EXTERNAL_STORAGE)
-    }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            Manifest.permission.READ_MEDIA_VIDEO
+        else
+            Manifest.permission.READ_EXTERNAL_STORAGE
+    )
 
     private val permissionGranted = mutableStateOf(false)
     private val askedOnce = mutableStateOf(false)
