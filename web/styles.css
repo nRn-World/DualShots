@@ -2001,3 +2001,22 @@ body.ref .device-inner { border-radius: 0; }
   .device { width: 100vw; height: min(100dvh, calc(100vw * 1476 / 1024)); aspect-ratio: auto; border-radius: 0; }
   .device-inner { border-radius: 0; }
 }
+
+/* saved-video row (settings) and photo capture flash (record view) */
+.st-save { height: 86px; }
+.st-save .st-seg { left: 500px; top: 15px; width: 380px; height: 51px; }
+.st-cams + .st-sec { margin-top: 26px; }
+.st-save + .st-sec { margin-top: 22px; }
+.rec-preview.flash::after {
+  content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none;
+  background: #fff; animation: photo-flash .35s ease-out forwards;
+}
+@keyframes photo-flash { from { opacity: .85; } to { opacity: 0; } }
+#rec-photo[disabled] { opacity: .35; }
+
+/* paused cameras are plain black, nothing of the feed shows through */
+.tile.paused { background: #000; }
+.tile.paused > video, .tile.paused > canvas { opacity: 0; }
+.pip.paused video, .pip.paused canvas { opacity: 0; }
+.main-controls { right: auto; top: auto; left: 10px; bottom: 10px; }
+.pip-ctl.on { color: var(--orange-light); border-color: rgba(255, 102, 0, .55); }

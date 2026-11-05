@@ -86,6 +86,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import com.nrworld.duelshot.camera.PipLayout
+import com.nrworld.duelshot.camera.PhotoSaver
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -113,8 +120,11 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     var part by remember { mutableStateOf(1) }
     var showTune by remember { mutableStateOf(false) }
     var stacked by remember { mutableStateOf(false) }
-    var showGrid by remember { mutableStateOf(false) }
+    var showGrid by remember { mutableStateOf(vm.grid) }
     var paused by remember { mutableStateOf(false) }
+    // Stora kameran i Dual View kan pausas på egen hand (svart bild, samma fil).
+    var mainPaused by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var premiumFeature by remember { mutableStateOf<String?>(null) }
     // Bild-i-bild: [pip] är sparad placering, [pipLive] följer fingret.
     var pip by remember { mutableStateOf(PipLayout()) }
@@ -148,7 +158,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     // kameran binds om och nästa del (_p2, _p3 …) startar direkt.
     LaunchedEffect(
         camReady, ready, backView, frontView, composedView, vm.mode, vm.frontAspect,
-        vm.backAspect, vm.quality, pip, isRecording, fallbackFrom
+        vm.backAspect, vm.quality, vm.saveAspect, pip, isRecording, fallbackFrom
     ) {
         if (!camReady) return@LaunchedEffect
         // En take = en fil: ändringar under inspelning väntar till nästa take.
@@ -164,6 +174,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             }
         } else if (backView == null && frontView == null) return@LaunchedEffect
 
+        controller.recordAudio = vm.recordAudio
         status = controller.bind(
             wanted = wanted,
             frontAspect = vm.frontAspect,
@@ -173,12 +184,48 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             backView = backView,
             frontView = frontView,
             composedView = composedView,
-            pip = pip
+            pip = pip,
+            saveAspect = vm.saveAspect
         )
         renderedMode = controller.activeMode
         boundFor = vm.mode
         fallbackFrom = if (controller.activeMode != vm.mode) vm.mode else null
         ready = true
+    }
+
+    // Svart-vid-paus följer knapparna direkt, även mitt i en inspelning.
+    LaunchedEffect(mainPaused, pipLive, vm.frontAspect, vm.backAspect) {
+        val smallAspect = if (pipLive.swapCameras) vm.backAspect else vm.frontAspect
+        controller.setPaused(mainPaused, pipLive.paused && pipLive.visible, pipLive, smallAspect)
+    }
+
+    // Stillbild av det som syns: sammansatt bild i Dual View, annars en per kamera.
+    fun takePhoto() {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val shots = when {
+            !controller.supported -> listOf("camera" to backView)
+            displayMode == RecordingMode.DUAL_VIEW -> listOf("combined" to composedView)
+            else -> listOfNotNull(
+                if (!hideBack) "back" to backView else null,
+                if (!hideFront) "front" to frontView else null
+            )
+        }
+        val bitmaps = shots.mapNotNull { (key, view) -> view?.bitmap?.let { key to it } }
+        if (bitmaps.isEmpty()) {
+            status = "No picture to save yet"
+            return
+        }
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                bitmaps.count { (key, bmp) -> PhotoSaver.save(context, bmp, "dualshot_photo_${key}_$stamp") }
+            }
+            status = when (saved) {
+                0 -> "Could not save the photo"
+                1 -> "Photo saved – Gallery → Photos"
+                else -> "$saved photos saved – Gallery → Photos"
+            }
+        }
     }
 
     // Timer: nollställs vid start och står still när man pausar.
@@ -248,17 +295,19 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     val swap = pipLive.swapCameras
                     val largeAspect = if (swap) vm.frontAspect else vm.backAspect
                     val smallAspect = if (swap) vm.backAspect else vm.frontAspect
+                    // Med eget filformat visar ramen hela filen (t.ex. 16:9 för YouTube).
+                    val frameAspect = vm.saveAspect ?: largeAspect
                     Box(
                         modifier = Modifier.fillMaxSize().padding(3.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         // Videon och den lilla kamerans ram delar exakt samma yta,
                         // så ramen hamnar där den faktiskt spelas in.
-                        Box(Modifier.aspectRatio(largeAspect.ratio())) {
+                        Box(Modifier.aspectRatio(frameAspect.ratio())) {
                             Feed(
                                 composedView,
                                 label = if (swap) "FRONT" else "BACK",
-                                ratio = largeAspect.label,
+                                ratio = vm.saveAspect?.let { "FILE " + it.label.substringBefore(' ') } ?: largeAspect.label,
                                 modifier = Modifier.fillMaxSize(),
                                 zoom = if (swap) frontZoom else backZoom,
                                 onZoom = { f ->
@@ -275,6 +324,12 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                 },
                                 onRelease = { if (composedView === it) composedView = null }
                             ) { composedView = it }
+
+                            // Pausad stor kamera: svart, bara lilla kameran syns.
+                            if (mainPaused) PausedLarge(
+                                hole = if (pipLive.visible && !pipLive.paused) pipLive else null,
+                                smallAspect = smallAspect
+                            )
 
                             if (pipLive.visible) PipOutline(
                                 layout = pipLive,
@@ -294,9 +349,12 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                 onTogglePause = {
                                     pipLive = pipLive.copy(paused = !pipLive.paused)
                                     pip = pipLive
-                                    if (isRecording) {
-                                        status = if (pipLive.paused) "Small camera paused – next clip part"
-                                        else "Small camera running – next clip part"
+                                    status = when {
+                                        !isRecording -> if (pipLive.paused) "Small camera paused – black" else "Small camera running"
+                                        controller.effectsActive -> if (pipLive.paused) "Small camera paused – black in the video"
+                                        else "Small camera running – same file"
+                                        else -> if (pipLive.paused) "Small camera paused – applies to the next take"
+                                        else "Small camera running – applies to the next take"
                                     }
                                 },
                                 onClose = {
@@ -305,6 +363,21 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                     if (isRecording) status = "Small camera off – next clip part"
                                 }
                             )
+
+                            // Pausa/återuppta den stora kameran.
+                            Box(Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 40.dp)) {
+                                PipChip(if (mainPaused) DuelIconKind.PLAY else DuelIconKind.PAUSE) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    mainPaused = !mainPaused
+                                    status = when {
+                                        !isRecording -> if (mainPaused) "Large camera paused – black" else "Large camera running"
+                                        controller.effectsActive -> if (mainPaused) "Large camera paused – black in the video"
+                                        else "Large camera running – same file"
+                                        else -> if (mainPaused) "Large camera paused – applies to the next take"
+                                        else "Large camera running – applies to the next take"
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {
@@ -334,6 +407,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                 },
                                 onRelease = { if (backView === it) backView = null }
                             ) { backView = it }
+                            if (backPaused) PausedTile()
                             if (isRecording) TileChips(
                                 paused = backPaused,
                                 canHide = showFront,
@@ -371,6 +445,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                 },
                                 onRelease = { if (frontView === it) frontView = null }
                             ) { frontView = it }
+                            if (frontPaused) PausedTile()
                             if (isRecording) TileChips(
                                 paused = frontPaused,
                                 canHide = showBack,
@@ -469,6 +544,14 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                             onSelect = { vm.frontAspect = AspectOption.values()[it] }
                         )
                     }
+                    if (displayMode == RecordingMode.DUAL_VIEW) TuneRow("FILE") {
+                        val formats = listOf(null, AspectOption.R_9_16, AspectOption.R_16_9, AspectOption.R_1_1)
+                        SegmentedControl(
+                            options = listOf("Auto", "9:16", "16:9", "1:1"),
+                            selectedIndex = formats.indexOf(vm.saveAspect).coerceAtLeast(0),
+                            onSelect = { vm.saveAspect = formats[it] }
+                        )
+                    }
                     if (displayMode != RecordingMode.DUAL_VIEW) TuneRow("LAYOUT") {
                         SegmentedControl(
                             options = listOf("Side", "Stack"),
@@ -497,6 +580,9 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(top = 8.dp, bottom = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+            PhotoButton(enabled = ready && controller.canBind, onClick = { takePhoto() })
+            Spacer(Modifier.width(28.dp))
             RecordButton(
                 recording = isRecording,
                 enabled = ready && controller.canBind,
@@ -533,6 +619,9 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     }
                 }
             )
+            Spacer(Modifier.width(28.dp))
+            Spacer(Modifier.size(52.dp))
+            }
 
             if (controller.supported) {
                 Spacer(Modifier.height(12.dp))
@@ -834,6 +923,7 @@ private fun PipOutline(
                 .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
                 .size(with(density) { pipW.toDp() }, with(density) { pipH.toDp() })
                 .clip(RoundedCornerShape(12.dp))
+                .background(if (layout.paused) Color.Black else Color.Transparent)
                 .border(1.5.dp, Color.White.copy(alpha = if (layout.paused) .28f else .6f), RoundedCornerShape(12.dp))
                 .pointerInput(aspect) {
                     detectDragGestures(
@@ -845,6 +935,11 @@ private fun PipOutline(
                     }
                 }
         ) {
+            if (layout.paused) Text(
+                "PAUSED", color = Color.White.copy(alpha = .82f),
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 9.sp, letterSpacing = 1.sp,
+                modifier = Modifier.align(Alignment.Center)
+            )
             Row(
                 modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -867,6 +962,62 @@ private fun PipOutline(
                     }
             )
         }
+    }
+}
+
+/** Svart ruta när en kamera är pausad – ingen bild syns igenom. */
+@Composable
+private fun PausedTile() {
+    Box(
+        Modifier.fillMaxSize().padding(3.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            "PAUSED", color = Color.White.copy(alpha = .82f),
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 1.sp
+        )
+    }
+}
+
+/** Stora kameran pausad i Dual View: svart överallt utom den lilla kamerans ruta. */
+@Composable
+private fun PausedLarge(hole: PipLayout?, smallAspect: AspectOption) {
+    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp))) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            if (hole == null) {
+                drawRect(Color.Black)
+            } else {
+                val scale = hole.scale.coerceIn(0.18f, 0.6f)
+                val pw = w * scale
+                val ph = pw / smallAspect.ratio()
+                val left = (hole.cx * w - pw / 2f).coerceIn(0f, (w - pw).coerceAtLeast(0f))
+                val top = (hole.cy * h - ph / 2f).coerceIn(0f, (h - ph).coerceAtLeast(0f))
+                drawRect(Color.Black, Offset(0f, 0f), androidx.compose.ui.geometry.Size(w, top))
+                drawRect(Color.Black, Offset(0f, top + ph), androidx.compose.ui.geometry.Size(w, h - top - ph))
+                drawRect(Color.Black, Offset(0f, top), androidx.compose.ui.geometry.Size(left, ph))
+                drawRect(Color.Black, Offset(left + pw, top), androidx.compose.ui.geometry.Size(w - left - pw, ph))
+            }
+        }
+        Text(
+            "PAUSED", color = Color.White.copy(alpha = .7f),
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 1.sp,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp)
+        )
+    }
+}
+
+/** Tar en stillbild – fungerar både med och utan pågående inspelning. */
+@Composable
+private fun PhotoButton(enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(52.dp).clip(CircleShape)
+            .background(DuelSurface2).border(1.dp, DuelLine, CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        DuelIcon(DuelIconKind.CAMERA, if (enabled) DuelText else DuelTextMuted, 22.dp)
     }
 }
 

@@ -17,3 +17,11 @@ build/
 # Throwaway emulator test captures (design poster HTML is kept)
 design/*.png
 design/ui.xml
+
+# Built APKs for sideloading, server log, signing keys (never pushed)
+/apk/
+web/serve.err.log
+*.jks
+*.keystore
+*.p12
+keystore.properties

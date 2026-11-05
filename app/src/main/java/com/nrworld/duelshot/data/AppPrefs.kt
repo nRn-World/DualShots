@@ -53,6 +53,27 @@ class AppPrefs(context: Context) {
         get() = sp.getBoolean(KEY_PREMIUM, false)
         set(v) = sp.edit().putBoolean(KEY_PREMIUM, v).apply()
 
+    /** Format på Dual View-filen; null = följer bakkameran (Auto). */
+    var saveAspect: AspectOption?
+        get() = sp.getString(KEY_SAVE_ASPECT, null)?.let { n -> AspectOption.values().firstOrNull { it.name == n } }
+        set(v) = sp.edit().putString(KEY_SAVE_ASPECT, v?.name).apply()
+
+    var stabilize: Boolean
+        get() = sp.getBoolean(KEY_STABILIZE, true)
+        set(v) = sp.edit().putBoolean(KEY_STABILIZE, v).apply()
+
+    var grid: Boolean
+        get() = sp.getBoolean(KEY_GRID, true)
+        set(v) = sp.edit().putBoolean(KEY_GRID, v).apply()
+
+    var recordAudio: Boolean
+        get() = sp.getBoolean(KEY_AUDIO, true)
+        set(v) = sp.edit().putBoolean(KEY_AUDIO, v).apply()
+
+    var saveLocation: Boolean
+        get() = sp.getBoolean(KEY_LOCATION, false)
+        set(v) = sp.edit().putBoolean(KEY_LOCATION, v).apply()
+
     /** Visas onboarding bara första gången. */
     var onboarded: Boolean
         get() = sp.getBoolean(KEY_ONBOARDED, false)
@@ -67,6 +88,11 @@ class AppPrefs(context: Context) {
         private const val KEY_PREMIUM = "premium"
         private const val KEY_ONBOARDED = "onboarded"
         private const val KEY_SETUP_DONE = "setup_done"
+        private const val KEY_SAVE_ASPECT = "save_aspect"
+        private const val KEY_STABILIZE = "stabilize"
+        private const val KEY_GRID = "grid"
+        private const val KEY_AUDIO = "record_audio"
+        private const val KEY_LOCATION = "save_location"
     }
 }
 

@@ -50,6 +50,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (!v.premium || isPremium) { codecState = v; prefs.codec = v }
         }
 
+    private var saveAspectState by mutableStateOf(prefs.saveAspect)
+    /** Format på Dual View-filen; null = Auto (följer bakkameran). */
+    var saveAspect: AspectOption?
+        get() = saveAspectState
+        set(v) { saveAspectState = v; prefs.saveAspect = v }
+
+    private var stabilizeState by mutableStateOf(prefs.stabilize)
+    var stabilize: Boolean
+        get() = stabilizeState
+        set(v) { stabilizeState = v; prefs.stabilize = v }
+
+    private var gridState by mutableStateOf(prefs.grid)
+    var grid: Boolean
+        get() = gridState
+        set(v) { gridState = v; prefs.grid = v }
+
+    private var audioState by mutableStateOf(prefs.recordAudio)
+    var recordAudio: Boolean
+        get() = audioState
+        set(v) { audioState = v; prefs.recordAudio = v }
+
+    private var locationState by mutableStateOf(prefs.saveLocation)
+    var saveLocation: Boolean
+        get() = locationState
+        set(v) { locationState = v; prefs.saveLocation = v }
+
     private var premiumState by mutableStateOf(prefs.isPremium)
     var isPremium: Boolean
         get() = premiumState

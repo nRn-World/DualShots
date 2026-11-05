@@ -38,6 +38,16 @@ const ASPECTS = {
   R_4_3: { label: '4:3', short: '4:3', w: 4, h: 3 },
 };
 
+/* Shape of the composed Dual View file; AUTO follows the back camera. */
+const SAVE_ORDER = ['AUTO', 'R_9_16', 'R_16_9', 'R_1_1'];
+const saveLabel = (k) => (k === 'AUTO' ? 'Auto' : ASPECTS[k].short);
+
+/* Aspect the composed (Dual View) file is written in. */
+function composedAspect(take) {
+  const t = take || state;
+  return t.saveAspect && t.saveAspect !== 'AUTO' ? t.saveAspect : t.backAspect;
+}
+
 const QUALITY_ORDER = ['HD720', 'FHD1080', 'UHD4K'];
 
 const QUALITIES = {
@@ -69,11 +79,13 @@ const state = {
   stabilize: true,
   location: false,
   galleryFilter: 'ALL',
+  saveAspect: 'AUTO',
   zoom: { main: 1, inset: 1 },
   stack: 'front-first',
   pip: { cx: 0.74, cy: 0.24, scale: 0.34 },
   pipOff: false,
   pipPaused: false,
+  mainPaused: false,
   swap: false,
   clips: [],
 };
@@ -266,6 +278,7 @@ function savePrefs() {
       grid: state.grid,
       stabilize: state.stabilize,
       location: state.location,
+      saveAspect: state.saveAspect,
       pip: state.pip,
       swap: state.swap,
       onboarded: !!state.onboarded,
@@ -290,6 +303,7 @@ function loadPrefs() {
     if (typeof p.grid === 'boolean') state.grid = p.grid;
     if (typeof p.stabilize === 'boolean') state.stabilize = p.stabilize;
     if (typeof p.location === 'boolean') state.location = p.location;
+    if (p.saveAspect === 'AUTO' || ASPECTS[p.saveAspect]) state.saveAspect = p.saveAspect;
     if (p.pip && Number.isFinite(p.pip.cx) && Number.isFinite(p.pip.cy) && Number.isFinite(p.pip.scale)) {
       state.pip = {
         cx: clamp(p.pip.cx, 0, 1),
@@ -979,7 +993,7 @@ function drawOutput(o) {
     const big = cam.feeds[bigKey];
     const small = cam.feeds[smallKey];
 
-    if (big) drawCover(ctx, big.el, w, h, big.mirror, zoom.main);
+    if (big && !state.mainPaused) drawBig(ctx, big, bigKey, w, h, zoom.main);
     if (small && !state.pipOff) {
       const aspectKey = smallKey === 'back'
         ? ((rec.take && rec.take.backAspect) || state.backAspect)
@@ -993,12 +1007,8 @@ function drawOutput(o) {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, g.w, g.h);
       if (state.pipPaused) {
-        ctx.fillStyle = 'rgba(8,10,16,.94)';
+        ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, g.w, g.h);
-        ctx.fillStyle = 'rgba(255,255,255,.55)';
-        ctx.font = `700 ${Math.round(g.w * 0.1)}px ui-monospace, monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText('PAUSED', g.w / 2, g.h / 2);
       } else {
         drawCover(ctx, small.el, g.w, g.h, small.mirror, zoom.inset);
       }
@@ -1012,7 +1022,84 @@ function drawOutput(o) {
   }
 
   const feed = cam.feeds[o.key];
-  if (feed) drawCover(ctx, feed.el, w, h, feed.mirror, zoom.main);
+  if (feed && !rec.tilePaused[o.key]) drawCover(ctx, feed.el, w, h, feed.mirror, zoom.main);
+}
+
+/* Draws the large camera. With an explicit saved format that differs from
+   the camera's own, the camera keeps its shape (e.g. 9:16 inside a 16:9
+   file) on a blurred, darkened fill of itself instead of being cropped. */
+function drawBig(ctx, feed, key, w, h, zoom) {
+  const t = rec.take || state;
+  const own = ASPECTS[key === 'back' ? t.backAspect : t.frontAspect];
+  const explicit = t.saveAspect && t.saveAspect !== 'AUTO';
+  const ownRatio = own.w / own.h;
+  if (!explicit || Math.abs(ownRatio - w / h) < 0.01) {
+    drawCover(ctx, feed.el, w, h, feed.mirror, zoom);
+    return;
+  }
+  ctx.save();
+  ctx.filter = `blur(${Math.round(Math.max(w, h) / 40)}px) brightness(.45)`;
+  drawCover(ctx, feed.el, w, h, feed.mirror, 1);
+  ctx.restore();
+  let fw = w;
+  let fh = Math.round(w / ownRatio);
+  if (fh > h) { fh = h; fw = Math.round(h * ownRatio); }
+  ctx.save();
+  ctx.translate(Math.round((w - fw) / 2), Math.round((h - fh) / 2));
+  ctx.beginPath();
+  ctx.rect(0, 0, fw, fh);
+  ctx.clip();
+  drawCover(ctx, feed.el, fw, fh, feed.mirror, zoom);
+  ctx.restore();
+}
+
+/* ------------------------------------------------------------- photos */
+
+/* Still photo of what the current mode records; works while filming too. */
+async function takePhoto() {
+  if (!cam.ready) { toast('Cameras are not ready yet'); return; }
+  const t = rec.take || state;
+  const stamp = stampNow();
+  const single = !cam.feeds.back || !cam.feeds.front;
+  const shots = [];
+  if (single) shots.push([cam.active, t[cam.active === 'back' ? 'backAspect' : 'frontAspect']]);
+  else {
+    if (t.mode !== 'SEPARATE') shots.push(['composed', composedAspect(t)]);
+    if (t.mode !== 'DUAL_VIEW') shots.push(['back', t.backAspect], ['front', t.frontAspect]);
+  }
+
+  const photos = [];
+  for (const [key, aspectKey] of shots) {
+    const { width, height } = outputSize(aspectKey, t.quality);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const o = { key, canvas, ctx: canvas.getContext('2d') };
+    drawOutput(o);
+    // eslint-disable-next-line no-await-in-loop
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if (!blob) continue;
+    photos.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      kind: 'photo',
+      name: `dualshot_photo_${key === 'composed' ? 'combined' : key}_${stamp}.jpg`,
+      sizeMb: mb(blob.size),
+      url: URL.createObjectURL(blob),
+      mime: 'image/jpeg',
+      duration: '',
+      when: new Date(),
+      mode: t.mode,
+      poster: posterFor(o),
+    });
+  }
+  if (!photos.length) { toast('Could not take a photo here'); return; }
+  state.clips.unshift(...photos);
+  if (recDom.preview) {
+    recDom.preview.classList.remove('flash');
+    void recDom.preview.offsetWidth;
+    recDom.preview.classList.add('flash');
+  }
+  toast(photos.length === 1 ? 'Photo saved to Gallery' : `${photos.length} photos saved`);
 }
 
 function posterFor(output) {
@@ -1061,6 +1148,7 @@ async function startRecording() {
     backAspect: state.backAspect,
     quality: state.quality,
     swap: state.swap,
+    saveAspect: state.saveAspect,
   };
   rec.take = take;
 
@@ -1074,7 +1162,7 @@ async function startRecording() {
       key === 'back' ? take.backAspect : take.frontAspect, true);
     if (o) outs.push(o);
   } else if (take.mode === 'DUAL_VIEW') {
-    const o = makeOutput('composed', `dualshot_combined_${stamp}`, take.backAspect, true);
+    const o = makeOutput('composed', `dualshot_combined_${stamp}`, composedAspect(take), true);
     if (o) outs.push(o);
   } else if (take.mode === 'SEPARATE') {
     const b = makeOutput('back', `dualshot_back_${stamp}`, take.backAspect, true);
@@ -1082,7 +1170,7 @@ async function startRecording() {
     if (b) outs.push(b);
     if (f) outs.push(f);
   } else {
-    const c = makeOutput('composed', `dualshot_combined_${stamp}`, take.backAspect, true);
+    const c = makeOutput('composed', `dualshot_combined_${stamp}`, composedAspect(take), true);
     const b = makeOutput('back', `dualshot_back_${stamp}`, take.backAspect, false);
     const f = makeOutput('front', `dualshot_front_${stamp}`, take.frontAspect, false);
     [c, b, f].forEach((o) => o && outs.push(o));
@@ -1254,6 +1342,7 @@ function buildRecordShell() {
 
       <div class="rec-controls">
         <button class="zoom-chip" id="rec-zoom" type="button" aria-label="Zoom">1×</button>
+        <button class="dock-btn" id="rec-photo" type="button" aria-label="Take photo">${ICONS.camera}</button>
         <button class="shutter" id="rec-btn" type="button" aria-label="Record"><i></i></button>
         <button class="dock-btn" id="rec-flip" type="button" aria-label="Switch camera">${ICONS.flipCam}</button>
         <button class="dock-btn" id="rec-swap" type="button" aria-label="Swap large and small camera">${ICONS.swap}</button>
@@ -1303,6 +1392,7 @@ function buildRecordShell() {
     toast(state.swap ? 'Front camera large' : 'Back camera large');
   });
   $('#rec-mode').addEventListener('click', mountCameraSheet);
+  $('#rec-photo').addEventListener('click', takePhoto);
   recDom.btn.addEventListener('click', () => {
     if (rec.active) stopRecording();
     else startRecording();
@@ -1371,6 +1461,27 @@ function placeholder(text) {
 }
 
 /* Pausa eller stäng av lilla kameran medan den stora spelar in. */
+/* Pause button for the large camera in Dual View; paused = black frame. */
+function buildMainControls() {
+  const wrap = document.createElement('div');
+  wrap.className = 'tile-controls main-controls';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pip-ctl' + (state.mainPaused ? ' on' : '');
+  btn.setAttribute('aria-label', state.mainPaused ? 'Resume large camera' : 'Pause large camera');
+  btn.innerHTML = state.mainPaused ? ICONS.play : ICONS.pause;
+  btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.mainPaused = !state.mainPaused;
+    mountFeeds();
+    refreshRecord();
+    toast(state.mainPaused ? 'Large camera paused' : 'Large camera running');
+  });
+  wrap.appendChild(btn);
+  return wrap;
+}
+
 function buildPipControls() {
   const wrap = document.createElement('div');
   wrap.className = 'pip-controls';
@@ -1452,6 +1563,8 @@ function mountFeeds() {
     const small = cam.feeds[smallKey];
 
     const tile = makeTile(bigKey.toUpperCase());
+    tile.classList.toggle('paused', !!state.mainPaused);
+    tile.appendChild(buildMainControls());
     stage.appendChild(tile);
     if (big) {
       if (big.mirror) tile.classList.add('mirror');
@@ -1549,6 +1662,7 @@ function activeTake() {
     frontAspect: state.frontAspect,
     backAspect: state.backAspect,
     quality: state.quality,
+    saveAspect: state.saveAspect,
   };
 }
 
@@ -1686,8 +1800,10 @@ function formatSummary() {
     const short = ASPECTS[cam.active === 'back' ? t.backAspect : t.frontAspect].short;
     return `${cam.active === 'back' ? 'Back' : 'Front'} ${short} · ${quality} · ${audio}`;
   }
-  const pipState = state.pipOff ? ' · small off' : state.pipPaused ? ' · small paused' : '';
-  return `Front ${ASPECTS[t.frontAspect].short} · Back ${ASPECTS[t.backAspect].short} · ${quality} · ${audio}${pipState}`;
+  const pipState = (state.mainPaused ? ' · large paused' : '')
+    + (state.pipOff ? ' · small off' : state.pipPaused ? ' · small paused' : '');
+  const saved = t.mode !== 'SEPARATE' && t.saveAspect && t.saveAspect !== 'AUTO' ? ` · file ${ASPECTS[t.saveAspect].short}` : '';
+  return `Front ${ASPECTS[t.frontAspect].short} · Back ${ASPECTS[t.backAspect].short}${saved} · ${quality} · ${audio}${pipState}`;
 }
 
 function refreshRecord() {
@@ -1709,6 +1825,8 @@ function refreshRecord() {
     recDom.pipBtn.classList.toggle('off', state.pipOff);
     recDom.pipBtn.setAttribute('aria-label', state.pipOff ? 'Show small camera' : 'Hide small camera');
   }
+  const photoBtn = $('#rec-photo');
+  if (photoBtn) photoBtn.disabled = !cam.ready;
   if (recDom.btn) {
     recDom.btn.classList.toggle('on', rec.active);
     recDom.btn.disabled = !cam.ready;
@@ -1797,6 +1915,14 @@ function cameraSheetHTML() {
       `).join('')}
     </div>
 
+    ${state.mode !== 'SEPARATE' ? `
+    <div class="section-title">Saved video (Dual View)</div>
+    <div class="chips">
+      ${SAVE_ORDER.map((k) => `
+        <button class="chip ${k === state.saveAspect ? 'active' : ''}" data-recsave="${k}" type="button">${saveLabel(k)}</button>
+      `).join('')}
+    </div>` : ''}
+
     <button class="mini-btn" data-swap type="button">Swap front and back</button>
     ${state.mode === 'DUAL_VIEW'
       ? '<button class="mini-btn" data-reset-pip type="button">Reset overlay position</button>'
@@ -1837,6 +1963,13 @@ function wireCameraSheet() {
 
   $$('[data-recfront]', modalRoot).forEach((b) => b.addEventListener('click', () => pick('front', b.dataset.recfront)));
   $$('[data-recback]', modalRoot).forEach((b) => b.addEventListener('click', () => pick('back', b.dataset.recback)));
+  $$('[data-recsave]', modalRoot).forEach((b) => b.addEventListener('click', () => {
+    state.saveAspect = b.dataset.recsave;
+    savePrefs();
+    if (rec.active) toast(`Saved video ${saveLabel(state.saveAspect)} · starts with the next take`);
+    mountCameraSheet();
+    if (!rec.active) refreshRecord();
+  }));
 
   const swap = $('[data-swap]', modalRoot);
   if (swap) swap.addEventListener('click', () => {
@@ -1939,10 +2072,11 @@ const shortDur = (sec) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${St
 function libraryItems() {
   if (!isDemo()) {
     return state.clips.map((c) => ({
-      id: c.id, clip: c, name: c.name, date: clipDateText(c), duration: shortDur(clipSeconds(c)), img: c.poster, baked: false,
+      id: c.id, clip: c, kind: c.kind || 'video', name: c.name, date: clipDateText(c),
+      duration: c.kind === 'photo' ? 'PHOTO' : shortDur(clipSeconds(c)), img: c.poster, baked: false,
     }));
   }
-  return DEMO_CLIPS.map((d, i) => ({ id: `demo-${i}`, clip: null, baked: true, ...d }));
+  return DEMO_CLIPS.map((d, i) => ({ id: `demo-${i}`, clip: null, kind: 'video', baked: true, ...d }));
 }
 
 function openItem(id) {
@@ -2048,20 +2182,31 @@ const FILTERS = [
 const fmtSize = (mbVal) => (mbVal >= 1024 ? `${(mbVal / 1024).toFixed(1)} GB` : `${mbVal} MB`);
 
 function renderGallery() {
-  const items = libraryItems();
   const demo = isDemo();
   const filter = state.galleryFilter || 'ALL';
-  const showList = filter === 'ALL' || filter === 'VIDEOS';
-  const totalMb = state.clips.reduce((sum, c) => sum + (c.sizeMb || 0), 0);
+  const items = libraryItems().filter((i) => (filter === 'ALL')
+    || (filter === 'VIDEOS' && i.kind !== 'photo')
+    || (filter === 'PHOTOS' && i.kind === 'photo'));
+  const showList = items.length > 0;
+  const videos = state.clips.filter((c) => c.kind !== 'photo');
+  const photos = state.clips.filter((c) => c.kind === 'photo');
+  const videoMb = videos.reduce((sum, c) => sum + (c.sizeMb || 0), 0);
+  const photoMb = photos.reduce((sum, c) => sum + (c.sizeMb || 0), 0);
+  const totalMb = videoMb + photoMb;
   const folders = [
-    ['All Videos', `<img src="assets/folder-all.webp" alt="" />`, demo ? 86 : state.clips.length, 'photo'],
+    ['All Videos', `<img src="assets/folder-all.webp" alt="" />`, demo ? 86 : videos.length, 'photo'],
     ['Favorites', ICONS.heart, demo ? 12 : 0, 'warm'],
     ['Trips', ICONS.mountain, demo ? 24 : 0, ''],
     ['Events', ICONS.calendar, demo ? 8 : 0, ''],
   ];
   const storage = demo
     ? { label: '12.4 GB of 64 GB used', video: 17.5, photo: 1.9, legend: ['Videos (11.2 GB)', 'Photos (1.2 GB)', 'Other (0 GB)'] }
-    : { label: `${fmtSize(totalMb)} recorded`, video: Math.min(100, (totalMb / 1024) * 100), photo: 0, legend: [`Videos (${fmtSize(totalMb)})`, 'Photos (0 MB)', 'Other (0 MB)'] };
+    : {
+      label: `${fmtSize(totalMb)} recorded`,
+      video: Math.min(100, (videoMb / 1024) * 100),
+      photo: Math.min(100, (photoMb / 1024) * 100),
+      legend: [`Videos (${fmtSize(videoMb)})`, `Photos (${fmtSize(photoMb)})`, 'Other (0 MB)'],
+    };
   const filterLabel = (FILTERS.find(([k]) => k === filter) || FILTERS[0])[1];
 
   screenEl.innerHTML = `
@@ -2154,7 +2299,7 @@ const DEMO_STATS = {
 };
 
 function realStats() {
-  const clips = state.clips;
+  const clips = state.clips.filter((c) => c.kind !== 'photo');
   const secs = clips.map(clipSeconds);
   const totalSec = secs.reduce((a, b) => a + b, 0);
   const totalMb = clips.reduce((s, c) => s + (c.sizeMb || 0), 0);
@@ -2199,7 +2344,7 @@ function chartScale(values) {
 }
 
 function renderStats() {
-  const s = isDemo() ? DEMO_STATS : realStats();
+  const s = state.clips.some((c) => c.kind !== 'photo') ? realStats() : DEMO_STATS;
   const metric = state.statsMetric || 'clips';
   const values = s.series[metric];
   const top = chartScale(values);
@@ -2358,6 +2503,16 @@ function renderSettings() {
         ${cameraCardHTML('Back Camera', ICONS.camera, 'backAspect', 'back')}
       </div>
 
+      <div class="st-sec"><span class="v5-label">SAVED VIDEO</span><span class="st-hint">DUAL VIEW FILE. <em>16:9 FOR YOUTUBE.</em></span></div>
+      <div class="st-row st-save">
+        <span class="st-rico">${ICONS.film}</span>
+        <b>Video format</b>
+        <span class="st-rsub">Shape of the combined file</span>
+        <div class="st-seg">
+          ${SAVE_ORDER.map((k) => `<button class="${state.saveAspect === k ? 'active' : ''}" data-save="${k}" type="button">${saveLabel(k)}</button>`).join('')}
+        </div>
+      </div>
+
       <div class="st-sec"><span class="v5-label">VIDEO QUALITY</span><span class="st-hint">HIGHER QUALITY. BETTER STORIES.</span></div>
       <div class="st-row st-res">
         <span class="st-rico st-hd">HD</span>
@@ -2419,6 +2574,12 @@ function renderSettings() {
     renderSettings();
   }));
 
+  $$('[data-save]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    state.saveAspect = b.dataset.save;
+    savePrefs();
+    renderSettings();
+  }));
+
   $$('[data-quality]', screenEl).forEach((b) => b.addEventListener('click', () => {
     const key = b.dataset.quality;
     if (QUALITIES[key].premium && !state.premium) {
@@ -2457,8 +2618,10 @@ function playClip(clip) {
     <div class="modal">
       <div class="dialog clip-dialog">
         <div class="clip-dialog-name">${esc(clip.name)}</div>
-        <video class="clip-video" src="${clip.url}" controls autoplay playsinline></video>
-        <div class="clip-dialog-meta">${esc(clipMetaLine(clip))} · ${esc(clip.duration || '')}</div>
+        ${clip.kind === 'photo'
+          ? `<img class="clip-video" src="${clip.url}" alt="${esc(clip.name)}" />`
+          : `<video class="clip-video" src="${clip.url}" controls autoplay playsinline></video>`}
+        <div class="clip-dialog-meta">${esc(clipMetaLine(clip))}${clip.duration ? ` · ${esc(clip.duration)}` : ''}</div>
         <div class="pill-row">
           <button class="pill" data-share type="button">${ICONS.share}<span>Share</span></button>
           <button class="pill danger" data-delete type="button">${ICONS.trash}<span>Delete</span></button>
