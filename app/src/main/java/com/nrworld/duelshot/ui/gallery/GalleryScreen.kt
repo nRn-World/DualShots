@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -66,6 +67,7 @@ import com.nrworld.duelshot.ui.components.RefSoft
 import com.nrworld.duelshot.ui.components.RefSub
 import com.nrworld.duelshot.ui.components.SeeAll
 import com.nrworld.duelshot.ui.components.rp
+import com.nrworld.duelshot.ui.components.rv
 import com.nrworld.duelshot.ui.components.rs
 import com.nrworld.duelshot.ui.theme.DuelLine
 import com.nrworld.duelshot.ui.theme.DuelOrange
@@ -105,7 +107,7 @@ fun GalleryScreen(
     val gb = 1024.0 * 1024 * 1024
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Box(Modifier.fillMaxWidth().height(rp(132))) {
+        Box(Modifier.fillMaxWidth().height(rv(132))) {
             Brand(50, 18, 53)
             RText("YOUR MOMENTS. TWO PERSPECTIVES.", 52, 76, 18, 24, color = RefFaint, mono = true, ls = 3.8)
             RCircle(RefIconKind.SEARCH, 809, 20, 70, 36) { onSoon("Search") }
@@ -113,77 +115,81 @@ fun GalleryScreen(
         }
 
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = rp(50), end = rp(20)).height(rp(66)),
-            horizontalArrangement = Arrangement.spacedBy(rp(14.5))
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = rp(50), end = rp(20)).height(rv(66)),
+            horizontalArrangement = Arrangement.spacedBy(rp(12))
         ) {
             Filter.values().forEach { f ->
                 val active = f == filter
                 Row(
-                    Modifier.width(rp(f.width)).fillMaxHeight().clip(RoundedCornerShape(rp(24)))
+                    Modifier.fillMaxHeight().clip(RoundedCornerShape(rp(24)))
                         .background(if (active) Color(0xFF1C130F) else Color(0xFF121826))
                         .border(rp(if (active) 3 else 2), if (active) RefOrange else Color(0xFF232B3C), RoundedCornerShape(rp(24)))
                         .clickable { filter = f }
-                        .padding(start = rp(33)),
+                        .padding(start = rp(26), end = rp(30)),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(rp(20))
+                    horizontalArrangement = Arrangement.spacedBy(rp(14))
                 ) {
-                    RefIcon(f.icon, if (active) RefOrange else RefSoft, rp(34))
-                    Text(f.label, color = if (active) RefOrange else Color(0xFFD4DAE6), fontSize = rs(21), fontWeight = FontWeight.Medium)
+                    RefIcon(f.icon, if (active) RefOrange else RefSoft, rp(32))
+                    Text(f.label, color = if (active) RefOrange else Color(0xFFD4DAE6), fontSize = rs(19), fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
                 }
             }
         }
 
-        Spacer(Modifier.height(rp(25)))
+        Spacer(Modifier.height(rv(25)))
         Box(
-            Modifier.padding(horizontal = rp(47)).fillMaxWidth().height(rp(106)).clip(RoundedCornerShape(rp(22)))
+            Modifier.padding(horizontal = rp(47)).fillMaxWidth().height(rv(186)).clip(RoundedCornerShape(rp(22)))
                 .background(Brush.horizontalGradient(listOf(Color(0xFF20140E), Color(0xFF15110F), Color(0xFF1A120E))))
                 .border(rp(2), Color(0xFF4A2612), RoundedCornerShape(rp(22)))
         ) {
             Box(
-                Modifier.absoluteOffset(rp(21), rp(18)).size(rp(98), rp(67)).clip(RoundedCornerShape(rp(16))).background(Color(0xFF2A1B12)),
+                Modifier.absoluteOffset(rp(21), rv(18)).size(rp(98), rv(67)).clip(RoundedCornerShape(rp(16))).background(Color(0xFF2A1B12)),
                 contentAlignment = Alignment.Center
             ) { RefIcon(RefIconKind.CLOUD, RefOrange, rp(58)) }
-            RText("Back up your recordings", 149, 25, 25, 32, weight = FontWeight.Medium)
-            RText("Keep your memories safe in the cloud.", 149, 59, 19, 24, color = RefSub)
-            OutlineButton("Enable Backup", 665, 22, 244, 59, RefOrange, 3) { onSoon("Cloud backup") }
+            RText("Back up your recordings", 149, 22, 23, 32, weight = FontWeight.Medium, maxWidth = 720)
+            RText("Keep your memories safe in the cloud.", 149, 60, 17, 24, color = RefSub, maxWidth = 730)
+            OutlineButton("Enable Backup", 149, 108, 330, 58, RefOrange, 3, fontSize = 19, pad = 24) { onSoon("Cloud backup") }
         }
 
         if (entries.isNotEmpty()) {
             SectionHead("Recent", top = 25) { onSoon("See all") }
             Column(
-                Modifier.padding(start = rp(50), end = rp(49), top = rp(17)),
+                Modifier.padding(start = rp(50), end = rp(49), top = rv(17)),
                 verticalArrangement = Arrangement.spacedBy(rp(17))
             ) {
-                entries.chunked(3).forEach { row ->
+                entries.chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(rp(20))) {
                         row.forEach { e -> GalleryCard(e, Modifier.weight(1f)) { onOpenEntry(e) } }
-                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                        repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
 
             SectionHead("Folders", top = 35) { onSoon("Folders") }
             val videos = library.count { !it.isPhoto }
-            Row(
-                Modifier.padding(start = rp(49), end = rp(48), top = rp(16)).fillMaxWidth().height(rp(111)),
-                horizontalArrangement = Arrangement.spacedBy(rp(12))
+            Column(
+                Modifier.padding(start = rp(49), end = rp(48), top = rv(16)),
+                verticalArrangement = Arrangement.spacedBy(rv(14))
             ) {
-                Folder("All Videos", if (demo) 86 else videos, null, Color.Transparent, R.drawable.ref_folder_all) { onSoon("Folders") }
-                Folder("Favorites", if (demo) 12 else 0, RefIconKind.HEART, Color(0xFF2B1B13)) { onSoon("Folders") }
-                Folder("Trips", if (demo) 24 else 0, RefIconKind.MOUNTAIN, Color(0xFF1A2131)) { onSoon("Folders") }
-                Folder("Events", if (demo) 8 else 0, RefIconKind.CALENDAR, Color(0xFF1A2131)) { onSoon("Folders") }
+                Row(Modifier.fillMaxWidth().height(rv(111)), horizontalArrangement = Arrangement.spacedBy(rp(14))) {
+                    Folder("All Videos", if (demo) 86 else videos, null, Color.Transparent, R.drawable.ref_folder_all) { onSoon("Folders") }
+                    Folder("Favorites", if (demo) 12 else 0, RefIconKind.HEART, Color(0xFF2B1B13)) { onSoon("Folders") }
+                }
+                Row(Modifier.fillMaxWidth().height(rv(111)), horizontalArrangement = Arrangement.spacedBy(rp(14))) {
+                    Folder("Trips", if (demo) 24 else 0, RefIconKind.MOUNTAIN, Color(0xFF1A2131)) { onSoon("Folders") }
+                    Folder("Events", if (demo) 8 else 0, RefIconKind.CALENDAR, Color(0xFF1A2131)) { onSoon("Folders") }
+                }
             }
 
-            Box(Modifier.padding(start = rp(50), end = rp(49), top = rp(36)).fillMaxWidth().height(rp(110))) {
+            Box(Modifier.padding(start = rp(50), end = rp(49), top = rv(36)).fillMaxWidth().height(rv(205))) {
                 RText("Storage", 1, 0, 30, 36, weight = FontWeight.Medium)
                 RText(
                     if (demo) "12.4 GB of 64 GB used" else "${formatSize(videoBytes + photoBytes)} recorded",
-                    2, 6, 18, 24, color = RefSub, right = true
+                    2, 6, 17, 24, color = RefSub, right = true
                 )
                 val vFrac = if (demo) .175f else (videoBytes / gb).toFloat().coerceIn(0f, 1f)
                 val pFrac = if (demo) .019f else (photoBytes / gb).toFloat().coerceIn(0f, 1f)
                 Row(
-                    Modifier.absoluteOffset(rp(2), rp(48)).size(rp(676), rp(16)).clip(RoundedCornerShape(rp(8))).background(Color(0xFF283044))
+                    Modifier.absoluteOffset(rp(2), rv(52)).fillMaxWidth().height(rv(16)).clip(RoundedCornerShape(rp(8))).background(Color(0xFF283044))
                 ) {
                     if (vFrac > 0f) Box(
                         Modifier.fillMaxHeight().fillMaxWidth(vFrac).clip(RoundedCornerShape(rp(8)))
@@ -191,16 +197,16 @@ fun GalleryScreen(
                     )
                     if (pFrac > 0f) Box(Modifier.fillMaxHeight().fillMaxWidth(pFrac / (1f - vFrac).coerceAtLeast(.01f)).background(Color(0xFF4A5468)))
                 }
-                Row(Modifier.absoluteOffset(rp(2), rp(84)), horizontalArrangement = Arrangement.spacedBy(rp(28))) {
+                Row(Modifier.absoluteOffset(rp(2), rv(86)), horizontalArrangement = Arrangement.spacedBy(rp(22))) {
                     Legend(RefOrange, if (demo) "Videos (11.2 GB)" else "Videos (${formatSize(videoBytes)})")
                     Legend(Color(0xFF6B7488), if (demo) "Photos (1.2 GB)" else "Photos (${formatSize(photoBytes)})")
                     Legend(Color(0xFF2F3646), if (demo) "Other (0 GB)" else "Other (0 MB)")
                 }
-                OutlineButton("Manage Storage", 709, 45, 216, 57, Color(0xFFE3E8F0), 2, border = Color(0xFF39425A), fontSize = 19, pad = 18) { onSoon("Storage management") }
+                OutlineButton("Manage Storage", 2, 134, 340, 58, Color(0xFFE3E8F0), 2, border = Color(0xFF39425A), fontSize = 19, pad = 24) { onSoon("Storage management") }
             }
         } else {
             Column(
-                Modifier.fillMaxWidth().padding(top = rp(90)),
+                Modifier.fillMaxWidth().padding(top = rv(90)),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(rp(14))
             ) {
@@ -209,14 +215,14 @@ fun GalleryScreen(
                 Text("Nothing to show here yet.", color = RefMuted, fontSize = rs(22))
             }
         }
-        Spacer(Modifier.height(rp(40)))
+        Spacer(Modifier.height(rv(40)))
     }
 }
 
 @Composable
 private fun SectionHead(title: String, top: Int, onSeeAll: () -> Unit) {
     Row(
-        Modifier.padding(start = rp(50), end = rp(52), top = rp(top)).fillMaxWidth().height(rp(36)),
+        Modifier.padding(start = rp(50), end = rp(52), top = rv(top)).fillMaxWidth().height(rv(36)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, color = Color.White, fontSize = rs(30), lineHeight = rs(36), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
@@ -226,18 +232,25 @@ private fun SectionHead(title: String, top: Int, onSeeAll: () -> Unit) {
 
 @Composable
 private fun GalleryCard(e: LibraryEntry, modifier: Modifier, onClick: () -> Unit) {
-    Box(
-        modifier.height(rp(248)).clip(RoundedCornerShape(rp(20))).background(RefCard)
-            .border(rp(2), RefCardBorder, RoundedCornerShape(rp(20))).clickable(onClick = onClick)
+    Column(
+        modifier.clip(RoundedCornerShape(rp(20))).background(RefCard)
+            .border(rp(2), RefCardBorder, RoundedCornerShape(rp(20))).clickable(onClick = onClick).padding(rp(3))
     ) {
         EntryThumb(
             e,
-            Modifier.absoluteOffset(rp(3), rp(3)).padding(end = rp(6)).fillMaxWidth().height(rp(173))
+            Modifier.fillMaxWidth().aspectRatio(1.72f)
                 .clip(RoundedCornerShape(topStart = rp(18), topEnd = rp(18), bottomStart = rp(4), bottomEnd = rp(4)))
         )
-        RText(e.title, 15, 183, 21, 26, weight = FontWeight.Medium, maxWidth = 230)
-        RText(e.date, 15, 211, 19, 24, color = RefMuted, maxWidth = 250)
-        RefIcon(RefIconKind.DOTS, RefSub, rp(28), Modifier.align(Alignment.TopEnd).absoluteOffset(x = -rp(12), y = rp(197)))
+        Row(
+            Modifier.fillMaxWidth().padding(start = rp(12), end = rp(8), top = rv(8), bottom = rv(10)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(e.title, color = Color.White, fontSize = rs(19), lineHeight = rs(26), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(e.date, color = RefMuted, fontSize = rs(15), lineHeight = rs(22), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            RefIcon(RefIconKind.DOTS, RefSub, rp(28))
+        }
     }
 }
 
@@ -250,15 +263,14 @@ private fun androidx.compose.foundation.layout.RowScope.Folder(
             .border(rp(2), RefCardBorder, RoundedCornerShape(rp(18))).clickable(onClick = onClick)
     ) {
         Box(
-            Modifier.absoluteOffset(rp(15), rp(21)).size(rp(64), rp(66)).clip(RoundedCornerShape(rp(12))).background(tile),
+            Modifier.absoluteOffset(rp(15), rv(21)).size(rp(64), rv(66)).clip(RoundedCornerShape(rp(12))).background(tile),
             contentAlignment = Alignment.Center
         ) {
             if (image != null) Image(painterResource(image), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             else if (icon != null) RefIcon(icon, RefOrange, rp(42))
         }
-        RText(name, 95, 32, 19, 24, weight = FontWeight.Medium)
-        RText("$count items", 95, 59, 18, 22, color = RefMuted)
-        RefIcon(RefIconKind.CHEVRON, RefMuted, rp(26), Modifier.align(Alignment.TopEnd).absoluteOffset(x = -rp(16), y = rp(48)), stroke = 2f)
+        RText(name, 100, 22, 19, 26, weight = FontWeight.Medium, maxWidth = 300)
+        RText("$count items", 100, 58, 15, 22, color = RefMuted)
     }
 }
 
@@ -267,7 +279,7 @@ private fun Legend(color: Color, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(rp(17)).clip(CircleShape).background(color))
         Spacer(Modifier.width(rp(11)))
-        Text(text, color = RefMuted, fontSize = rs(18), lineHeight = rs(22))
+        Text(text, color = RefMuted, fontSize = rs(15), lineHeight = rs(22), maxLines = 1, softWrap = false)
     }
 }
 
@@ -278,7 +290,7 @@ fun androidx.compose.foundation.layout.BoxScope.OutlineButton(
     border: Color = color, fontSize: Number = 21, pad: Number = 26, onClick: () -> Unit
 ) {
     Row(
-        Modifier.absoluteOffset(rp(x), rp(top)).size(rp(w), rp(h)).clip(RoundedCornerShape(rp(18)))
+        Modifier.absoluteOffset(rp(x), rv(top)).size(rp(w), rv(h)).clip(RoundedCornerShape(rp(18)))
             .border(rp(borderPx), border, RoundedCornerShape(rp(18))).clickable(onClick = onClick)
             .padding(horizontal = rp(pad)),
         verticalAlignment = Alignment.CenterVertically,
@@ -306,7 +318,7 @@ fun EntryThumb(e: LibraryEntry, modifier: Modifier) {
             Text(
                 e.badge, color = Color.White, fontSize = rs(21), fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(rp(8)).clip(RoundedCornerShape(rp(10)))
-                    .background(Color(0xC70A0C12)).padding(horizontal = rp(10), vertical = rp(3))
+                    .background(Color(0xC70A0C12)).padding(horizontal = rp(10), vertical = rv(3))
             )
         }
     }

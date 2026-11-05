@@ -17,6 +17,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -38,7 +42,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import com.nrworld.duelshot.ui.components.LocalRefFont
 import com.nrworld.duelshot.ui.components.LocalRefScale
+import com.nrworld.duelshot.ui.components.LocalRefStretch
 import com.nrworld.duelshot.ui.components.PremiumDialog
 import com.nrworld.duelshot.ui.components.RefBg
 import com.nrworld.duelshot.ui.components.RefIcon
@@ -99,8 +105,20 @@ fun DuelShotsApp(vm: AppViewModel) {
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(RefBg)) {
-        // Skärmarna är ritade i referensbildernas pixlar (1024 breda).
-        CompositionLocalProvider(LocalRefScale provides maxWidth.value / 1024f) {
+        // Skärmarna är ritade i referensbildernas pixlar (1024 breda, 2:3). Telefoner är
+        // högre: höjder/avstånd sträcks så skärmen fylls, och texten blir något större.
+        val scale = maxWidth.value / 1024f
+        val bars = WindowInsets.statusBars.asPaddingValues().calculateTopPadding().value +
+            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value
+        val refAvailable = (maxHeight.value - bars) / scale - 136f
+        // Mobil: text och höjder ~45 % större än i 2:3-referensen, fler skärmar scrollar.
+        val stretch = (refAvailable / 1330f).coerceIn(1.45f, 1.6f)
+        val font = stretch
+        CompositionLocalProvider(
+            LocalRefScale provides scale,
+            LocalRefStretch provides stretch,
+            LocalRefFont provides font
+        ) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Box(Modifier.weight(1f)) {
                     if (recording) {

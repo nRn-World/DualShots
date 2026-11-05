@@ -59,6 +59,7 @@ import com.nrworld.duelshot.ui.components.RefOrange
 import com.nrworld.duelshot.ui.components.RefSoft
 import com.nrworld.duelshot.ui.components.RefSub
 import com.nrworld.duelshot.ui.components.rp
+import com.nrworld.duelshot.ui.components.rv
 import com.nrworld.duelshot.ui.components.rs
 
 /** Settings enligt design/reference/settings.png, plus raden för filformat. */
@@ -67,7 +68,7 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
     var premiumFeature by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Box(Modifier.fillMaxWidth().height(rp(131))) {
+        Box(Modifier.fillMaxWidth().height(rv(131))) {
             Brand(63, 11, 53)
             RText("CUSTOMIZE YOUR EXPERIENCE", 63, 67, 18, 24, color = RefFaint, mono = true, ls = 3.1)
             RText(
@@ -81,28 +82,28 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
         }
 
         Section("RECORDING MODE", hint = true, top = 0)
-        Row(
-            Modifier.padding(start = rp(63), end = rp(53), top = rp(12)).fillMaxWidth().height(rp(159)),
-            horizontalArrangement = Arrangement.spacedBy(rp(18))
+        Column(
+            Modifier.padding(start = rp(63), end = rp(53), top = rv(12)).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(rv(14))
         ) {
-            ModeCard(RecordingMode.DUAL_VIEW, RefIconKind.VIDEO, "Both cameras\nin one video", vm)
-            ModeCard(RecordingMode.SEPARATE, RefIconKind.SEPARATE, "Two files, one\nfor each", vm)
-            ModeCard(RecordingMode.BOTH, RefIconKind.OVERLAP, "Combined +\ntwo separate files", vm)
+            ModeCard(RecordingMode.DUAL_VIEW, RefIconKind.VIDEO, "Both cameras in one video", vm)
+            ModeCard(RecordingMode.SEPARATE, RefIconKind.SEPARATE, "Two files, one for each", vm)
+            ModeCard(RecordingMode.BOTH, RefIconKind.OVERLAP, "Combined + two separate files", vm)
         }
 
         Section("CAMERA FORMATS", top = 27)
-        Row(
-            Modifier.padding(start = rp(63), end = rp(53), top = rp(11)).fillMaxWidth().height(rp(159)),
-            horizontalArrangement = Arrangement.spacedBy(rp(18))
+        Column(
+            Modifier.padding(start = rp(63), end = rp(53), top = rv(11)).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(rv(14))
         ) {
-            CameraCard("Front Camera", RefIconKind.USER, vm.frontAspect, Modifier.weight(444f)) { vm.frontAspect = it }
-            CameraCard("Back Camera", RefIconKind.CAMERA, vm.backAspect, Modifier.weight(446f)) { vm.backAspect = it }
+            CameraCard("Front Camera", RefIconKind.USER, vm.frontAspect, Modifier.fillMaxWidth().height(rv(168))) { vm.frontAspect = it }
+            CameraCard("Back Camera", RefIconKind.CAMERA, vm.backAspect, Modifier.fillMaxWidth().height(rv(168))) { vm.backAspect = it }
         }
 
         Section("SAVED VIDEO", top = 26, customHint = "DUAL VIEW FILE. " to "16:9 FOR YOUTUBE.")
         val formats = listOf<AspectOption?>(null, AspectOption.R_9_16, AspectOption.R_16_9, AspectOption.R_1_1)
         SegRow(
-            icon = { RefIcon(RefIconKind.FILM, RefOrange, rp(42), Modifier.absoluteOffset(rp(25), rp(21))) },
+            icon = { RefIcon(RefIconKind.FILM, RefOrange, rp(42), Modifier.absoluteOffset(rp(25), rv(21))) },
             title = "Video format", sub = "Shape of the combined file", height = 86,
             options = listOf("Auto", "9:16", "16:9", "1:1"),
             selected = formats.indexOf(vm.saveAspect).coerceAtLeast(0),
@@ -113,7 +114,7 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
         SegRow(
             icon = {
                 Box(
-                    Modifier.absoluteOffset(rp(25), rp(23)).size(rp(44), rp(38)).border(rp(3), RefOrange, RoundedCornerShape(rp(7))),
+                    Modifier.absoluteOffset(rp(25), rv(23)).size(rp(44), rv(38)).border(rp(3), RefOrange, RoundedCornerShape(rp(7))),
                     contentAlignment = Alignment.Center
                 ) { Text("HD", color = RefOrange, fontSize = rs(17), fontWeight = FontWeight.Bold) }
             },
@@ -127,7 +128,7 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
 
         Section("CONTAINER / CODEC", top = 22)
         SegRow(
-            icon = { RefIcon(RefIconKind.FILE, RefOrange, rp(42), Modifier.absoluteOffset(rp(25), rp(23))) },
+            icon = { RefIcon(RefIconKind.FILE, RefOrange, rp(42), Modifier.absoluteOffset(rp(25), rv(23))) },
             title = "Format", sub = "Choose file format", height = 91,
             options = listOf("MP4", "HEVC"),
             selected = vm.codec.ordinal, segX = 632, segW = 206, chevron = true
@@ -138,9 +139,9 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
 
         Section("ADDITIONAL SETTINGS", top = 22)
         Column(
-            Modifier.padding(start = rp(63), end = rp(53), top = rp(9)).fillMaxWidth()
+            Modifier.padding(start = rp(63), end = rp(53), top = rv(9)).fillMaxWidth()
                 .clip(RoundedCornerShape(rp(22))).background(RefCard).border(rp(2), RefCardBorder, RoundedCornerShape(rp(22)))
-                .padding(vertical = rp(3))
+                .padding(vertical = rv(3))
         ) {
             ToggleRow(RefIconKind.STABILIZE, "Stabilization", "Reduce camera shake", vm.stabilize, true) { vm.stabilize = it }
             ToggleRow(RefIconKind.GRID4, "Grid", "Show grid while recording", vm.grid, true) { vm.grid = it }
@@ -149,30 +150,30 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
         }
 
         Box(
-            Modifier.padding(start = rp(63), end = rp(53), top = rp(26)).fillMaxWidth().height(rp(94))
+            Modifier.padding(start = rp(63), end = rp(53), top = rv(26)).fillMaxWidth().height(rv(94))
                 .clip(RoundedCornerShape(rp(22)))
                 .background(Brush.horizontalGradient(listOf(Color(0xFF24160D), Color(0xFF1A120E), Color(0xFF1D130E))))
                 .border(rp(2), Color(0xFF5A2E12), RoundedCornerShape(rp(22)))
         ) {
-            RefIcon(RefIconKind.CROWN, RefCrown, rp(48), Modifier.absoluteOffset(rp(31), rp(23)), stroke = 2f)
-            RText("Premium Features", 116, 18, 25, 30, color = RefGold, weight = FontWeight.Medium)
-            RText("Unlock 4K, 60fps, more formats and more.", 116, 52, 18, 22, color = RefSub)
+            RefIcon(RefIconKind.CROWN, RefCrown, rp(48), Modifier.absoluteOffset(rp(31), rv(23)), stroke = 2f)
+            RText("Premium Features", 116, 18, 22, 30, color = RefGold, weight = FontWeight.Medium)
+            RText("Unlock 4K, 60fps, more formats and more.", 116, 52, 14.5, 22, color = RefSub, maxWidth = 530)
             if (vm.isPremium) {
                 RText("Premium active", 40, 30, 22, 30, color = RefGold, right = true)
             } else {
                 Row(
-                    Modifier.absoluteOffset(rp(659), rp(16)).size(rp(229), rp(58)).clip(RoundedCornerShape(rp(18)))
+                    Modifier.absoluteOffset(rp(659), rv(16)).size(rp(229), rv(58)).clip(RoundedCornerShape(rp(18)))
                         .border(rp(3), RefOrange, RoundedCornerShape(rp(18))).clickable(onClick = onOpenPremium)
                         .padding(start = rp(36), end = rp(26)),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("GO PREMIUM", color = RefOrange, fontSize = rs(21), fontWeight = FontWeight.Medium, letterSpacing = rs(.5), maxLines = 1, softWrap = false)
+                    Text("GO PREMIUM", color = RefOrange, fontSize = rs(17), fontWeight = FontWeight.Medium, letterSpacing = rs(.5), maxLines = 1, softWrap = false)
                     RefIcon(RefIconKind.CHEVRON, RefOrange, rp(24), stroke = 2.6f)
                 }
             }
         }
-        Spacer(Modifier.height(rp(40)))
+        Spacer(Modifier.height(rv(40)))
     }
 
     premiumFeature?.let { feature ->
@@ -187,11 +188,11 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
 @Composable
 private fun Section(label: String, top: Int, hint: Boolean = false, customHint: Pair<String, String>? = null) {
     Row(
-        Modifier.padding(start = rp(63), end = rp(53), top = rp(top)).fillMaxWidth(),
+        Modifier.padding(start = rp(63), end = rp(53), top = rv(top)).fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            label, color = RefLabel, fontSize = rs(21), lineHeight = rs(28), fontWeight = FontWeight.Medium,
+            label, color = RefLabel, fontSize = rs(18), lineHeight = rs(28), fontWeight = FontWeight.Medium,
             fontFamily = FontFamily.Monospace, letterSpacing = rs(2.1), modifier = Modifier.weight(1f)
         )
         val h = customHint ?: if (hint) "RECORD BOTH SIDES. " to "AT ONCE." else null
@@ -200,41 +201,41 @@ private fun Section(label: String, top: Int, hint: Boolean = false, customHint: 
                 append(h.first)
                 withStyle(SpanStyle(color = RefOrange)) { append(h.second) }
             },
-            color = RefFaint, fontSize = rs(15), fontFamily = FontFamily.Monospace, letterSpacing = rs(1.6), maxLines = 1
+            color = RefFaint, fontSize = rs(12.5), fontFamily = FontFamily.Monospace, letterSpacing = rs(1.2), maxLines = 1
         )
     }
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.ModeCard(mode: RecordingMode, icon: RefIconKind, sub: String, vm: AppViewModel) {
+private fun ModeCard(mode: RecordingMode, icon: RefIconKind, sub: String, vm: AppViewModel) {
     val sel = vm.mode == mode
     val shape = RoundedCornerShape(rp(22))
     Box(
-        Modifier.weight(1f).fillMaxHeight()
+        Modifier.fillMaxWidth().height(rv(116))
             .then(if (sel) Modifier.shadow(rp(18), shape, spotColor = RefOrange, ambientColor = RefOrange) else Modifier)
             .clip(shape)
             .background(if (sel) Brush.verticalGradient(listOf(Color(0xFF1D1410), Color(0xFF16120F))) else Brush.verticalGradient(listOf(RefCard, RefCard)))
             .border(rp(if (sel) 3 else 2), if (sel) RefOrange else RefCardBorder, shape)
             .clickable { vm.mode = mode }
     ) {
-        RefIcon(icon, if (sel) RefOrange else Color(0xFFE3E8F0), rp(50), Modifier.absoluteOffset(rp(25), rp(39)))
-        RText(mode.title, 101, 54, 21, 26, weight = FontWeight.Medium)
-        RText(sub, 101, 87, 17.5, 24, color = RefMuted)
+        RefIcon(icon, if (sel) RefOrange else Color(0xFFE3E8F0), rp(54), Modifier.absoluteOffset(rp(28), rv(31)))
+        RText(mode.title, 112, 22, 21, 30, weight = FontWeight.Medium, maxWidth = 620)
+        RText(sub, 112, 64, 16, 24, color = RefMuted, maxWidth = 700)
         Box(
-            Modifier.align(Alignment.TopEnd).absoluteOffset(x = -rp(21), y = rp(19)).size(rp(30)).clip(CircleShape)
+            Modifier.align(Alignment.TopEnd).absoluteOffset(x = -rp(28), y = rv(38)).size(rp(34)).clip(CircleShape)
                 .border(rp(if (sel) 3 else 2.5), if (sel) RefOrange else Color(0xFF4A5368), CircleShape),
             contentAlignment = Alignment.Center
-        ) { if (sel) Box(Modifier.size(rp(15)).clip(CircleShape).background(RefOrange)) }
+        ) { if (sel) Box(Modifier.size(rp(17)).clip(CircleShape).background(RefOrange)) }
     }
 }
 
 @Composable
 private fun CameraCard(title: String, icon: RefIconKind, value: AspectOption, modifier: Modifier, onPick: (AspectOption) -> Unit) {
     Box(modifier.fillMaxHeight().clip(RoundedCornerShape(rp(22))).background(RefCard).border(rp(2), RefCardBorder, RoundedCornerShape(rp(22)))) {
-        RefIcon(icon, RefOrange, rp(42), Modifier.absoluteOffset(rp(25), rp(15)))
-        RText(title, 96, 23, 21, 26, weight = FontWeight.Medium)
+        RefIcon(icon, RefOrange, rp(46), Modifier.absoluteOffset(rp(25), rv(16)))
+        RText(title, 96, 22, 21, 30, weight = FontWeight.Medium)
         Row(
-            Modifier.absoluteOffset(rp(17), rp(71)).padding(end = rp(34)).fillMaxWidth().height(rp(69)),
+            Modifier.padding(start = rp(17), end = rp(17), top = rv(82)).fillMaxWidth().height(rv(66)),
             horizontalArrangement = Arrangement.spacedBy(rp(14))
         ) {
             listOf(AspectOption.R_9_16, AspectOption.R_16_9, AspectOption.R_1_1).forEach { a ->
@@ -248,8 +249,8 @@ private fun CameraCard(title: String, icon: RefIconKind, value: AspectOption, mo
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text(short, color = if (active) Color.White else RefSoft, fontSize = rs(22), lineHeight = rs(26), fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
-                    Text(word, color = if (active) Color(0xFFE3E8F0) else RefMuted, fontSize = rs(18), lineHeight = rs(22))
+                    Text(short, color = if (active) Color.White else RefSoft, fontSize = rs(21), lineHeight = rs(26), fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+                    Text(word, color = if (active) Color(0xFFE3E8F0) else RefMuted, fontSize = rs(16), lineHeight = rs(21), maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -264,15 +265,15 @@ private fun SegRow(
     onSelect: (Int) -> Unit
 ) {
     Box(
-        Modifier.padding(start = rp(63), end = rp(53), top = rp(11)).fillMaxWidth().height(rp(height))
+        Modifier.padding(start = rp(63), end = rp(53), top = rv(11)).fillMaxWidth().height(rv(height))
             .clip(RoundedCornerShape(rp(22))).background(RefCard).border(rp(2), RefCardBorder, RoundedCornerShape(rp(22)))
     ) {
         icon()
         val dy = if (height > 88) 2 else 0
-        RText(title, 105, 13 + dy, 21, 26, weight = FontWeight.Medium)
-        RText(sub, 105, 44 + dy, 18, 22, color = RefSub)
+        RText(title, 105, 13 + dy, 19, 26, weight = FontWeight.Medium)
+        RText(sub, 105, 44 + dy, 14.5, 22, color = RefSub, maxWidth = 380)
         Row(
-            Modifier.absoluteOffset(rp(segX), rp(15 + dy)).size(rp(segW), rp(51 + dy)).clip(RoundedCornerShape(rp(14)))
+            Modifier.absoluteOffset(rp(segX), rv(15 + dy)).size(rp(segW), rv(51 + dy)).clip(RoundedCornerShape(rp(14)))
                 .background(Color(0xFF1A2131)).border(rp(1.5), Color(0xFF232B3C), RoundedCornerShape(rp(14))).padding(rp(2))
         ) {
             options.forEachIndexed { i, label ->
@@ -283,29 +284,29 @@ private fun SegRow(
                         .clickable { onSelect(i) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(label, color = if (active) Color(0xFF2A1206) else RefSub, fontSize = rs(21), fontWeight = if (active) FontWeight.Medium else FontWeight.Normal)
+                    Text(label, color = if (active) Color(0xFF2A1206) else RefSub, fontSize = rs(18), fontWeight = if (active) FontWeight.Medium else FontWeight.Normal)
                 }
             }
         }
-        if (chevron) RefIcon(RefIconKind.CHEVRON, RefSub, rp(28), Modifier.absoluteOffset(rp(864), rp(27 + dy)), stroke = 2f)
+        if (chevron) RefIcon(RefIconKind.CHEVRON, RefSub, rp(28), Modifier.absoluteOffset(rp(864), rv(27 + dy)), stroke = 2f)
     }
 }
 
 @Composable
 private fun ToggleRow(icon: RefIconKind, title: String, sub: String, on: Boolean, divider: Boolean, onChange: (Boolean) -> Unit) {
-    Box(Modifier.fillMaxWidth().height(rp(70)).clickable { onChange(!on) }) {
-        RefIcon(icon, RefOrange, rp(44), Modifier.absoluteOffset(rp(28), rp(12)))
-        RText(title, 105, 8, 21, 26, weight = FontWeight.Medium)
-        RText(sub, 105, 37, 18, 22, color = RefSub)
+    Box(Modifier.fillMaxWidth().height(rv(70)).clickable { onChange(!on) }) {
+        RefIcon(icon, RefOrange, rp(44), Modifier.absoluteOffset(rp(28), rv(12)))
+        RText(title, 105, 8, 19, 26, weight = FontWeight.Medium)
+        RText(sub, 105, 37, 14.5, 22, color = RefSub, maxWidth = 640)
         val knob by animateDpAsState(if (on) rp(27) else rp(1), label = "knob")
         Box(
-            Modifier.absoluteOffset(rp(812), rp(14)).size(rp(64), rp(38)).clip(RoundedCornerShape(rp(19)))
+            Modifier.absoluteOffset(rp(812), rv(14)).size(rp(64), rv(38)).clip(RoundedCornerShape(rp(19)))
                 .background(if (on) RefOrange else Color(0xFF1D2333))
                 .border(rp(2), if (on) RefOrange else Color(0xFF2A3245), RoundedCornerShape(rp(19)))
         ) {
             Box(Modifier.absoluteOffset(knob, rp(1)).size(rp(32)).clip(CircleShape).background(Color.White))
         }
-        if (divider) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(rp(2)).background(Color(0xFF1A2132)))
+        if (divider) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(rv(2)).background(Color(0xFF1A2132)))
     }
 }
 

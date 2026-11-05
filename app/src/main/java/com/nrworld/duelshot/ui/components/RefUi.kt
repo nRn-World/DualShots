@@ -46,13 +46,27 @@ import androidx.compose.ui.unit.dp
 
 val LocalRefScale = staticCompositionLocalOf { 0.4f }
 
+/** Lodrät utsträckning: telefoner är högre än referensbildernas 2:3, så höjder och avstånd växer. */
+val LocalRefStretch = staticCompositionLocalOf { 1f }
+
+/** Textstorlek relativt referensen (större text på hög skärm). */
+val LocalRefFont = staticCompositionLocalOf { 1f }
+
 /** Referenspixlar → dp. */
 @Composable
 fun rp(px: Number): Dp = (px.toFloat() * LocalRefScale.current).dp
 
+/** Referenspixlar lodrätt (höjder, avstånd, y-lägen) → dp, utsträckt efter skärmens höjd. */
+@Composable
+fun rv(px: Number): Dp = (px.toFloat() * LocalRefScale.current * LocalRefStretch.current).dp
+
+/** Referenspixlar → dp med textfaktorn (för text och dess radhöjd). */
+@Composable
+fun rf(px: Number): Dp = (px.toFloat() * LocalRefScale.current * LocalRefFont.current).dp
+
 /** Referenspixlar → sp, oberoende av systemets textstorlek (layouten är fast). */
 @Composable
-fun rs(px: Number): TextUnit = with(LocalDensity.current) { rp(px).toSp() }
+fun rs(px: Number): TextUnit = with(LocalDensity.current) { rf(px).toSp() }
 
 // Färger från referensbilderna
 val RefBg = Color(0xFF0A0D14)
@@ -103,9 +117,9 @@ fun BoxScope.RText(
     right: Boolean = false,
     maxWidth: Number? = null
 ) {
-    var m: Modifier = if (right) Modifier.align(Alignment.TopEnd).absoluteOffset(x = -rp(x), y = rp(top))
-    else Modifier.absoluteOffset(x = rp(x), y = rp(top))
-    if (maxWidth != null) m = m.then(Modifier.size(width = rp(maxWidth), height = rp(lh)))
+    var m: Modifier = if (right) Modifier.align(Alignment.TopEnd).absoluteOffset(x = -rp(x), y = rv(top))
+    else Modifier.absoluteOffset(x = rp(x), y = rv(top))
+    if (maxWidth != null) m = m.then(Modifier.size(width = rp(maxWidth), height = rf(lh)))
     Text(
         text,
         modifier = m,
@@ -137,7 +151,7 @@ fun BoxScope.Brand(x: Number, top: Number, size: Number) {
 @Composable
 fun BoxScope.RCircle(icon: RefIconKind, x: Number, top: Number, d: Number, iconSize: Number, bg: Color = RefChip, onClick: () -> Unit) {
     Box(
-        Modifier.absoluteOffset(rp(x), rp(top)).size(rp(d)).clip(CircleShape)
+        Modifier.absoluteOffset(rp(x), rv(top)).size(rp(d)).clip(CircleShape)
             .background(bg).border(rp(2), RefChipBorder, CircleShape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) { RefIcon(icon, Color(0xFFE8ECF4), rp(iconSize)) }
