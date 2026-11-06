@@ -114,6 +114,9 @@ camera and the 3×3 grid. On the first visit the same three-step onboarding is s
 git clone https://github.com/nRn-World/DualShots.git
 cd DualShots
 
+# Build with JDK 17 or 21 (Gradle 8.10 does not support JDK 25)
+export JAVA_HOME=/path/to/jdk-21
+
 # Point Gradle at your SDK (or set ANDROID_HOME)
 echo "sdk.dir=/path/to/Android/sdk" > local.properties
 
