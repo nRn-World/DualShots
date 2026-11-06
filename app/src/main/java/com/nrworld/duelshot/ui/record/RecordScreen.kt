@@ -1,5 +1,6 @@
 package com.nrworld.duelshot.ui.record
 
+import android.view.TextureView
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -31,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -85,6 +87,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import com.nrworld.duelshot.camera.GlLayout
 import com.nrworld.duelshot.camera.PipLayout
 import com.nrworld.duelshot.camera.PhotoSaver
 import androidx.compose.runtime.rememberCoroutineScope
@@ -106,6 +109,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     var backView by remember { mutableStateOf<PreviewView?>(null) }
     var frontView by remember { mutableStateOf<PreviewView?>(null) }
     var composedView by remember { mutableStateOf<PreviewView?>(null) }
+    // Egen GL-yta för Dual View: båda kamerorna ritas i samma bild.
+    var glView by remember { mutableStateOf<TextureView?>(null) }
 
     var status by remember { mutableStateOf("Starting cameras…") }
     var camReady by remember { mutableStateOf(false) }
@@ -119,6 +124,9 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     var savedNames by remember { mutableStateOf<List<String>>(emptyList()) }
     var part by remember { mutableStateOf(1) }
     var showTune by remember { mutableStateOf(false) }
+    // Ficklampa (bara om bakkameran har blixt).
+    var torch by remember { mutableStateOf(false) }
+    var hasTorch by remember { mutableStateOf(false) }
     var stacked by remember { mutableStateOf(false) }
     var showGrid by remember { mutableStateOf(vm.grid) }
     var paused by remember { mutableStateOf(false) }
@@ -142,6 +150,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
 
     // Visat läge: önskat läge tills bindningen skett, därefter det som faktiskt band (fallback).
     val displayMode = if (boundFor == vm.mode) renderedMode else vm.mode
+    // Dual-gränssnitt: riktig dubbelkamera, eller testläget (debug) som visar bakkameran i båda rutorna.
+    val dualOk = controller.supported || (controller.simulateDual && vm.mode == RecordingMode.DUAL_VIEW)
 
     // Skärmen ska inte slockna mitt i en inspelning.
     DisposableEffect(isRecording) {
@@ -159,8 +169,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     // Bind när förhandsvisningarna finns. Ändras något under inspelning avslutas klippet,
     // kameran binds om och nästa del (_p2, _p3 …) startar direkt.
     LaunchedEffect(
-        camReady, ready, backView, frontView, composedView, vm.mode, vm.frontAspect,
-        vm.backAspect, vm.quality, vm.saveAspect, pip, mainPaused, isRecording, fallbackFrom
+        camReady, ready, backView, frontView, composedView, glView, vm.mode, vm.frontAspect,
+        vm.backAspect, vm.quality, vm.saveAspect, isRecording, fallbackFrom
     ) {
         if (!camReady) return@LaunchedEffect
         // En take = en fil: ändringar under inspelning väntar till nästa take.
@@ -168,9 +178,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         // Dual View kan saknas på enheten. Bind då om i det läge som faktiskt
         // stöds i stället för att försöka igen – annars blir rutorna svarta.
         val wanted = if (fallbackFrom == vm.mode) renderedMode else vm.mode
-        if (controller.supported) {
+        val dualNow = controller.supported || (controller.simulateDual && wanted == RecordingMode.DUAL_VIEW)
+        if (dualNow) {
             when (wanted) {
-                RecordingMode.DUAL_VIEW -> if (composedView == null) return@LaunchedEffect
+                RecordingMode.DUAL_VIEW -> if (glView == null) return@LaunchedEffect
                 RecordingMode.SEPARATE -> if (backView == null || frontView == null) return@LaunchedEffect
                 RecordingMode.BOTH -> if (backView == null || frontView == null || composedView == null) return@LaunchedEffect
             }
@@ -188,12 +199,50 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             frontView = frontView,
             composedView = composedView,
             pip = pip,
-            saveAspect = vm.saveAspect
+            saveAspect = vm.saveAspect,
+            glView = glView
         )
         renderedMode = controller.activeMode
         boundFor = vm.mode
         fallbackFrom = if (controller.activeMode != vm.mode) vm.mode else null
+        hasTorch = controller.torchAvailable
         ready = true
+    }
+
+    // Skickar rutan till kamerabilden direkt – ingen ombindning och ingen väntan på omritning.
+    fun pushGlLayout(l: PipLayout) {
+        if (!controller.glActive) return
+        controller.setGlLayout(
+            GlLayout(
+                swap = l.swapCameras,
+                smallVisible = l.visible,
+                smallPaused = l.paused,
+                mainPaused = mainPaused,
+                cx = l.cx,
+                cy = l.cy,
+                scale = l.scale,
+                largeRatio = (if (l.swapCameras) vm.frontAspect else vm.backAspect).ratio(),
+                smallRatio = (if (l.swapCameras) vm.backAspect else vm.frontAspect).ratio()
+            )
+        )
+    }
+
+    // Den lilla rutan följer fingret direkt i Dual View – ingen ombindning behövs.
+    LaunchedEffect(pipLive, mainPaused, vm.frontAspect, vm.backAspect, vm.saveAspect) {
+        if (!controller.glActive) return@LaunchedEffect
+        controller.setGlLayout(
+            GlLayout(
+                swap = pipLive.swapCameras,
+                smallVisible = pipLive.visible,
+                smallPaused = pipLive.paused,
+                mainPaused = mainPaused,
+                cx = pipLive.cx,
+                cy = pipLive.cy,
+                scale = pipLive.scale,
+                largeRatio = (if (pipLive.swapCameras) vm.frontAspect else vm.backAspect).ratio(),
+                smallRatio = (if (pipLive.swapCameras) vm.backAspect else vm.frontAspect).ratio()
+            )
+        )
     }
 
 
@@ -202,14 +251,16 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val shots = when {
-            !controller.supported -> listOf("camera" to backView)
-            displayMode == RecordingMode.DUAL_VIEW -> listOf("combined" to composedView)
+            !dualOk -> listOf("camera" to backView?.bitmap)
+            displayMode == RecordingMode.DUAL_VIEW -> listOf(
+                "combined" to (if (controller.glActive) glView?.bitmap else composedView?.bitmap)
+            )
             else -> listOfNotNull(
-                if (!hideBack) "back" to backView else null,
-                if (!hideFront) "front" to frontView else null
+                if (!hideBack) "back" to backView?.bitmap else null,
+                if (!hideFront) "front" to frontView?.bitmap else null
             )
         }
-        val bitmaps = shots.mapNotNull { (key, view) -> view?.bitmap?.let { key to it } }
+        val bitmaps = shots.mapNotNull { (key, bmp) -> bmp?.let { key to it } }
         if (bitmaps.isEmpty()) {
             status = "No picture to save yet"
             return
@@ -237,7 +288,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Column(modifier = Modifier.fillMaxSize()) {
         // Toppfält
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -274,9 +326,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             IconChip(DuelIconKind.SETTINGS, active = showTune) { showTune = !showTune }
         }
 
-        // Förhandsvisning
-        Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp)) {
-            if (!controller.supported) {
+        // Förhandsvisning: videon går kant till kant och fortsätter bakom
+        // kontrollerna längst ner, så den fyller skärmen i stället för att krympa.
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            if (!dualOk) {
                 // Enskild kamera: en fullmatad förhandsvisning i valt format.
                 FramedFeed(
                     backView, vm.backAspect, label = "CAMERA", modifier = Modifier.fillMaxSize(),
@@ -293,20 +346,36 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     val swap = pipLive.swapCameras
                     val largeAspect = if (swap) vm.frontAspect else vm.backAspect
                     val smallAspect = if (swap) vm.backAspect else vm.frontAspect
-                    // Med eget filformat visar ramen hela filen (t.ex. 16:9 för YouTube).
-                    val frameAspect = vm.saveAspect ?: largeAspect
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(3.dp),
-                        contentAlignment = Alignment.Center
+                    // Ramen visar exakt filens yta. Auto = stående 9:16 (samma
+                    // komposition som webbens canvas: BACK fyller, FRONT som ruta).
+                    val frameAspect = vm.saveAspect ?: AspectOption.R_9_16
+                    BoxWithConstraints(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 3.dp)
                     ) {
-                        // Videon och den lilla kamerans ram delar exakt samma yta,
-                        // så ramen hamnar där den faktiskt spelas in.
-                        Box(Modifier.aspectRatio(frameAspect.ratio())) {
+                        // Ramen fyller hela bredden. Är bilden högre än ytan fortsätter den
+                        // bakom kontrollerna i stället för att krympa till en liten ruta.
+                        val frameH = maxWidth / frameAspect.ratio()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(frameAspect.ratio())
+                                .align(if (frameH > maxHeight) Alignment.TopCenter else Alignment.Center)
+                        ) {
+                            // Egen sammansättning av båda kamerorna: frontbilden är en
+                            // riktig livebild i den lilla rutan och flyttas med fingret.
+                            if (dualOk) AndroidView(
+                                modifier = Modifier.fillMaxSize()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .alpha(if (controller.glActive) 1f else 0f),
+                                factory = { ctx -> TextureView(ctx).also { glView = it } },
+                                onRelease = { if (glView === it) glView = null }
+                            )
                             Feed(
                                 composedView,
                                 label = if (swap) "FRONT" else "BACK",
                                 ratio = vm.saveAspect?.let { "FILE " + it.label.substringBefore(' ') } ?: largeAspect.label,
                                 modifier = Modifier.fillMaxSize(),
+                                showPreview = !controller.glActive,
                                 zoom = if (swap) frontZoom else backZoom,
                                 onZoom = { f ->
                                     if (swap) {
@@ -331,14 +400,32 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
 
                             if (pipLive.visible) PipOutline(
                                 layout = pipLive,
+                                // Rutan har den lilla kamerans format, inte filens.
                                 aspect = smallAspect,
                                 onDrag = { dx, dy ->
-                                    pipLive = pipLive.copy(
+                                    val moved = pipLive.copy(
                                         cx = (pipLive.cx + dx).coerceIn(0.12f, 0.88f),
                                         cy = (pipLive.cy + dy).coerceIn(0.12f, 0.88f)
                                     )
+                                    // Kamerabilden flyttas först – då hackar inte bakkameran.
+                                    pushGlLayout(moved)
+                                    pipLive = moved
                                 },
-                                onResize = { size -> pipLive = pipLive.copy(scale = size) },
+                                onZoom = { f ->
+                                    // Lilla kameran är FRONT, om inte kamerorna bytts.
+                                    if (swap) {
+                                        val (_, bz) = controller.setZoom(back = backZoom * f)
+                                        backZoom = bz
+                                    } else {
+                                        val (_, fz) = controller.setZoom(front = frontZoom * f)
+                                        frontZoom = fz
+                                    }
+                                },
+                                onResize = { size ->
+                                    val resized = pipLive.copy(scale = size)
+                                    pushGlLayout(resized)
+                                    pipLive = resized
+                                },
                                 onCommit = {
                                     pip = pipLive
                                     status = if (isRecording) "Small camera moved – applies to the next part"
@@ -492,7 +579,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
 
         // Ändra live: läge, kvalitet, format och layout.
         if (showTune) {
-            val dual = controller.supported
+            val dual = dualOk
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -557,16 +644,12 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             }
         }
 
-        // Status + sparade filer
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            Text(status, color = DuelTextMuted, fontSize = 12.sp)
-            if (savedNames.isNotEmpty()) {
-                Text(
-                    "Saved: " + savedNames.joinToString(", "),
-                    color = Color(0xFF8FA0C8), fontSize = 11.sp,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
+        // Inga informations- eller filnamnsrader under videon – bara fel som behöver åtgärdas.
+        if (status.startsWith("Low storage") || status.startsWith("Could not") || status.startsWith("No camera")) {
+            Text(
+                status, color = DuelOrangeLight, fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            )
         }
 
         // Kontrollrad: zoom, slutare och småbildsverktyg – synliga i alla lägen.
@@ -617,7 +700,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             Spacer(Modifier.size(52.dp))
             }
 
-            if (controller.supported) {
+            if (dualOk) {
                 Spacer(Modifier.height(12.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -687,6 +770,42 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 }
             }
         }
+    }
+
+    // Ficklampa och kryss längst uppe på skärmen, alltid ovanpå videon.
+    Row(
+        modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (hasTorch) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape)
+                    .background(if (torch) Color(0xFFFF6A1A).copy(alpha = .92f) else Color.Black.copy(alpha = .5f))
+                    .border(1.dp, if (torch) Color(0xFFFF9A3C) else Color.White.copy(alpha = .35f), CircleShape)
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        torch = controller.setTorch(!torch)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                DuelIcon(DuelIconKind.FLASH, Color.White, 20.dp)
+            }
+        }
+        Box(
+            modifier = Modifier.size(44.dp).clip(CircleShape)
+                .background(Color.Black.copy(alpha = .5f))
+                .border(1.dp, Color.White.copy(alpha = .35f), CircleShape)
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (isRecording) controller.stopRecording()
+                    onExit()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text("✕", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        }
+    }
     }
 
     premiumFeature?.let { feature ->
@@ -763,15 +882,21 @@ private fun Feed(
     label: String? = null,
     ratio: String? = null,
     modifier: Modifier = Modifier,
+    // false = bilden ritas av DualGl i stället; lagret behålls för gester och etiketter.
+    showPreview: Boolean = true,
     zoom: Float = 1f,
     onZoom: ((Float) -> Unit)? = null,
     onFocus: ((Float, Float) -> Unit)? = null,
     onRelease: (PreviewView) -> Unit = {},
     onView: (PreviewView) -> Unit
 ) {
-    Box(modifier = modifier.clip(RoundedCornerShape(14.dp)).background(DuelSurface).border(1.dp, DuelLine, RoundedCornerShape(14.dp))) {
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(14.dp))
+            .background(if (showPreview) DuelSurface else Color.Transparent)
+            .border(1.dp, if (showPreview) DuelLine else Color.Transparent, RoundedCornerShape(14.dp))
+    ) {
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().alpha(if (showPreview) 1f else 0f),
             factory = { ctx ->
                 PreviewView(ctx).apply {
                     implementationMode = PreviewView.ImplementationMode.COMPATIBLE
@@ -826,7 +951,8 @@ private fun Feed(
                     .clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = .45f)).padding(horizontal = 8.dp, vertical = 3.dp)
             )
         }
-        if (ratio != null) {
+        // Etiketten hör bara till CameraX-förhandsvisningen; i Dual View ritas bilden av GL.
+        if (ratio != null && showPreview) {
             Text(
                 ratio, color = DuelText, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp,
                 modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
@@ -896,6 +1022,8 @@ private fun PipOutline(
     layout: PipLayout,
     aspect: AspectOption,
     onDrag: (Float, Float) -> Unit,
+    // Två fingrar på rutan zoomar den lilla kameran.
+    onZoom: (Float) -> Unit,
     onResize: (Float) -> Unit,
     onCommit: () -> Unit,
     onTogglePause: () -> Unit,
@@ -918,13 +1046,24 @@ private fun PipOutline(
                 .size(with(density) { pipW.toDp() }, with(density) { pipH.toDp() })
                 .clip(RoundedCornerShape(12.dp))
                 .border(1.5.dp, Color.White.copy(alpha = if (layout.paused) .28f else .6f), RoundedCornerShape(12.dp))
-                .pointerInput(aspect) {
-                    detectDragGestures(
-                        onDragEnd = { onCommit() },
-                        onDragCancel = { onCommit() }
-                    ) { change, drag ->
-                        change.consume()
-                        onDrag(drag.x / w, drag.y / h)
+                .pointerInput(aspect, onZoom) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var pinching = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val factor = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            if (factor != 1f) {
+                                pinching = true
+                                onZoom(factor)
+                            } else if (!pinching && pan != Offset.Zero) {
+                                onDrag(pan.x / w, pan.y / h)
+                            }
+                            event.changes.forEach { it.consume() }
+                            if (event.changes.none { it.pressed }) break
+                        }
+                        onCommit()
                     }
                 }
         ) {

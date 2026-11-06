@@ -87,8 +87,14 @@ private fun query(context: Context, isPhoto: Boolean): List<MediaItem> {
         if (!isPhoto) add(MediaStore.Video.Media.DURATION)
     }.toTypedArray()
     // Nya filer hamnar i …/DualShots; gamla i …/DuelShots listas också.
-    val sel = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
-    val args = arrayOf("%/DualShots%", "%/DuelShots%")
+    val (sel, args) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?" to
+            arrayOf("%/DualShots%", "%/DuelShots%")
+    } else {
+        // Android 7–9 har ingen RELATIVE_PATH-kolumn; matcha den riktiga sökvägen.
+        "${MediaStore.MediaColumns.DATA} LIKE ? OR ${MediaStore.MediaColumns.DATA} LIKE ?" to
+            arrayOf("%/DualShots/%", "%/DuelShots/%")
+    }
     runCatching {
         context.contentResolver.query(base, proj, sel, args, "${MediaStore.MediaColumns.DATE_ADDED} DESC")?.use { c ->
             val idCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)

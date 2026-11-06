@@ -25,3 +25,9 @@ web/serve.err.log
 *.keystore
 *.p12
 keystore.properties
+
+# Agent-/verktygskataloger och fristående APK-filer
+/.tools/
+/.claude/
+.freebuff/
+*.apk

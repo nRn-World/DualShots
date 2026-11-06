@@ -12,8 +12,8 @@ android {
         applicationId = "com.nrworld.duelshot"
         minSdk = 24
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.1.2"
+        versionCode = 20
+        versionName = "1.2.8"
     }
 
     buildTypes {
@@ -35,6 +35,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

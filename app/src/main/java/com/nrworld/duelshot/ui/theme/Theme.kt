@@ -1,6 +1,8 @@
 package com.nrworld.duelshot.ui.theme
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -37,7 +39,7 @@ fun DuelShotsTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
+            val window = view.context.findActivity()?.window ?: return@SideEffect
             WindowCompat.setDecorFitsSystemWindows(window, false)
             window.statusBarColor = Color.Transparent.toArgbOrNull()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
@@ -49,6 +51,13 @@ fun DuelShotsTheme(
         typography = DuelTypography,
         content = content
     )
+}
+
+/** Plockar fram Activity ur en ContextWrapper-kedja i stället för en osäker cast. */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 // Hjälp: sätter fönsterbakgrund utan att kräva API-helskinning.

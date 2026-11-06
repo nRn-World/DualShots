@@ -1,6 +1,7 @@
 package com.nrworld.duelshot.ui
 
 import android.widget.Toast
+import com.nrworld.duelshot.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -181,7 +182,7 @@ fun DuelShotsApp(vm: AppViewModel) {
             title = { Text("DualShots", color = DuelText, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Version 1.1 · Dual lens recording engine\nMade by nRnWorld · nrnworld.one\nbynrnworld@gmail.com",
+                    "Version ${BuildConfig.VERSION_NAME} · Dual lens recording engine\nMade by nRnWorld · nrnworld.one\nbynrnworld@gmail.com",
                     color = DuelTextMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp
                 )
             },

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import com.nrworld.duelshot.BuildConfig
 import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.CodecOption
 import com.nrworld.duelshot.model.QualityOption
@@ -74,7 +75,7 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
             RText(
                 buildAnnotatedString {
                     append("SETTINGS\n")
-                    withStyle(SpanStyle(color = RefFaint)) { append("V1.1") }
+                    withStyle(SpanStyle(color = RefFaint)) { append("V" + BuildConfig.VERSION_NAME) }
                 },
                 149, 27, 15, 23, color = RefLabel, mono = true, ls = 3, right = true
             )

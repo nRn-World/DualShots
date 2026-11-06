@@ -467,9 +467,9 @@ async function openStream(facing, deviceId) {
 
 function camErrorMessage(err) {
   const name = (err && err.name) || '';
-  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera blocked — demo feed';
-  if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera found — demo feed';
-  if (name === 'NotReadableError') return 'Camera busy — demo feed';
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera blocked in this browser — allow camera for this site, then reload';
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera found on this device — demo feed';
+  if (name === 'NotReadableError') return 'Camera is busy in another app — demo feed';
   return 'Camera unavailable — demo feed';
 }
 
@@ -568,7 +568,12 @@ async function startCameras() {
   refreshRecord();
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    enableDemo('Camera API unavailable — demo feed');
+    // Mobila webbläsare ger ingen kamera på http://<ip> – bara https eller localhost.
+    const local = location.protocol === 'https:'
+      || ['localhost', '127.0.0.1'].includes(location.hostname);
+    enableDemo(local
+      ? 'Camera API unavailable in this browser — demo feed'
+      : 'Camera needs HTTPS — open this page on the computer, or use the APK on the phone');
     return;
   }
 
@@ -1787,7 +1792,7 @@ function unmountFeeds() {
 function recordStatusText() {
   if (recordMessage) return recordMessage;
   if (!cam.ready) return 'Starting cameras…';
-  if (cam.demo) return 'Demo feed — camera unavailable here';
+  if (cam.demo) return 'Demo feed — no camera access (allow camera for this site to use real feeds)';
   if (!cam.feeds.back || !cam.feeds.front) return `Single camera · ${cam.active}`;
   return `${MODES[activeTake().mode].title} · front + back`;
 }

@@ -16,36 +16,44 @@ class AppPrefs(context: Context) {
     private val sp = context.applicationContext
         .getSharedPreferences("duelshot_prefs", Context.MODE_PRIVATE)
 
+    /** Läser en enum säkert: en okänd eller gammal sparad text ger standardvärdet i stället för krasch. */
+    private inline fun <reified T : Enum<T>> read(key: String, fallback: T): T {
+        val name = sp.getString(key, null) ?: return fallback
+        return runCatching { enumValueOf<T>(name) }.getOrDefault(fallback)
+    }
+
     init {
         // Dual View är standard: det är läget med den lilla kameran.
         // En gång per installation flyttas det gamla förvalet (Separate) över.
         if (!sp.getBoolean(KEY_SETUP_DONE, false)) {
             val stored = sp.getString(KEY_MODE, null)
-            if (stored == null || stored == RecordingMode.SEPARATE.name) {
-                sp.edit().putString(KEY_MODE, RecordingMode.DUAL_VIEW.name).apply()
-            }
-            sp.edit().putBoolean(KEY_SETUP_DONE, true).apply()
+            sp.edit().apply {
+                if (stored == null || stored == RecordingMode.SEPARATE.name) {
+                    putString(KEY_MODE, RecordingMode.DUAL_VIEW.name)
+                }
+                putBoolean(KEY_SETUP_DONE, true)
+            }.apply()
         }
     }
 
     var mode: RecordingMode
-        get() = RecordingMode.valueOf(sp.getString(KEY_MODE, RecordingMode.DUAL_VIEW.name)!!)
+        get() = read(KEY_MODE, RecordingMode.DUAL_VIEW)
         set(v) = sp.edit().putString(KEY_MODE, v.name).apply()
 
     var frontAspect: AspectOption
-        get() = AspectOption.valueOf(sp.getString(KEY_FRONT, AspectOption.R_9_16.name)!!)
+        get() = read(KEY_FRONT, AspectOption.R_9_16)
         set(v) = sp.edit().putString(KEY_FRONT, v.name).apply()
 
     var backAspect: AspectOption
-        get() = AspectOption.valueOf(sp.getString(KEY_BACK, AspectOption.R_16_9.name)!!)
+        get() = read(KEY_BACK, AspectOption.R_16_9)
         set(v) = sp.edit().putString(KEY_BACK, v.name).apply()
 
     var quality: QualityOption
-        get() = QualityOption.valueOf(sp.getString(KEY_QUALITY, QualityOption.FHD1080.name)!!)
+        get() = read(KEY_QUALITY, QualityOption.FHD1080)
         set(v) = sp.edit().putString(KEY_QUALITY, v.name).apply()
 
     var codec: CodecOption
-        get() = CodecOption.valueOf(sp.getString(KEY_CODEC, CodecOption.MP4.name)!!)
+        get() = read(KEY_CODEC, CodecOption.MP4)
         set(v) = sp.edit().putString(KEY_CODEC, v.name).apply()
 
     /** Premium-låst: sätts av köpflödet (här mockad). */

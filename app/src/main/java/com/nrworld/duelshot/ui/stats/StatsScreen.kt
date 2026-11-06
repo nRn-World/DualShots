@@ -82,26 +82,7 @@ private data class Stats(
     val rows: List<String>
 )
 
-private val DemoStats = Stats(
-    total = 24, totalDelta = "+60%",
-    cards = listOf(
-        Triple(RefIconKind.CAMERA, "RECORDING TIME", "52 min" to "+32%"),
-        Triple(RefIconKind.DATABASE, "STORAGE USED", "2.4 GB" to "+18%"),
-        Triple(RefIconKind.FILM, "AVERAGE LENGTH", "2:10" to "+12%"),
-        Triple(RefIconKind.STAR, "FAVORITES", "8 clips" to "+100%"),
-    ),
-    days = listOf("Mon" to "12 Aug", "Tue" to "13 Aug", "Wed" to "14 Aug", "Thu" to "15 Aug", "Fri" to "16 Aug", "Sat" to "17 Aug", "Sun" to "18 Aug"),
-    series = mapOf(
-        "clips" to listOf(3f, 5f, 8f, 6f, 4f, 7f, 9f),
-        "minutes" to listOf(6f, 11f, 17f, 13f, 9f, 15f, 19f),
-        "storage" to listOf(.3f, .5f, .8f, .6f, .4f, .7f, .9f),
-    ),
-    usage = Triple(75, 15, 10),
-    storageLabel = "2.4 GB of 64 GB used", storageFrac = .4f,
-    rows = listOf("2.1 GB", "0.3 GB", "0.0 GB")
-)
-
-/** Statistik ur de egna videorna; exempelvärdena visas tills man spelat in. */
+/** Statistik ur de egna filerna — allt är noll tills man spelat in eller fotat. */
 private fun realStats(items: List<MediaItem>): Stats {
     val videos = items.filter { !it.isPhoto }
     val photos = items.filter { it.isPhoto }
@@ -148,7 +129,7 @@ private fun realStats(items: List<MediaItem>): Stats {
 /** Stats enligt design/reference/stats.png. */
 @Composable
 fun StatsScreen(library: List<MediaItem>, isPremium: Boolean, onSoon: (String) -> Unit, onOpenPremium: () -> Unit) {
-    val s = if (library.any { !it.isPhoto }) realStats(library) else DemoStats
+    val s = realStats(library)
     var metric by remember { mutableStateOf("clips") }
     val values = s.series.getValue(metric)
     val maxV = values.maxOrNull() ?: 0f
@@ -276,16 +257,19 @@ fun StatsScreen(library: List<MediaItem>, isPremium: Boolean, onSoon: (String) -
             values.forEachIndexed { i, v ->
                 val center = 109 + i * 123.8
                 val h = if (top > 0f) v / top * 152f else 0f
-                Box(
-                    Modifier.absoluteOffset(rp(center - 31), rv(89 + 152 - h)).size(rp(62), rv(h))
-                        .clip(RoundedCornerShape(topStart = rp(5), topEnd = rp(5)))
-                        .background(Brush.verticalGradient(listOf(Color(0xFFFF5A0A), Color(0xFFFF9A2A))))
-                )
-                val label = if (v % 1f == 0f) v.toInt().toString() else v.toString()
-                Text(
-                    label, color = Color.White, fontSize = rs(19), lineHeight = rs(24), textAlign = TextAlign.Center,
-                    modifier = Modifier.absoluteOffset(rp(center - 40), rv(89 + 152 - h - 28)).width(rp(80))
-                )
+                // Inga staplar förrän det finns något att visa.
+                if (h > 0f) {
+                    Box(
+                        Modifier.absoluteOffset(rp(center - 31), rv(89 + 152 - h)).size(rp(62), rv(h))
+                            .clip(RoundedCornerShape(topStart = rp(5), topEnd = rp(5)))
+                            .background(Brush.verticalGradient(listOf(Color(0xFFFF5A0A), Color(0xFFFF9A2A))))
+                    )
+                    val label = if (v % 1f == 0f) v.toInt().toString() else v.toString()
+                    Text(
+                        label, color = Color.White, fontSize = rs(19), lineHeight = rs(24), textAlign = TextAlign.Center,
+                        modifier = Modifier.absoluteOffset(rp(center - 40), rv(89 + 152 - h - 28)).width(rp(80))
+                    )
+                }
                 Column(
                     Modifier.absoluteOffset(rp(center - 60), rv(89 + 161)).width(rp(120)),
                     horizontalAlignment = Alignment.CenterHorizontally

@@ -1,14 +1,23 @@
 package com.nrworld.duelshot.camera
 
 import android.content.ContentValues
+import android.os.Build
 import android.content.Context
 import android.provider.MediaStore
+import android.content.pm.ApplicationInfo
+import android.hardware.camera2.CameraCharacteristics
+import android.view.TextureView
+import android.graphics.SurfaceTexture
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.CompositionSettings
 import androidx.camera.core.ConcurrentCamera
 import androidx.camera.core.Preview
+import androidx.camera.core.SurfaceRequest
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.ViewPort
 import android.util.Rational
@@ -91,6 +100,73 @@ class DualCameraController(private val context: Context) {
     /** Ljud i inspelningen (inställningen Record Audio). */
     var recordAudio = true
 
+    /** Ficklampa på bakkameran; hålls kvar över ombindningar. */
+    private var torchWanted = false
+
+    /** Sant när bakkameran har en blixt. */
+    var torchAvailable = false
+        private set
+
+    /** Slår på/av ficklampan. Returnerar det läge som gäller efteråt. */
+    fun setTorch(on: Boolean): Boolean {
+        val cam = backCamera
+        if (cam == null || !torchAvailable) return false
+        val ok = runCatching { cam.cameraControl.enableTorch(on) }.isSuccess
+        if (ok) torchWanted = on
+        return ok && on
+    }
+
+    // Egen OpenGL-sammansättning för Dual View (stående ruta i liggande bild, som på webben).
+    private var gl: GlCompositor? = null
+    private var glRecorder: DualRecorder? = null
+    private var glStamp = ""
+    private var glQuality = QualityOption.FHD1080
+    private var glOutAspect = AspectOption.R_16_9
+    /** Sant när kamerorna gav 4:3 (hela sensorn) i stället för 16:9. */
+    private var glWide = false
+
+    /** Sant när Dual View ritas av [GlCompositor] (annars CameraX egen sammansättning). */
+    var glActive = false
+        private set
+
+    /** Testläge i debug-bygge utan dubbla kameror: frontrutan visar bakkameran. */
+    var simulateDual = false
+        private set
+
+    /** Dual View går att visa: riktig dubbelkamera eller testläget. */
+    val dualUi: Boolean get() = supported || simulateDual
+
+    /** Uppdaterar hur Dual View ritas (flytt, storlek, paus, byt) – direkt, utan ombindning. */
+    fun setGlLayout(layout: GlLayout) {
+        gl?.layout = layout
+    }
+
+    /** Kopplar förhandsvisningen (TextureView) till sammansättningen. */
+    private fun attachGlView(view: TextureView, comp: GlCompositor) {
+        view.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) = comp.setPreview(st)
+            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) = Unit
+            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                comp.setPreview(null)
+                return true
+            }
+            override fun onSurfaceTextureUpdated(st: SurfaceTexture) = Unit
+        }
+        view.surfaceTexture?.let { comp.setPreview(it) }
+    }
+
+    private fun stopGl() {
+        glRecorder?.let { r ->
+            gl?.recorder = null
+            gl?.setEncoder(null)
+            r.stop(context, "dualshot_combined_$glStamp") { }
+        }
+        glRecorder = null
+        gl?.release()
+        gl = null
+        glActive = false
+    }
+
     // CameraX återanvänder kameran per lifecycle owner och behåller då den lilla
     // kamerans FÖRSTA position/storlek i Dual View – ramen flyttades men bilden
     // stod still. Varje bindning får därför en ny owner som följer skärmens.
@@ -104,6 +180,7 @@ class DualCameraController(private val context: Context) {
     /** Släpper kamerorna när inspelningsvyn stängs. */
     fun release() {
         runCatching { provider?.unbindAll() }
+        stopGl()
         bindOwner?.destroy()
         bindOwner = null
     }
@@ -143,6 +220,9 @@ class DualCameraController(private val context: Context) {
         // Behåll zoomen över ombindningar (t.ex. när den lilla rutan flyttas).
         backZoom = applyZoom(backCamera, backZoom)
         frontZoom = applyZoom(frontCamera, frontZoom)
+        // Ficklampan följer med över ombindningar (t.ex. när rutan flyttas).
+        torchAvailable = backCamera?.cameraInfo?.hasFlashUnit() == true
+        if (torchWanted && torchAvailable) runCatching { backCamera?.cameraControl?.enableTorch(true) }
     }
 
     /** Vilket läge som faktiskt band (kan skilja sig från önskat pga fallback). */
@@ -180,6 +260,8 @@ class DualCameraController(private val context: Context) {
                 if (frontSelector == null) frontSelector = pick(p, CameraSelector.DEFAULT_FRONT_CAMERA)
             }
             canBind = backSelector != null || frontSelector != null
+            val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+            simulateDual = !supported && backSelector != null && debuggable
             when {
                 supported -> "Ready – dual cameras."
                 canBind -> "This device does not support simultaneous dual cameras – single camera enabled."
@@ -208,11 +290,13 @@ class DualCameraController(private val context: Context) {
         frontView: PreviewView?,
         composedView: PreviewView?,
         pip: PipLayout = PipLayout(),
-        saveAspect: AspectOption? = null
+        saveAspect: AspectOption? = null,
+        glView: TextureView? = null
     ): String {
         val p = provider ?: return "Camera is not ready yet."
 
         p.unbindAll()
+        stopGl()
         val owner = freshOwner(lifecycleOwner)
         backVideo = null; frontVideo = null; composedVideo = null
         backCamera = null; frontCamera = null
@@ -220,9 +304,28 @@ class DualCameraController(private val context: Context) {
 
         val qs = qualitySelector(quality)
 
+        // Dual View ritas av oss (stående ruta som på webben). Misslyckas det på enheten
+        // används CameraX egen sammansättning (supported) eller en kamera (testläge).
+        if (wanted == RecordingMode.DUAL_VIEW && dualUi && glView != null) {
+            try {
+                val outAspect = saveAspect ?: AspectOption.R_9_16
+                bindGl(p, owner, glView, frontAspect, backAspect, outAspect, quality, pip)
+                activeMode = RecordingMode.DUAL_VIEW
+                glActive = true
+                return if (supported) {
+                    "Camera ready – Dual View" + (if (glWide) " · 4:3 sensor" else " · 16:9 sensor")
+                } else "Dual View test: back camera shown twice (emulator)."
+            } catch (e: Exception) {
+                lastBindError = (e.localizedMessage ?: e.javaClass.simpleName).take(140)
+                stopGl()
+                runCatching { p.unbindAll() }
+            }
+        }
+
         // Dubbla kameror kräver båda selectorerna; annars enskild kamera som fallback.
         if (!supported || backSelector == null || frontSelector == null) {
-            return bindSingle(p, frontAspect, backAspect, qs, owner, backView, frontView)
+            return bindSingle(p, frontAspect, backAspect, qs, owner, backView, frontView) +
+                (lastBindError?.let { " [Dual View: $it]" } ?: "")
         }
         val bs = backSelector!!
         val fs = frontSelector!!
@@ -256,6 +359,111 @@ class DualCameraController(private val context: Context) {
             lastBindError = why
             "Composing the two cameras failed ($why) – recording as Separate files instead."
         }
+    }
+
+    /** Två vanliga previews (en per kamera) som matar [GlCompositor]. */
+    private fun bindGl(
+        p: ProcessCameraProvider, owner: LifecycleOwner, glView: TextureView,
+        frontAspect: AspectOption, backAspect: AspectOption, outAspect: AspectOption,
+        quality: QualityOption, pip: PipLayout
+    ) {
+        val comp = GlCompositor()
+        gl = comp
+        glQuality = quality
+        glOutAspect = outAspect
+        comp.simulateFront = !supported
+        comp.layout = GlLayout(
+            swap = pip.swapCameras, smallVisible = pip.visible, smallPaused = pip.paused, mainPaused = mainPaused,
+            cx = pip.cx, cy = pip.cy, scale = pip.scale,
+            largeRatio = (if (pip.swapCameras) frontAspect else backAspect).ratioOf(),
+            smallRatio = (if (pip.swapCameras) backAspect else frontAspect).ratioOf()
+        )
+        attachGlView(glView, comp)
+
+        val executor = ContextCompat.getMainExecutor(context)
+
+        fun attempt(wide: Boolean) {
+            val backPreview = glPreview(executor, wide) { comp.provide(0, it, executor) }
+            val backGroup = UseCaseGroup.Builder().addUseCase(backPreview).build()
+            if (supported) {
+                val frontPreview = glPreview(executor, wide) { comp.provide(1, it, executor) }
+                val frontGroup = UseCaseGroup.Builder().addUseCase(frontPreview).build()
+                val cams = p.bindToLifecycle(
+                    listOf(
+                        ConcurrentCamera.SingleCameraConfig(backSelector!!, backGroup, owner),
+                        ConcurrentCamera.SingleCameraConfig(frontSelector!!, frontGroup, owner)
+                    )
+                ).cameras
+                rememberCameras(cams)
+                applyGlRotations(comp, cams, glView)
+            } else {
+                val cams = listOf(p.bindToLifecycle(owner, backSelector!!, backGroup))
+                rememberCameras(cams)
+                applyGlRotations(comp, cams, glView)
+            }
+            glWide = wide
+        }
+
+        // 4:3 använder hela sensorns höjd och ger därför en vidare bild i den stående
+        // filen — med 16:9-strömmen beskärs över hälften av bredden och bilden känns
+        // inzoomad. En del telefoner tillåter inte 4:3 i dubbelkamera-läge; då binds
+        // kamerorna om utan önskemål i stället för att Dual View faller bort.
+        try {
+            attempt(wide = true)
+        } catch (e: Exception) {
+            lastBindError = (e.localizedMessage ?: e.javaClass.simpleName).take(140)
+            runCatching { p.unbindAll() }
+            attempt(wide = false)
+        }
+    }
+
+    /** Preview till [GlCompositor]. [wide] ber om 4:3 i stället för 16:9. */
+    private fun glPreview(
+        executor: java.util.concurrent.Executor,
+        wide: Boolean,
+        onRequest: (SurfaceRequest) -> Unit
+    ): Preview {
+        val builder = Preview.Builder()
+        if (wide) {
+            builder.setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .build()
+            )
+        }
+        return builder.build().apply { setSurfaceProvider(executor) { onRequest(it) } }
+    }
+
+    /**
+     * Ger sammansättningen varje kameras rotationsgrad. Kamerans buffert är alltid i
+     * sensorns orientering (oftast liggande), så utan detta blir både stora bilden och
+     * rutan 90 grader fel på en telefon som hålls stående.
+     */
+    private fun applyGlRotations(comp: GlCompositor, cameras: List<Camera>, view: TextureView) {
+        val target = when (view.display?.rotation ?: Surface.ROTATION_0) {
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> 0
+        }
+        cameras.forEach { cam ->
+            val sensor = runCatching {
+                Camera2CameraInfo.from(cam.cameraInfo)
+                    .getCameraCharacteristic(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+            }.getOrDefault(0)
+            val rot = ((sensor - target) % 360 + 360) % 360
+            val index = if (cam.cameraInfo.lensFacing == CameraSelector.LENS_FACING_FRONT) 1 else 0
+            comp.setRotation(index, rot)
+            // Testläge: lilla rutan visar bakkameran och behöver samma rotation.
+            if (!supported) comp.setRotation(1, rot)
+        }
+    }
+
+    private fun AspectOption.ratioOf(): Float = when (this) {
+        AspectOption.R_9_16 -> 9f / 16f
+        AspectOption.R_16_9 -> 16f / 9f
+        AspectOption.R_1_1 -> 1f
+        AspectOption.R_4_3 -> 4f / 3f
     }
 
     private fun bindSingle(
@@ -314,21 +522,24 @@ class DualCameraController(private val context: Context) {
         val composedPreview = previewFor(composedView)
         val composed = VideoCapture.withOutput(Recorder.Builder().setQualitySelector(qs).build())
         composedVideo = composed
+        val largeAspect = if (pip.swapCameras) frontAspect else backAspect
         // Sammansättningen tillåter bara en preview + en VideoCapture i gruppen.
         // Egna previews per kamera här fick bindningen att kasta och då blev
         // Dual View aldrig en enda fil – det var regressionen.
         val builder = UseCaseGroup.Builder()
             .addUseCase(composedPreview).addUseCase(composed)
-        // Valt filformat (t.ex. 16:9 för YouTube) beskär den sammansatta bilden.
-        if (saveAspect != null) viewPortFor(saveAspect)?.let { builder.setViewPort(it) }
+        // Förhandsvisning och fil beskärs alltid till samma format (valt filformat, annars
+        // stora kamerans). Utan det visar förhandsvisningen ett annat utsnitt än filen och
+        // ramen för lilla kameran hamnar fel. CameraX ritar lilla kameran som en liten kopia
+        // av hela bilden (samma proportioner som formatet), så ramen på skärmen gör likadant.
+        viewPortFor(saveAspect ?: AspectOption.R_9_16)?.let { builder.setViewPort(it) }
         val group = builder.build()
         val largeSel = if (pip.swapCameras) fs else bs
         val smallSel = if (pip.swapCameras) bs else fs
-        val largeAspect = if (pip.swapCameras) frontAspect else backAspect
         rememberCameras(
             p.bindToLifecycle(
                 listOf(
-                    ConcurrentCamera.SingleCameraConfig(largeSel, group, fullComposition(largeAspect, saveAspect), owner),
+                    ConcurrentCamera.SingleCameraConfig(largeSel, group, fullComposition(largeAspect, saveAspect ?: AspectOption.R_9_16), owner),
                     ConcurrentCamera.SingleCameraConfig(smallSel, group, insetComposition(pip), owner)
                 )
             ).cameras
@@ -477,7 +688,10 @@ class DualCameraController(private val context: Context) {
                         }
                     }
                 }
-                RecordingMode.DUAL_VIEW -> {
+                RecordingMode.DUAL_VIEW -> if (glActive) {
+                    startGlRecording(stamp)
+                    names += "dualshot_combined_$stamp.mp4"
+                } else {
                     composedVideo?.let {
                         val rec = it.record(context, "dualshot_combined_$stamp", audio = recordAudio, executor)
                         started += rec; composedRecording = rec; names += "dualshot_combined_$stamp.mp4"
@@ -506,8 +720,38 @@ class DualCameraController(private val context: Context) {
         }
     }
 
+    private fun startGlRecording(stamp: String) {
+        val comp = gl ?: error("Dual View is not ready")
+        val ratio = glOutAspect.ratioOf()
+        val long = when (glQuality) {
+            QualityOption.HD720 -> 1280
+            QualityOption.FHD1080 -> 1920
+            QualityOption.UHD4K -> 3840
+        }
+        var attempt = long
+        var recorder: DualRecorder? = null
+        var failure: Exception? = null
+        while (recorder == null && attempt >= 1280) {
+            val w = if (ratio >= 1f) attempt else (attempt * ratio).toInt()
+            val h = if (ratio >= 1f) (attempt / ratio).toInt() else attempt
+            try {
+                val bitrate = if (attempt >= 3000) 20_000_000 else if (attempt >= 1900) 10_000_000 else 6_000_000
+                recorder = DualRecorder(context, w - w % 2, h - h % 2, bitrate, recordAudio)
+            } catch (e: Exception) {
+                failure = e
+                attempt = if (attempt > 1920) 1920 else attempt - 640
+            }
+        }
+        val rec = recorder ?: throw (failure ?: IllegalStateException("No video encoder"))
+        glStamp = stamp
+        glRecorder = rec
+        comp.setEncoder(rec.inputSurface)
+        comp.recorder = rec
+    }
+
     /** Pausar pågående inspelning – samma fil fortsätter när man återupptar. */
     fun pauseRecording(): Boolean {
+        glRecorder?.let { it.pause(); return true }
         if (activeRecordings.isEmpty()) return false
         activeRecordings.forEach { runCatching { it.pause() } }
         return true
@@ -515,6 +759,7 @@ class DualCameraController(private val context: Context) {
 
     /** Återupptar en pausad inspelning i samma fil. */
     fun resumeRecording(): Boolean {
+        glRecorder?.let { it.resume(); return true }
         if (activeRecordings.isEmpty()) return false
         activeRecordings.forEach { runCatching { it.resume() } }
         return true
@@ -560,6 +805,13 @@ class DualCameraController(private val context: Context) {
 
     /** Stoppar alla inspelningar; [then] körs när alla filer är färdigskrivna. */
     fun stopRecording(then: (() -> Unit)? = null) {
+        glRecorder?.let { rec ->
+            gl?.recorder = null
+            gl?.setEncoder(null)
+            glRecorder = null
+            rec.stop(context, "dualshot_combined_$glStamp") { then?.invoke() }
+            return
+        }
         if (activeRecordings.isEmpty()) { then?.invoke(); return }
         then?.let { stopWaiters += it }
         activeRecordings.toList().forEach { runCatching { it.stop() } }
@@ -600,7 +852,14 @@ class DualCameraController(private val context: Context) {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, "$displayName.mp4")
             put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/DualShots")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/DualShots")
+            } else {
+                // Android 7–9 saknar RELATIVE_PATH – peka ut sökvägen direkt i stället.
+                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "DualShots")
+                dir.mkdirs()
+                put(MediaStore.MediaColumns.DATA, File(dir, "$displayName.mp4").absolutePath)
+            }
         }
         return MediaStoreOutputOptions.Builder(
             context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI

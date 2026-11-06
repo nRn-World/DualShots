@@ -15,6 +15,10 @@ object PhotoSaver {
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/DualShots")
+            } else {
+                val dir = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "DualShots")
+                dir.mkdirs()
+                put(MediaStore.MediaColumns.DATA, java.io.File(dir, "$name.jpg").absolutePath)
             }
         }
         val resolver = context.contentResolver
