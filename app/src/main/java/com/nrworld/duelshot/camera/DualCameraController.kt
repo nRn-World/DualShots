@@ -1,6 +1,8 @@
 package com.nrworld.duelshot.camera
 
+import android.Manifest
 import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.os.Build
 import android.content.Context
 import android.provider.MediaStore
@@ -9,6 +11,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.view.TextureView
 import android.graphics.SurfaceTexture
 import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
@@ -439,6 +442,7 @@ class DualCameraController(private val context: Context) {
      * sensorns orientering (oftast liggande), så utan detta blir både stora bilden och
      * rutan 90 grader fel på en telefon som hålls stående.
      */
+    @androidx.annotation.OptIn(markerClass = [ExperimentalCamera2Interop::class])
     private fun applyGlRotations(comp: GlCompositor, cameras: List<Camera>, view: TextureView) {
         val target = when (view.display?.rotation ?: Surface.ROTATION_0) {
             Surface.ROTATION_90 -> 90
@@ -830,7 +834,11 @@ class DualCameraController(private val context: Context) {
         ctx: Context, name: String, audio: Boolean, executor: java.util.concurrent.Executor
     ): Recording {
         val pending = output.prepareRecording(ctx, mediaStoreOutput(ctx, name))
-        if (audio) pending.withAudioEnabled()
+        // Ljud bara när mikrofonen är tillåten – annars spelas videon tyst i stället för att kasta.
+        val micAllowed = ContextCompat.checkSelfPermission(
+            ctx, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (audio && micAllowed) pending.withAudioEnabled()
         val ref = arrayOfNulls<Recording>(1)
         val rec = pending.start(executor) { ev -> if (ev is VideoRecordEvent.Finalize) onFinalized(ref[0]) }
         ref[0] = rec

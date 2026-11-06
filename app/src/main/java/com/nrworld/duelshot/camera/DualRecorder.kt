@@ -1,7 +1,9 @@
 package com.nrworld.duelshot.camera
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaCodec
@@ -13,6 +15,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.Surface
+import androidx.core.content.ContextCompat
 import java.io.File
 import java.nio.ByteBuffer
 
@@ -29,6 +32,10 @@ class DualRecorder(
     private val withAudio: Boolean
 ) {
     private val file = File(context.cacheDir, "dual_${System.currentTimeMillis()}.mp4")
+    /** Ljud spelas bara in när mikrofonen är tillåten. */
+    private val audioAllowed = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.RECORD_AUDIO
+    ) == PackageManager.PERMISSION_GRANTED
     private val videoEnc: MediaCodec
     val inputSurface: Surface
 
@@ -63,8 +70,8 @@ class DualRecorder(
         inputSurface = videoEnc.createInputSurface()
         videoEnc.start()
 
-        if (withAudio) {
-            runCatching {
+        if (withAudio && audioAllowed) {
+            try {
                 val rate = 44100
                 val min = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 val rec = AudioRecord(
@@ -83,6 +90,10 @@ class DualRecorder(
                 rec.startRecording()
                 audioRecord = rec
                 audioEnc = enc
+            } catch (e: SecurityException) {
+                // Mikrofonen nekades – videon spelas in tyst.
+            } catch (e: Exception) {
+                // Ingen ljudkodare på enheten – videon spelas in tyst.
             }
         }
         videoThread = Thread({ drain(videoEnc, isVideo = true) }, "dual-video").also { it.start() }
