@@ -30,11 +30,14 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install SDK platform and build tools
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+        run: |
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(ls -1 "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin/sdkmanager | head -1)"
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" > /dev/null
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
