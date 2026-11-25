@@ -2210,6 +2210,20 @@ body.ref .device-inner { border-radius: 0; }
 .st-timer .st-seg { left: 560px; top: 15px; width: 320px; height: 51px; }
 .st-timer + .st-sec { margin-top: 22px; }
 .v5-settings { padding-bottom: 36px; }
+.st-footer-ver {
+  display: block;
+  width: 100%;
+  margin-top: 28px;
+  padding: 12px 0;
+  background: transparent;
+  border: 0;
+  text-align: center;
+  font-family: "Roboto Mono", var(--mono);
+  font-size: 16px;
+  letter-spacing: 1.4px;
+  color: #7d879c;
+  cursor: pointer;
+}
 .g-grid { margin-top: 22px; }
 .g-card { position: relative; cursor: pointer; }
 .s-range { display: inline-flex; align-items: center; justify-content: center; gap: 14px; }

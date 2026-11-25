@@ -68,7 +68,6 @@ fun HomeScreen(
     onOpenGallery: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTips: () -> Unit,
-    onOpenAbout: () -> Unit,
     onOpenEntry: (LibraryEntry) -> Unit
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -90,7 +89,6 @@ fun HomeScreen(
                         }
                 )
                 Brand(57, 31, 48)
-                RCircle(RefIconKind.USER, 917, 26, 62, 38, bg = Color(0xFF1C2335), onClick = onOpenAbout)
                 RText(
                     buildAnnotatedString {
                         append("RECORD BOTH SIDES.\n")

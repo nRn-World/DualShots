@@ -64,14 +64,6 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit) {
         Box(Modifier.fillMaxWidth().height(rv(131))) {
             Brand(63, 11, 53)
             RText("CUSTOMIZE YOUR EXPERIENCE", 63, 67, 18, 24, color = RefFaint, mono = true, ls = 3.1)
-            RText(
-                buildAnnotatedString {
-                    append("SETTINGS\n")
-                    withStyle(SpanStyle(color = RefFaint)) { append("V" + BuildConfig.VERSION_NAME) }
-                },
-                149, 27, 15, 23, color = RefLabel, mono = true, ls = 3, right = true
-            )
-            RCircle(RefIconKind.GEAR, 902, 14, 70, 38, onClick = onOpenAbout)
         }
 
         Section("RECORDING MODE", hint = true, top = 0)
@@ -151,7 +143,17 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit) {
             ToggleRow(RefIconKind.GRID4, "Grid", "Show 3×3 framing grid", vm.grid, true) { vm.grid = it }
             ToggleRow(RefIconKind.AUDIO, "Record Audio", "Capture microphone audio", vm.recordAudio, false) { vm.recordAudio = it }
         }
-        Spacer(Modifier.height(rv(40)))
+        Spacer(Modifier.height(rv(28)))
+        Box(
+            Modifier.fillMaxWidth().clickable(onClick = onOpenAbout).padding(vertical = rv(10)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "DualShots · v${BuildConfig.VERSION_NAME} · Made by nRnWorld",
+                color = RefFaint, fontSize = rs(16), fontFamily = FontFamily.Monospace, letterSpacing = rs(1.2)
+            )
+        }
+        Spacer(Modifier.height(rv(32)))
     }
 }
 

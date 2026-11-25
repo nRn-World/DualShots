@@ -139,7 +139,6 @@ fun DuelShotsApp(vm: AppViewModel) {
                                 onOpenGallery = { tab = Tab.GALLERY },
                                 onOpenSettings = { tab = Tab.SETTINGS },
                                 onOpenTips = { showTips = true },
-                                onOpenAbout = { showAbout = true },
                                 onOpenEntry = openEntry
                             )
                             Tab.GALLERY -> GalleryScreen(

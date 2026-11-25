@@ -2249,7 +2249,6 @@ function renderHome() {
       <section class="h-hero">
         <img class="h-art" src="assets/hero.webp" alt="" />
         ${brand('h-brand')}
-        <button class="v5-circle h-profile" data-about type="button" aria-label="About">${ICONS.user}</button>
         <p class="h-kicker">RECORD BOTH SIDES.<br><span>AT ONCE.</span></p>
         <h1 class="h-title">Two<br>Perspectives.<br><span>One Story.</span></h1>
         <p class="h-sub">Capture more. Create better.</p>
@@ -2598,8 +2597,6 @@ function renderSettings() {
       <header class="st-head">
         ${brand('st-brand')}
         <div class="v5-tagline st-tagline">CUSTOMIZE YOUR EXPERIENCE</div>
-        <span class="st-version">SETTINGS<br><em>V1.2.8</em></span>
-        <button class="v5-circle st-gear" data-about type="button" aria-label="About">${ICONS.gear}</button>
       </header>
 
       <div class="st-sec"><span class="v5-label">RECORDING MODE</span><span class="st-hint">RECORD BOTH SIDES. <em>AT ONCE.</em></span></div>
@@ -2671,6 +2668,8 @@ function renderSettings() {
             <button class="st-switch ${state[key] ? 'on' : ''}" data-toggle="${key}" type="button" role="switch" aria-checked="${!!state[key]}" aria-label="${title}"></button>
           </div>`).join('')}
       </div>
+
+      <button class="st-footer-ver" data-about type="button">DualShots · v1.2.8 · Made by nRnWorld</button>
     </div>`;
 
   $$('[data-mode]', screenEl).forEach((b) => b.addEventListener('click', () => {
