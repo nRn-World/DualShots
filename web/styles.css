@@ -2210,10 +2210,12 @@ body.ref .device-inner { border-radius: 0; }
 .st-timer .st-seg { left: 560px; top: 15px; width: 320px; height: 51px; }
 .st-timer + .st-sec { margin-top: 22px; }
 .v5-settings { padding-bottom: 36px; }
-.st-footer-ver {
-  display: block;
+.v5 .st-footer-ver {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  margin-top: 28px;
+  margin: 28px auto 0;
   padding: 12px 0;
   background: transparent;
   border: 0;

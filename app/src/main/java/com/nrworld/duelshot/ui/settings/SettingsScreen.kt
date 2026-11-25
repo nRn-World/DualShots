@@ -150,7 +150,9 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit) {
         ) {
             Text(
                 "DualShots · v${BuildConfig.VERSION_NAME} · Made by nRnWorld",
-                color = RefFaint, fontSize = rs(16), fontFamily = FontFamily.Monospace, letterSpacing = rs(1.2)
+                color = RefFaint, fontSize = rs(16), fontFamily = FontFamily.Monospace, letterSpacing = rs(1.2),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
         }
         Spacer(Modifier.height(rv(32)))
