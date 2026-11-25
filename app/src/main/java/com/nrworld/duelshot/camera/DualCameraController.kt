@@ -103,6 +103,9 @@ class DualCameraController(private val context: Context) {
     /** Ljud i inspelningen (inställningen Record Audio). */
     var recordAudio = true
 
+    /** Använd HEVC (H.265) i DualRecorder när valt i inställningarna. */
+    var useHevc = false
+
     /** Ficklampa på bakkameran; hålls kvar över ombindningar. */
     private var torchWanted = false
 
@@ -740,7 +743,7 @@ class DualCameraController(private val context: Context) {
             val h = if (ratio >= 1f) (attempt / ratio).toInt() else attempt
             try {
                 val bitrate = if (attempt >= 3000) 20_000_000 else if (attempt >= 1900) 10_000_000 else 6_000_000
-                recorder = DualRecorder(context, w - w % 2, h - h % 2, bitrate, recordAudio)
+                recorder = DualRecorder(context, w - w % 2, h - h % 2, bitrate, recordAudio, useHevc)
             } catch (e: Exception) {
                 failure = e
                 attempt = if (attempt > 1920) 1920 else attempt - 640

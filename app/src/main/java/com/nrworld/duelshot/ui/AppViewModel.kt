@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import com.nrworld.duelshot.data.AppPrefs
 import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.CodecOption
+import com.nrworld.duelshot.model.PipStyle
 import com.nrworld.duelshot.model.QualityOption
 import com.nrworld.duelshot.model.RecordingMode
 
@@ -50,11 +51,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         get() = saveAspectState
         set(v) { saveAspectState = v; prefs.saveAspect = v }
 
-    private var stabilizeState by mutableStateOf(prefs.stabilize)
-    var stabilize: Boolean
-        get() = stabilizeState
-        set(v) { stabilizeState = v; prefs.stabilize = v }
-
     private var gridState by mutableStateOf(prefs.grid)
     var grid: Boolean
         get() = gridState
@@ -65,8 +61,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         get() = audioState
         set(v) { audioState = v; prefs.recordAudio = v }
 
-    private var locationState by mutableStateOf(prefs.saveLocation)
-    var saveLocation: Boolean
-        get() = locationState
-        set(v) { locationState = v; prefs.saveLocation = v }
+    private var countdownState by mutableStateOf(prefs.countdownSec)
+    var countdownSec: Int
+        get() = countdownState
+        set(v) { countdownState = v; prefs.countdownSec = v }
+
+    private var pipStyleState by mutableStateOf(prefs.pipStyle)
+    var pipStyle: PipStyle
+        get() = pipStyleState
+        set(v) { pipStyleState = v; prefs.pipStyle = v }
+
+    private var favoritesState by mutableStateOf(prefs.favorites)
+    val favorites: Set<String> get() = favoritesState
+
+    fun toggleFavorite(key: String) {
+        val next = if (key in favoritesState) favoritesState - key else favoritesState + key
+        favoritesState = next
+        prefs.favorites = next
+    }
 }

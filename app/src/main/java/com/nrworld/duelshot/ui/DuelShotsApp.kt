@@ -97,7 +97,6 @@ fun DuelShotsApp(vm: AppViewModel) {
         if (!recording) library = withContext(Dispatchers.IO) { queryLibrary(context) }
     }
 
-    val soon: (String) -> Unit = { what -> Toast.makeText(context, "$what is coming soon", Toast.LENGTH_SHORT).show() }
     val openEntry: (LibraryEntry) -> Unit = { e ->
         if (e.item != null) openItem = e.item
         else Toast.makeText(context, "Sample clip – record a take to see your own here", Toast.LENGTH_SHORT).show()
@@ -121,7 +120,16 @@ fun DuelShotsApp(vm: AppViewModel) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Box(Modifier.weight(1f)) {
                     if (recording) {
-                        RecordScreen(vm = vm, onExit = { recording = false })
+                        RecordScreen(
+                            vm = vm,
+                            latestItem = library.firstOrNull(),
+                            onOpenLatest = { item ->
+                                recording = false
+                                openItem = item
+                            },
+                            onSaved = { reload++ },
+                            onExit = { recording = false }
+                        )
                     } else {
                         when (tab) {
                             Tab.HOME -> HomeScreen(
@@ -134,8 +142,15 @@ fun DuelShotsApp(vm: AppViewModel) {
                                 onOpenAbout = { showAbout = true },
                                 onOpenEntry = openEntry
                             )
-                            Tab.GALLERY -> GalleryScreen(library, openEntry, soon) { showAbout = true }
-                            Tab.STATS -> StatsScreen(library, soon)
+                            Tab.GALLERY -> GalleryScreen(
+                                library = library,
+                                favorites = vm.favorites,
+                                onToggleFavorite = { vm.toggleFavorite(it) },
+                                onOpenEntry = openEntry,
+                                onStartRecording = { recording = true },
+                                onOpenAbout = { showAbout = true }
+                            )
+                            Tab.STATS -> StatsScreen(library, vm.favorites)
                             Tab.SETTINGS -> SettingsScreen(vm, onOpenAbout = { showAbout = true })
                         }
                     }
@@ -146,8 +161,11 @@ fun DuelShotsApp(vm: AppViewModel) {
     }
 
     openItem?.let { item ->
+        val itemKey = (if (item.isPhoto) "p" else "v") + item.id
         MediaDialog(
             item = item,
+            isFavorite = itemKey in vm.favorites,
+            onToggleFavorite = { vm.toggleFavorite(itemKey) },
             onClose = { openItem = null },
             onShare = { shareItem(context, item) },
             onDelete = { pendingDelete = item; openItem = null }

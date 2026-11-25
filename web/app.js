@@ -65,6 +65,9 @@ const CODECS = {
 
 const STORE_KEY = 'duelshot_prefs';
 
+const PIP_STYLES = ['PIP', 'CIRCLE', 'SPLIT'];
+const PIP_STYLE_LABEL = { PIP: 'PiP', CIRCLE: 'Circle', SPLIT: '50/50' };
+
 const state = {
   page: 'HOME',
   record: false,
@@ -75,13 +78,16 @@ const state = {
   codec: 'MP4',
   audio: true,
   grid: true,
-  stabilize: true,
-  location: false,
+  countdownSec: 0,
+  pipStyle: 'PIP',
+  favorites: [],
   galleryFilter: 'ALL',
+  gallerySearchOpen: false,
+  galleryQuery: '',
   saveAspect: 'AUTO',
   zoom: { main: 1, inset: 1 },
   stack: 'front-first',
-  pip: { cx: 0.74, cy: 0.24, scale: 0.34 },
+  pip: { cx: 0.74, cy: 0.30, scale: 0.34 },
   pipOff: false,
   pipPaused: false,
   mainPaused: false,
@@ -274,8 +280,9 @@ function savePrefs() {
       codec: state.codec,
       audio: state.audio,
       grid: state.grid,
-      stabilize: state.stabilize,
-      location: state.location,
+      countdownSec: state.countdownSec,
+      pipStyle: state.pipStyle,
+      favorites: state.favorites,
       saveAspect: state.saveAspect,
       pip: state.pip,
       swap: state.swap,
@@ -298,8 +305,9 @@ function loadPrefs() {
     state.onboarded = !!p.onboarded;
     if (typeof p.audio === 'boolean') state.audio = p.audio;
     if (typeof p.grid === 'boolean') state.grid = p.grid;
-    if (typeof p.stabilize === 'boolean') state.stabilize = p.stabilize;
-    if (typeof p.location === 'boolean') state.location = p.location;
+    if (p.countdownSec === 0 || p.countdownSec === 3 || p.countdownSec === 5) state.countdownSec = p.countdownSec;
+    if (PIP_STYLES.includes(p.pipStyle)) state.pipStyle = p.pipStyle;
+    if (Array.isArray(p.favorites)) state.favorites = p.favorites.filter((x) => typeof x === 'string');
     if (p.saveAspect === 'AUTO' || ASPECTS[p.saveAspect]) state.saveAspect = p.saveAspect;
     if (p.pip && Number.isFinite(p.pip.cx) && Number.isFinite(p.pip.cy) && Number.isFinite(p.pip.scale)) {
       state.pip = {
@@ -950,13 +958,30 @@ function drawOutput(o) {
     const big = cam.feeds[bigKey];
     const small = cam.feeds[smallKey];
 
+    if (state.pipStyle === 'SPLIT' && small && !state.pipOff) {
+      const half = Math.round(h / 2);
+      if (big && !state.mainPaused) {
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, 0, w, half); ctx.clip();
+        drawCover(ctx, big.el, w, half, big.mirror, zoom.main);
+        ctx.restore();
+      }
+      ctx.save();
+      ctx.translate(0, half);
+      ctx.beginPath(); ctx.rect(0, 0, w, h - half); ctx.clip();
+      if (!state.pipPaused) drawCover(ctx, small.el, w, h - half, small.mirror, zoom.inset);
+      ctx.restore();
+      return;
+    }
+
     if (big && !state.mainPaused) drawBig(ctx, big, bigKey, w, h, zoom.main);
     if (small && !state.pipOff) {
-      const aspectKey = smallKey === 'back'
+      const isCircle = state.pipStyle === 'CIRCLE';
+      const aspectKey = isCircle ? 'R_1_1' : (smallKey === 'back'
         ? ((rec.take && rec.take.backAspect) || state.backAspect)
-        : ((rec.take && rec.take.frontAspect) || state.frontAspect);
+        : ((rec.take && rec.take.frontAspect) || state.frontAspect));
       const g = pipRect(w, h, aspectKey, currentPip());
-      const radius = Math.round(Math.min(g.w, g.h) * 0.07);
+      const radius = isCircle ? Math.round(Math.min(g.w, g.h) / 2) : Math.round(Math.min(g.w, g.h) * 0.07);
       ctx.save();
       ctx.translate(g.x, g.y);
       roundRect(ctx, 0, 0, g.w, g.h, radius);
@@ -1051,6 +1076,7 @@ async function takePhoto() {
   }
   if (!photos.length) { toast('Could not take a photo here'); return; }
   state.clips.unshift(...photos);
+  refreshRecord();
   if (recDom.preview) {
     recDom.preview.classList.remove('flash');
     void recDom.preview.offsetWidth;
@@ -1274,6 +1300,41 @@ function setRecordMessage(msg) {
    SCREEN: RECORD
    ===================================================================== */
 
+let countdownTimer = 0;
+let countdownLeft = 0;
+
+function cancelCountdown() {
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = 0; }
+  countdownLeft = 0;
+  if (recDom.countdownOverlay) {
+    recDom.countdownOverlay.hidden = true;
+    recDom.countdownOverlay.textContent = '';
+  }
+}
+
+function triggerRecordClick() {
+  if (countdownLeft > 0) { cancelCountdown(); toast('Countdown cancelled'); return; }
+  if (rec.active) { stopRecording(); return; }
+  if (state.countdownSec > 0) {
+    countdownLeft = state.countdownSec;
+    if (recDom.countdownOverlay) {
+      recDom.countdownOverlay.textContent = String(countdownLeft);
+      recDom.countdownOverlay.hidden = false;
+    }
+    countdownTimer = setInterval(() => {
+      countdownLeft -= 1;
+      if (countdownLeft <= 0) {
+        cancelCountdown();
+        startRecording();
+      } else if (recDom.countdownOverlay) {
+        recDom.countdownOverlay.textContent = String(countdownLeft);
+      }
+    }, 1000);
+  } else {
+    startRecording();
+  }
+}
+
 function buildRecordShell() {
   screenEl.innerHTML = `
     <div class="record" id="record-root">
@@ -1282,6 +1343,8 @@ function buildRecordShell() {
         <span class="timer"><span class="dot"></span><span id="rec-timer">00:00:00</span></span>
         <button class="icon-chip" id="rec-pause" type="button" aria-label="Pause recording" hidden>${ICONS.pause}</button>
         <span class="spacer"></span>
+        <button class="icon-chip" id="rec-audio" type="button" aria-label="Toggle microphone">${state.audio ? ICONS.audio : ICONS.mute}</button>
+        <button class="icon-chip rec-timer-chip" id="rec-countdown" type="button" aria-label="Countdown timer">${state.countdownSec ? `${state.countdownSec}s` : '0s'}</button>
         <button class="icon-chip" id="rec-grid" type="button" aria-label="Grid">${ICONS.grid}</button>
         <button class="icon-chip" id="rec-mode" type="button" aria-label="Camera setup">${ICONS.settings}</button>
       </div>
@@ -1289,6 +1352,7 @@ function buildRecordShell() {
       <div class="rec-preview" id="rec-preview">
         <div class="feeds" id="rec-feeds"></div>
         <div class="rec-grid" id="rec-grid-layer"></div>
+        <div class="rec-countdown-overlay" id="rec-countdown-overlay" hidden></div>
       </div>
 
       <div class="rec-status" id="rec-status">
@@ -1302,8 +1366,10 @@ function buildRecordShell() {
         <button class="dock-btn" id="rec-photo" type="button" aria-label="Take photo">${ICONS.camera}</button>
         <button class="shutter" id="rec-btn" type="button" aria-label="Record"><i></i></button>
         <button class="dock-btn" id="rec-flip" type="button" aria-label="Switch camera">${ICONS.flipCam}</button>
+        <button class="zoom-chip" id="rec-layout" type="button" aria-label="Dual View layout">${PIP_STYLE_LABEL[state.pipStyle]}</button>
         <button class="dock-btn" id="rec-swap" type="button" aria-label="Swap large and small camera">${ICONS.swap}</button>
         <button class="dock-btn" id="rec-pip" type="button" aria-label="Hide small camera">${ICONS.pip}</button>
+        <button class="rec-thumb" id="rec-thumb" type="button" aria-label="Latest recording" hidden></button>
       </div>
     </div>`;
 
@@ -1316,9 +1382,40 @@ function buildRecordShell() {
   recDom.saved = $('#rec-saved');
   recDom.timer = $('#rec-timer');
   recDom.pauseBtn = $('#rec-pause');
+  recDom.audioBtn = $('#rec-audio');
+  recDom.countdownBtn = $('#rec-countdown');
+  recDom.countdownOverlay = $('#rec-countdown-overlay');
+  recDom.layoutBtn = $('#rec-layout');
+  recDom.thumb = $('#rec-thumb');
   recDom.gridBtn = $('#rec-grid');
   recDom.gridLayer = $('#rec-grid-layer');
   recDom.pauseBtn.addEventListener('click', () => (rec.paused ? resumeTake() : pauseTake()));
+  recDom.audioBtn.addEventListener('click', () => {
+    if (rec.active) { toast('Audio setting applies to the next take'); return; }
+    state.audio = !state.audio;
+    savePrefs();
+    refreshRecord();
+    toast(state.audio ? 'Microphone on' : 'Microphone muted');
+  });
+  recDom.countdownBtn.addEventListener('click', () => {
+    if (rec.active || countdownLeft > 0) return;
+    state.countdownSec = state.countdownSec === 0 ? 3 : (state.countdownSec === 3 ? 5 : 0);
+    savePrefs();
+    refreshRecord();
+    toast(state.countdownSec ? `Countdown ${state.countdownSec}s` : 'Countdown off');
+  });
+  recDom.layoutBtn.addEventListener('click', () => {
+    const idx = PIP_STYLES.indexOf(state.pipStyle);
+    state.pipStyle = PIP_STYLES[(idx + 1) % PIP_STYLES.length];
+    savePrefs();
+    mountFeeds();
+    refreshRecord();
+    toast(`Layout: ${PIP_STYLE_LABEL[state.pipStyle]}`);
+  });
+  recDom.thumb.addEventListener('click', () => {
+    if (rec.active || !state.clips.length) return;
+    playClip(state.clips[0]);
+  });
   recDom.gridBtn.addEventListener('click', () => {
     state.grid = !state.grid;
     savePrefs();
@@ -1353,6 +1450,7 @@ function buildRecordShell() {
   });
 
   $('#rec-close').addEventListener('click', async () => {
+    cancelCountdown();
     if (rec.active) await stopRecording();
     closeRecord();
   });
@@ -1366,10 +1464,7 @@ function buildRecordShell() {
   });
   $('#rec-mode').addEventListener('click', mountCameraSheet);
   $('#rec-photo').addEventListener('click', takePhoto);
-  recDom.btn.addEventListener('click', () => {
-    if (rec.active) stopRecording();
-    else startRecording();
-  });
+  recDom.btn.addEventListener('click', triggerRecordClick);
   recDom.zoom.addEventListener('click', () => {
     state.zoom.main = state.zoom.main >= ZOOM_MAX - 0.5
       ? ZOOM_MIN
@@ -1535,6 +1630,24 @@ function mountFeeds() {
     const big = cam.feeds[bigKey];
     const small = cam.feeds[smallKey];
 
+    if (state.pipStyle === 'SPLIT' && small && !state.pipOff) {
+      const topTile = makeTile(bigKey.toUpperCase());
+      topTile.classList.toggle('paused', !!state.mainPaused);
+      topTile.appendChild(buildMainControls());
+      if (big) {
+        if (big.mirror) topTile.classList.add('mirror');
+        topTile.appendChild(big.el);
+      }
+      const botTile = makeTile(smallKey.toUpperCase());
+      botTile.classList.toggle('paused', !!state.pipPaused);
+      if (small) {
+        if (small.mirror) botTile.classList.add('mirror');
+        botTile.appendChild(small.el);
+      }
+      stage.append(topTile, botTile);
+      return;
+    }
+
     const tile = makeTile(bigKey.toUpperCase());
     tile.classList.toggle('paused', !!state.mainPaused);
     tile.appendChild(buildMainControls());
@@ -1545,9 +1658,10 @@ function mountFeeds() {
     }
 
     if (small && !state.pipOff) {
+      const isCircle = state.pipStyle === 'CIRCLE';
       const pip = document.createElement('div');
-      pip.className = 'pip' + (small.mirror ? ' mirror' : '') + (state.pipPaused ? ' paused' : '');
-      const a = ASPECTS[smallKey === 'back' ? take.backAspect : take.frontAspect];
+      pip.className = 'pip' + (small.mirror ? ' mirror' : '') + (state.pipPaused ? ' paused' : '') + (isCircle ? ' circle' : '');
+      const a = isCircle ? ASPECTS.R_1_1 : ASPECTS[smallKey === 'back' ? take.backAspect : take.frontAspect];
       pip.style.setProperty('--pip-ratio', `${a.w} / ${a.h}`);
       pip.appendChild(small.el);
 
@@ -1569,7 +1683,7 @@ function mountFeeds() {
 
       tile.appendChild(pip);
       recDom.pip = pip;
-      recDom.pipAspect = smallKey === 'back' ? take.backAspect : take.frontAspect;
+      recDom.pipAspect = isCircle ? 'R_1_1' : (smallKey === 'back' ? take.backAspect : take.frontAspect);
       applyPipStyle();
       wirePipResize(handle);
       applyZoom();
@@ -1793,6 +1907,24 @@ function refreshRecord() {
   if (recDom.root) recDom.root.classList.toggle('recording', rec.active);
   const dual = !!(cam.feeds.back && cam.feeds.front);
   const isDualView = activeTake().mode === 'DUAL_VIEW';
+  if (recDom.layoutBtn) {
+    recDom.layoutBtn.hidden = !dual || !isDualView;
+    recDom.layoutBtn.textContent = PIP_STYLE_LABEL[state.pipStyle];
+    recDom.layoutBtn.classList.toggle('active', state.pipStyle !== 'PIP');
+  }
+  if (recDom.audioBtn) {
+    recDom.audioBtn.innerHTML = state.audio ? ICONS.audio : ICONS.mute;
+    recDom.audioBtn.classList.toggle('muted', !state.audio);
+  }
+  if (recDom.countdownBtn) {
+    recDom.countdownBtn.textContent = state.countdownSec ? `${state.countdownSec}s` : '0s';
+    recDom.countdownBtn.classList.toggle('on', state.countdownSec > 0);
+  }
+  if (recDom.thumb) {
+    const latest = state.clips[0];
+    recDom.thumb.hidden = rec.active || !latest;
+    recDom.thumb.innerHTML = latest && latest.poster ? `<img src="${latest.poster}" alt="" />` : ICONS.gallery;
+  }
   if (recDom.swap) {
     recDom.swap.hidden = !dual || !isDualView;
     recDom.swap.classList.toggle('swapped', state.swap);
@@ -2029,6 +2161,20 @@ const DEMO_CLIPS = [
 
 const isDemo = () => state.clips.length === 0;
 
+function isFavorite(id) {
+  return Array.isArray(state.favorites) && state.favorites.includes(id);
+}
+
+function toggleFavorite(id) {
+  if (!Array.isArray(state.favorites)) state.favorites = [];
+  if (state.favorites.includes(id)) {
+    state.favorites = state.favorites.filter((x) => x !== id);
+  } else {
+    state.favorites = [...state.favorites, id];
+  }
+  savePrefs();
+}
+
 function clipDateText(c) {
   return c.when instanceof Date && !Number.isNaN(c.when.getTime())
     ? c.when.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -2066,7 +2212,6 @@ function openItem(id) {
 
 function bindCommon(root) {
   $$('[data-item]', root).forEach((el) => el.addEventListener('click', () => openItem(el.dataset.item)));
-  $$('[data-soon]', root).forEach((el) => el.addEventListener('click', () => toast(`${el.dataset.soon} is coming soon`)));
   $$('[data-go]', root).forEach((el) => el.addEventListener('click', () => go(el.dataset.go)));
   $$('[data-about]', root).forEach((el) => el.addEventListener('click', showAbout));
 }
@@ -2128,16 +2273,21 @@ function renderHome() {
 
       <section class="h-panel">
         <h2>Recent Recordings</h2>
-        <button class="v5-seeall h-seeall" data-go="GALLERY" type="button">See All ${ICONS.chevron}</button>
-        <div class="h-items">
-          ${recent.map((i) => `
-            <button class="h-item" data-item="${i.id}" type="button">
-              <span class="h-thumb">${thumbHTML(i)}</span>
-              <span class="h-ititle">${esc(i.name)}</span>
-              <span class="h-idate">${esc(i.date)}</span>
-              <span class="v5-dots">${ICONS.dots}</span>
-            </button>`).join('')}
-        </div>
+        ${recent.length ? `<button class="v5-seeall h-seeall" data-go="GALLERY" type="button">See All ${ICONS.chevron}</button>` : ''}
+        ${recent.length ? `
+          <div class="h-items">
+            ${recent.map((i) => `
+              <button class="h-item" data-item="${i.id}" type="button">
+                <span class="h-thumb">${thumbHTML(i)}</span>
+                <span class="h-ititle">${esc(i.name)}</span>
+                <span class="h-idate">${esc(i.date)}</span>
+                <span class="v5-dots">${ICONS.dots}</span>
+              </button>`).join('')}
+          </div>` : `
+          <div class="h-empty">
+            <b>No recordings yet</b>
+            <span>Tap Start Recording above to capture your first dual-camera clip.</span>
+          </div>`}
       </section>
     </div>`;
 
@@ -2153,37 +2303,32 @@ const FILTERS = [
   ['VIDEOS', 'Videos', ICONS.video],
   ['PHOTOS', 'Photos', ICONS.photo],
   ['FAVORITES', 'Favorites', ICONS.heart],
-  ['DELETED', 'Deleted', ICONS.trash],
 ];
 
 const fmtSize = (mbVal) => (mbVal >= 1024 ? `${(mbVal / 1024).toFixed(1)} GB` : `${mbVal} MB`);
 
 function renderGallery() {
-  const demo = isDemo();
   const filter = state.galleryFilter || 'ALL';
-  const items = libraryItems().filter((i) => (filter === 'ALL')
-    || (filter === 'VIDEOS' && i.kind !== 'photo')
-    || (filter === 'PHOTOS' && i.kind === 'photo'));
+  const q = String(state.galleryQuery || '').trim().toLowerCase();
+  const items = libraryItems().filter((i) => {
+    const okFilter = (filter === 'ALL')
+      || (filter === 'VIDEOS' && i.kind !== 'photo')
+      || (filter === 'PHOTOS' && i.kind === 'photo')
+      || (filter === 'FAVORITES' && isFavorite(i.id));
+    return okFilter && (!q || i.name.toLowerCase().includes(q));
+  });
   const showList = items.length > 0;
   const videos = state.clips.filter((c) => c.kind !== 'photo');
   const photos = state.clips.filter((c) => c.kind === 'photo');
   const videoMb = videos.reduce((sum, c) => sum + (c.sizeMb || 0), 0);
   const photoMb = photos.reduce((sum, c) => sum + (c.sizeMb || 0), 0);
   const totalMb = videoMb + photoMb;
-  const folders = [
-    ['All Videos', `<img src="assets/folder-all.webp" alt="" />`, demo ? 86 : videos.length, 'photo'],
-    ['Favorites', ICONS.heart, demo ? 12 : 0, 'warm'],
-    ['Trips', ICONS.mountain, demo ? 24 : 0, ''],
-    ['Events', ICONS.calendar, demo ? 8 : 0, ''],
-  ];
-  const storage = demo
-    ? { label: '12.4 GB of 64 GB used', video: 17.5, photo: 1.9, legend: ['Videos (11.2 GB)', 'Photos (1.2 GB)', 'Other (0 GB)'] }
-    : {
-      label: `${fmtSize(totalMb)} recorded`,
-      video: Math.min(100, (videoMb / 1024) * 100),
-      photo: Math.min(100, (photoMb / 1024) * 100),
-      legend: [`Videos (${fmtSize(videoMb)})`, `Photos (${fmtSize(photoMb)})`, 'Other (0 MB)'],
-    };
+  const storage = {
+    label: `${fmtSize(totalMb)} recorded`,
+    video: Math.min(100, (videoMb / 1024) * 100),
+    photo: Math.min(100, (photoMb / 1024) * 100),
+    legend: [`Videos (${fmtSize(videoMb)})`, `Photos (${fmtSize(photoMb)})`],
+  };
   const filterLabel = (FILTERS.find(([k]) => k === filter) || FILTERS[0])[1];
 
   screenEl.innerHTML = `
@@ -2191,43 +2336,31 @@ function renderGallery() {
       <header class="g-head">
         ${brand('g-brand')}
         <div class="v5-tagline g-tagline">YOUR MOMENTS. TWO PERSPECTIVES.</div>
-        <button class="v5-circle g-search" data-soon="Search" type="button" aria-label="Search">${ICONS.search}</button>
+        <button class="v5-circle g-search ${state.gallerySearchOpen ? 'active' : ''}" id="g-search-btn" type="button" aria-label="Search">${ICONS.search}</button>
         <button class="v5-circle g-more" data-about type="button" aria-label="More">${ICONS.dots}</button>
       </header>
+
+      ${state.gallerySearchOpen ? `
+        <div class="g-searchbar">
+          ${ICONS.search}
+          <input id="g-search-input" type="search" placeholder="Search clips and photos…" value="${esc(state.galleryQuery || '')}" />
+          ${state.galleryQuery ? '<button id="g-search-clear" type="button">Clear</button>' : ''}
+        </div>` : ''}
 
       <div class="g-chips">
         ${FILTERS.map(([k, label, icon]) => `
           <button class="g-chip g-chip-${k.toLowerCase()} ${filter === k ? 'active' : ''}" data-filter="${k}" type="button">${icon}<span>${label}</span></button>`).join('')}
       </div>
 
-      <div class="g-banner">
-        <span class="g-banner-ico">${ICONS.cloud}</span>
-        <b>Back up your recordings</b>
-        <span class="g-banner-sub">Keep your memories safe in the cloud.</span>
-        <button class="g-banner-btn" data-soon="Cloud backup" type="button">Enable Backup ${ICONS.chevron}</button>
-      </div>
-
       ${showList ? `
-        <div class="g-sechead"><h2>Recent</h2><button class="v5-seeall" data-soon="See all" type="button">See All ${ICONS.chevron}</button></div>
         <div class="g-grid">
           ${items.map((i) => `
-            <button class="g-card" data-item="${i.id}" type="button">
+            <div class="g-card" data-item="${i.id}" role="button" tabindex="0">
               <span class="g-thumb">${thumbHTML(i)}</span>
               <span class="g-ctitle">${esc(i.name)}</span>
               <span class="g-cdate">${esc(i.date)}</span>
-              <span class="v5-dots">${ICONS.dots}</span>
-            </button>`).join('')}
-        </div>
-
-        <div class="g-sechead g-folders-head"><h2>Folders</h2><button class="v5-seeall" data-soon="Folders" type="button">See All ${ICONS.chevron}</button></div>
-        <div class="g-folders">
-          ${folders.map(([name, icon, n, tone]) => `
-            <button class="g-folder" data-soon="Folders" type="button">
-              <span class="g-fico ${tone}">${icon}</span>
-              <b>${name}</b>
-              <span class="g-fcount">${n} items</span>
-              <span class="g-fchev">${ICONS.chevron}</span>
-            </button>`).join('')}
+              <button class="g-fav ${isFavorite(i.id) ? 'on' : ''}" data-fav="${i.id}" type="button" aria-label="Favorite">${ICONS.heart}</button>
+            </div>`).join('')}
         </div>
 
         <div class="g-storage">
@@ -2237,19 +2370,46 @@ function renderGallery() {
           <div class="g-legend">
             <span><i class="dot o"></i>${storage.legend[0]}</span>
             <span><i class="dot g"></i>${storage.legend[1]}</span>
-            <span><i class="dot d"></i>${storage.legend[2]}</span>
           </div>
-          <button class="g-manage" data-soon="Storage management" type="button">Manage Storage ${ICONS.chevron}</button>
         </div>` : `
         <div class="g-empty">
-          <span class="g-empty-ico">${filter === 'DELETED' ? ICONS.trash : filter === 'PHOTOS' ? ICONS.photo : ICONS.heart}</span>
-          <b>No ${filterLabel.toLowerCase()} yet</b>
-          <span>Nothing to show here yet.</span>
+          <span class="g-empty-ico">${filter === 'PHOTOS' ? ICONS.photo : filter === 'FAVORITES' ? ICONS.heart : ICONS.video}</span>
+          <b>${q ? `No matches for "${esc(state.galleryQuery)}"` : `No ${filterLabel.toLowerCase()} yet`}</b>
+          <span>${state.clips.length === 0 ? 'Record your first dual-camera video or photo — it will appear right here.' : 'Try another filter or record a new clip.'}</span>
+          ${state.clips.length === 0 ? '<button class="g-empty-cta" id="g-start-btn" type="button">Start Recording</button>' : ''}
         </div>`}
     </div>`;
 
+  $('#g-search-btn').addEventListener('click', () => {
+    state.gallerySearchOpen = !state.gallerySearchOpen;
+    if (!state.gallerySearchOpen) state.galleryQuery = '';
+    renderGallery();
+    if (state.gallerySearchOpen) {
+      const inp = $('#g-search-input');
+      if (inp) inp.focus();
+    }
+  });
+  const searchInp = $('#g-search-input');
+  if (searchInp) {
+    searchInp.addEventListener('input', (e) => {
+      state.galleryQuery = e.target.value;
+      renderGallery();
+      const el = $('#g-search-input');
+      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    });
+  }
+  const clearBtn = $('#g-search-clear');
+  if (clearBtn) clearBtn.addEventListener('click', () => { state.galleryQuery = ''; renderGallery(); });
+  const startBtn = $('#g-start-btn');
+  if (startBtn) startBtn.addEventListener('click', openRecord);
+
   $$('[data-filter]', screenEl).forEach((b) => b.addEventListener('click', () => {
     state.galleryFilter = b.dataset.filter;
+    renderGallery();
+  }));
+  $$('[data-fav]', screenEl).forEach((b) => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleFavorite(b.dataset.fav);
     renderGallery();
   }));
   bindCommon(screenEl);
@@ -2257,30 +2417,15 @@ function renderGallery() {
 
 /* --------------------------------------------------------------- stats */
 
-const DEMO_STATS = {
-  total: 24, totalDelta: '+60%',
-  cards: [
-    ['camera', 'RECORDING TIME', '52 min', '+32%'],
-    ['database', 'STORAGE USED', '2.4 GB', '+18%'],
-    ['film', 'AVERAGE LENGTH', '2:10', '+12%'],
-    ['star', 'FAVORITES', '8 clips', '+100%'],
-  ],
-  days: [['Mon', '12 Aug'], ['Tue', '13 Aug'], ['Wed', '14 Aug'], ['Thu', '15 Aug'], ['Fri', '16 Aug'], ['Sat', '17 Aug'], ['Sun', '18 Aug']],
-  series: {
-    clips: [3, 5, 8, 6, 4, 7, 9],
-    minutes: [6, 11, 17, 13, 9, 15, 19],
-    storage: [0.3, 0.5, 0.8, 0.6, 0.4, 0.7, 0.9],
-  },
-  usage: [75, 15, 10],
-  storage: { label: '2.4 GB of 64 GB used', pct: 40, rows: ['2.1 GB', '0.3 GB', '0.0 GB'] },
-};
-
 function realStats() {
   const clips = state.clips.filter((c) => c.kind !== 'photo');
+  const photos = state.clips.filter((c) => c.kind === 'photo');
   const secs = clips.map(clipSeconds);
   const totalSec = secs.reduce((a, b) => a + b, 0);
   const totalMb = clips.reduce((s, c) => s + (c.sizeMb || 0), 0);
+  const photoMb = photos.reduce((s, c) => s + (c.sizeMb || 0), 0);
   const avg = clips.length ? Math.round(totalSec / clips.length) : 0;
+  const favCount = state.clips.filter((c) => isFavorite(c.id)).length;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const days = [];
@@ -2298,18 +2443,21 @@ function realStats() {
   const n = clips.length || 1;
   const both = by('combined');
   const front = by('front');
+  const backCount = Math.max(0, clips.length - both - front);
   return {
     total: clips.length, totalDelta: '',
     cards: [
       ['camera', 'RECORDING TIME', `${Math.round(totalSec / 60)} min`, ''],
-      ['database', 'STORAGE USED', fmtSize(totalMb), ''],
+      ['database', 'STORAGE USED', fmtSize(totalMb + photoMb), ''],
       ['film', 'AVERAGE LENGTH', `${Math.floor(avg / 60)}:${String(avg % 60).padStart(2, '0')}`, ''],
-      ['star', 'FAVORITES', '0 clips', ''],
+      ['star', 'FAVORITES', `${favCount} clips`, ''],
     ],
     days,
     series,
-    usage: [Math.round((both / n) * 100), Math.round((front / n) * 100), Math.round(((n - both - front) / n) * 100)],
-    storage: { label: `${fmtSize(totalMb)} recorded`, pct: Math.min(100, (totalMb / 1024) * 100), rows: [fmtSize(totalMb), '0 MB', '0 MB'] },
+    usage: clips.length
+      ? [Math.round((both / n) * 100), Math.round((front / n) * 100), Math.round((backCount / n) * 100)]
+      : [0, 0, 0],
+    storage: { label: `${fmtSize(totalMb + photoMb)} recorded`, pct: Math.min(100, ((totalMb + photoMb) / 1024) * 100), rows: [fmtSize(totalMb), fmtSize(photoMb), '0 MB'] },
   };
 }
 
@@ -2321,7 +2469,7 @@ function chartScale(values) {
 }
 
 function renderStats() {
-  const s = state.clips.some((c) => c.kind !== 'photo') ? realStats() : DEMO_STATS;
+  const s = realStats();
   const metric = state.statsMetric || 'clips';
   const values = s.series[metric];
   const top = chartScale(values);
@@ -2335,7 +2483,7 @@ function renderStats() {
         ${brand('s-brand')}
         <h1 class="s-title">Stats</h1>
         <p class="s-sub">Your DualShots recording history</p>
-        <button class="s-range" data-soon="Date range" type="button">${ICONS.calendar}<span>Last 7 days</span>${ICONS.chevDown}</button>
+        <span class="s-range">${ICONS.calendar}<span>Last 7 days</span></span>
       </header>
 
       <section class="s-total">
@@ -2422,13 +2570,12 @@ const MODE_SUBS = {
 };
 
 const SETTING_TOGGLES = [
-  ['stabilize', 'Stabilization', 'Reduce camera shake', ICONS.stabilize],
-  ['grid', 'Grid', 'Show grid while recording', ICONS.grid4],
-  ['audio', 'Record Audio', 'Include audio from both cameras', ICONS.audio],
-  ['location', 'Save Location', 'Add location info to your videos', ICONS.pin],
+  ['grid', 'Grid', 'Show 3×3 framing grid', ICONS.grid4],
+  ['audio', 'Record Audio', 'Capture microphone audio', ICONS.audio],
 ];
 
 const CAMERA_ASPECTS = ['R_9_16', 'R_16_9', 'R_1_1'];
+const ASPECT_HINTS = { R_9_16: 'Reels', R_16_9: 'YouTube', R_1_1: 'Feed' };
 
 function cameraCardHTML(title, icon, key, attr) {
   return `
@@ -2437,7 +2584,8 @@ function cameraCardHTML(title, icon, key, attr) {
       <b>${title}</b>
       <div class="st-chips">
         ${CAMERA_ASPECTS.map((k) => {
-    const [short, word] = ASPECTS[k].label.split(' ');
+    const short = ASPECTS[k].short;
+    const word = ASPECT_HINTS[k] || '';
     return `<button class="st-chip ${state[key] === k ? 'active' : ''}" data-${attr}="${k}" type="button"><b>${short}</b><span>${word}</span></button>`;
   }).join('')}
       </div>
@@ -2503,6 +2651,16 @@ function renderSettings() {
         <span class="st-rchev">${ICONS.chevron}</span>
       </div>
 
+      <div class="st-sec"><span class="v5-label">COUNTDOWN TIMER</span></div>
+      <div class="st-row st-timer">
+        <span class="st-rico">${ICONS.calendar}</span>
+        <b>Timer</b>
+        <span class="st-rsub">Delay before recording starts</span>
+        <div class="st-seg">
+          ${[0, 3, 5].map((sec) => `<button class="${state.countdownSec === sec ? 'active' : ''}" data-timer="${sec}" type="button">${sec ? `${sec}s` : 'Off'}</button>`).join('')}
+        </div>
+      </div>
+
       <div class="st-sec"><span class="v5-label">ADDITIONAL SETTINGS</span></div>
       <div class="st-toggles">
         ${SETTING_TOGGLES.map(([key, title, sub, icon]) => `
@@ -2551,6 +2709,12 @@ function renderSettings() {
     renderSettings();
   }));
 
+  $$('[data-timer]', screenEl).forEach((b) => b.addEventListener('click', () => {
+    state.countdownSec = Number(b.dataset.timer) || 0;
+    savePrefs();
+    renderSettings();
+  }));
+
   $$('[data-toggle]', screenEl).forEach((b) => b.addEventListener('click', () => {
     const key = b.dataset.toggle;
     state[key] = !state[key];
@@ -2561,12 +2725,16 @@ function renderSettings() {
   bindCommon(screenEl);
 }
 
-/* GalleryScreen.kt: spelare i dialog med Share / Delete / Close. */
+/* GalleryScreen.kt: spelare i dialog med Favorite / Share / Delete / Close. */
 function playClip(clip) {
+  const fav = isFavorite(clip.id);
   modalRoot.innerHTML = `
     <div class="modal">
       <div class="dialog clip-dialog">
-        <div class="clip-dialog-name">${esc(clip.name)}</div>
+        <div class="clip-dialog-head">
+          <div class="clip-dialog-name">${esc(clip.name)}</div>
+          <button class="clip-fav-btn ${fav ? 'on' : ''}" data-clip-fav type="button" aria-label="Favorite">${ICONS.heart}</button>
+        </div>
         ${clip.kind === 'photo'
       ? `<img class="clip-video" src="${clip.url}" alt="${esc(clip.name)}" />`
       : `<video class="clip-video" src="${clip.url}" controls autoplay playsinline></video>`}
@@ -2582,6 +2750,11 @@ function playClip(clip) {
   const backdrop = $('.modal', modalRoot);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
   wireSheet();
+  $('[data-clip-fav]', modalRoot).addEventListener('click', () => {
+    toggleFavorite(clip.id);
+    playClip(clip);
+    if (!state.record) render();
+  });
   $('[data-share]', modalRoot).addEventListener('click', () => shareClip(clip));
   $('[data-delete]', modalRoot).addEventListener('click', () => confirmDeleteClip(clip));
 }

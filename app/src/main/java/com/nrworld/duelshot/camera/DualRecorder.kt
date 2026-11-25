@@ -29,7 +29,8 @@ class DualRecorder(
     val outW: Int,
     val outH: Int,
     bitrate: Int,
-    private val withAudio: Boolean
+    private val withAudio: Boolean,
+    useHevc: Boolean = false
 ) {
     private val file = File(context.cacheDir, "dual_${System.currentTimeMillis()}.mp4")
     /** Ljud spelas bara in när mikrofonen är tillåten. */
@@ -59,14 +60,24 @@ class DualRecorder(
     private var audioThread: Thread? = null
 
     init {
-        val fmt = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, outW, outH).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
-            setInteger(MediaFormat.KEY_FRAME_RATE, 30)
-            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+        fun buildEncoder(mime: String): MediaCodec {
+            val fmt = MediaFormat.createVideoFormat(mime, outW, outH).apply {
+                setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+                setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
+                setInteger(MediaFormat.KEY_FRAME_RATE, 30)
+                setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+            }
+            val enc = MediaCodec.createEncoderByType(mime)
+            enc.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            return enc
         }
-        videoEnc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        videoEnc.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        // Riktig HEVC (H.265) när valt, med automatisk fallback till AVC (H.264) om enheten saknar HEVC-kodare.
+        videoEnc = if (useHevc) {
+            runCatching { buildEncoder(MediaFormat.MIMETYPE_VIDEO_HEVC) }
+                .getOrElse { buildEncoder(MediaFormat.MIMETYPE_VIDEO_AVC) }
+        } else {
+            buildEncoder(MediaFormat.MIMETYPE_VIDEO_AVC)
+        }
         inputSurface = videoEnc.createInputSurface()
         videoEnc.start()
 

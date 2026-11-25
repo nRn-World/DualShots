@@ -1,6 +1,7 @@
 package com.nrworld.duelshot.ui.gallery
 
 import android.graphics.Bitmap
+import android.widget.MediaController
 import android.widget.VideoView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -39,12 +41,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,30 +82,37 @@ import com.nrworld.duelshot.ui.theme.DuelSurface2
 import com.nrworld.duelshot.ui.theme.DuelText
 import com.nrworld.duelshot.ui.theme.DuelTextMuted
 
-private enum class Filter(val label: String, val icon: RefIconKind, val width: Int) {
-    ALL("All", RefIconKind.GRID4, 146),
-    VIDEOS("Videos", RefIconKind.VIDEO, 177),
-    PHOTOS("Photos", RefIconKind.PHOTO, 177),
-    FAVORITES("Favorites", RefIconKind.HEART, 198),
-    DELETED("Deleted", RefIconKind.TRASH, 172)
+private enum class Filter(val label: String, val icon: RefIconKind) {
+    ALL("All", RefIconKind.GRID4),
+    VIDEOS("Videos", RefIconKind.VIDEO),
+    PHOTOS("Photos", RefIconKind.PHOTO),
+    FAVORITES("Favorites", RefIconKind.HEART)
 }
 
-/** Gallery enligt design/reference/gallery.png. */
+/** Galleri med riktiga filter, sök, favoriter och ren tom-vy. */
 @Composable
 fun GalleryScreen(
     library: List<MediaItem>,
+    favorites: Set<String>,
+    onToggleFavorite: (String) -> Unit,
     onOpenEntry: (LibraryEntry) -> Unit,
-    onSoon: (String) -> Unit,
+    onStartRecording: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     var filter by remember { mutableStateOf(Filter.ALL) }
+    var searching by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val demo = library.isEmpty()
     val all = if (demo) DemoEntries else library.map { it.toEntry() }
-    val entries = when (filter) {
-        Filter.ALL -> all
-        Filter.VIDEOS -> all.filter { it.item?.isPhoto != true }
-        Filter.PHOTOS -> all.filter { it.item?.isPhoto == true }
-        else -> emptyList()
+    val entries = all.filter { e ->
+        val matchesFilter = when (filter) {
+            Filter.ALL -> true
+            Filter.VIDEOS -> e.item?.isPhoto != true
+            Filter.PHOTOS -> e.item?.isPhoto == true
+            Filter.FAVORITES -> e.key in favorites
+        }
+        val q = query.trim()
+        matchesFilter && (q.isEmpty() || e.title.contains(q, ignoreCase = true))
     }
     val videoBytes = library.filter { !it.isPhoto }.sumOf { it.sizeBytes }
     val photoBytes = library.filter { it.isPhoto }.sumOf { it.sizeBytes }
@@ -110,8 +122,43 @@ fun GalleryScreen(
         Box(Modifier.fillMaxWidth().height(rv(132))) {
             Brand(50, 18, 53)
             RText("YOUR MOMENTS. TWO PERSPECTIVES.", 52, 76, 18, 24, color = RefFaint, mono = true, ls = 3.8)
-            RCircle(RefIconKind.SEARCH, 809, 20, 70, 36) { onSoon("Search") }
+            RCircle(RefIconKind.SEARCH, 809, 20, 70, 36) {
+                searching = !searching
+                if (!searching) query = ""
+            }
             RCircle(RefIconKind.DOTS, 907, 20, 70, 36, onClick = onOpenAbout)
+        }
+
+        if (searching) {
+            Row(
+                Modifier.padding(start = rp(50), end = rp(50), bottom = rv(16)).fillMaxWidth().height(rv(64))
+                    .clip(RoundedCornerShape(rp(20))).background(Color(0xFF121826))
+                    .border(rp(2), RefOrange, RoundedCornerShape(rp(20)))
+                    .padding(horizontal = rp(22)),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(rp(14))
+            ) {
+                RefIcon(RefIconKind.SEARCH, RefOrange, rp(28))
+                Box(Modifier.weight(1f)) {
+                    if (query.isEmpty()) {
+                        Text("Search clips and photos…", color = RefMuted, fontSize = rs(19))
+                    }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color.White, fontSize = rs(19)),
+                        cursorBrush = SolidColor(RefOrange),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                if (query.isNotEmpty()) {
+                    Text(
+                        "Clear", color = RefOrange, fontSize = rs(17), fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clickable { query = "" }
+                    )
+                }
+            }
         }
 
         Row(
@@ -135,59 +182,32 @@ fun GalleryScreen(
             }
         }
 
-        Spacer(Modifier.height(rv(25)))
-        Box(
-            Modifier.padding(horizontal = rp(47)).fillMaxWidth().height(rv(186)).clip(RoundedCornerShape(rp(22)))
-                .background(Brush.horizontalGradient(listOf(Color(0xFF20140E), Color(0xFF15110F), Color(0xFF1A120E))))
-                .border(rp(2), Color(0xFF4A2612), RoundedCornerShape(rp(22)))
-        ) {
-            Box(
-                Modifier.absoluteOffset(rp(21), rv(18)).size(rp(98), rv(67)).clip(RoundedCornerShape(rp(16))).background(Color(0xFF2A1B12)),
-                contentAlignment = Alignment.Center
-            ) { RefIcon(RefIconKind.CLOUD, RefOrange, rp(58)) }
-            RText("Back up your recordings", 149, 22, 23, 32, weight = FontWeight.Medium, maxWidth = 720)
-            RText("Keep your memories safe in the cloud.", 149, 60, 17, 24, color = RefSub, maxWidth = 730)
-            OutlineButton("Enable Backup", 149, 108, 330, 58, RefOrange, 3, fontSize = 19, pad = 24) { onSoon("Cloud backup") }
-        }
-
         if (entries.isNotEmpty()) {
-            SectionHead("Recent", top = 25) { onSoon("See all") }
+            Spacer(Modifier.height(rv(24)))
             Column(
-                Modifier.padding(start = rp(50), end = rp(49), top = rv(17)),
+                Modifier.padding(start = rp(50), end = rp(49)),
                 verticalArrangement = Arrangement.spacedBy(rp(17))
             ) {
                 entries.chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(rp(20))) {
-                        row.forEach { e -> GalleryCard(e, Modifier.weight(1f)) { onOpenEntry(e) } }
+                        row.forEach { e ->
+                            GalleryCard(
+                                e = e,
+                                isFavorite = e.key in favorites,
+                                onToggleFavorite = { onToggleFavorite(e.key) },
+                                modifier = Modifier.weight(1f)
+                            ) { onOpenEntry(e) }
+                        }
                         repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
 
-            SectionHead("Folders", top = 35) { onSoon("Folders") }
-            val videos = library.count { !it.isPhoto }
-            Column(
-                Modifier.padding(start = rp(49), end = rp(48), top = rv(16)),
-                verticalArrangement = Arrangement.spacedBy(rv(14))
-            ) {
-                Row(Modifier.fillMaxWidth().height(rv(111)), horizontalArrangement = Arrangement.spacedBy(rp(14))) {
-                    Folder("All Videos", if (demo) 86 else videos, null, Color.Transparent, R.drawable.ref_folder_all) { onSoon("Folders") }
-                    Folder("Favorites", if (demo) 12 else 0, RefIconKind.HEART, Color(0xFF2B1B13)) { onSoon("Folders") }
-                }
-                Row(Modifier.fillMaxWidth().height(rv(111)), horizontalArrangement = Arrangement.spacedBy(rp(14))) {
-                    Folder("Trips", if (demo) 24 else 0, RefIconKind.MOUNTAIN, Color(0xFF1A2131)) { onSoon("Folders") }
-                    Folder("Events", if (demo) 8 else 0, RefIconKind.CALENDAR, Color(0xFF1A2131)) { onSoon("Folders") }
-                }
-            }
-
-            Box(Modifier.padding(start = rp(50), end = rp(49), top = rv(36)).fillMaxWidth().height(rv(205))) {
+            Box(Modifier.padding(start = rp(50), end = rp(49), top = rv(36)).fillMaxWidth().height(rv(125))) {
                 RText("Storage", 1, 0, 30, 36, weight = FontWeight.Medium)
-                RText(
-                    if (demo) "12.4 GB of 64 GB used" else "${formatSize(videoBytes + photoBytes)} recorded",
-                    2, 6, 17, 24, color = RefSub, right = true
-                )
-                val vFrac = if (demo) .175f else (videoBytes / gb).toFloat().coerceIn(0f, 1f)
-                val pFrac = if (demo) .019f else (photoBytes / gb).toFloat().coerceIn(0f, 1f)
+                RText("${formatSize(videoBytes + photoBytes)} recorded", 2, 6, 17, 24, color = RefSub, right = true)
+                val vFrac = (videoBytes / gb).toFloat().coerceIn(0f, 1f)
+                val pFrac = (photoBytes / gb).toFloat().coerceIn(0f, 1f)
                 Row(
                     Modifier.absoluteOffset(rp(2), rv(52)).fillMaxWidth().height(rv(16)).clip(RoundedCornerShape(rp(8))).background(Color(0xFF283044))
                 ) {
@@ -198,21 +218,37 @@ fun GalleryScreen(
                     if (pFrac > 0f) Box(Modifier.fillMaxHeight().fillMaxWidth(pFrac / (1f - vFrac).coerceAtLeast(.01f)).background(Color(0xFF4A5468)))
                 }
                 Row(Modifier.absoluteOffset(rp(2), rv(86)), horizontalArrangement = Arrangement.spacedBy(rp(22))) {
-                    Legend(RefOrange, if (demo) "Videos (11.2 GB)" else "Videos (${formatSize(videoBytes)})")
-                    Legend(Color(0xFF6B7488), if (demo) "Photos (1.2 GB)" else "Photos (${formatSize(photoBytes)})")
-                    Legend(Color(0xFF2F3646), if (demo) "Other (0 GB)" else "Other (0 MB)")
+                    Legend(RefOrange, "Videos (${formatSize(videoBytes)})")
+                    Legend(Color(0xFF6B7488), "Photos (${formatSize(photoBytes)})")
                 }
-                OutlineButton("Manage Storage", 2, 134, 340, 58, Color(0xFFE3E8F0), 2, border = Color(0xFF39425A), fontSize = 19, pad = 24) { onSoon("Storage management") }
             }
         } else {
             Column(
-                Modifier.fillMaxWidth().padding(top = rv(90)),
+                Modifier.fillMaxWidth().padding(horizontal = rp(60), vertical = rv(90)),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(rp(14))
+                verticalArrangement = Arrangement.spacedBy(rp(16))
             ) {
-                RefIcon(filter.icon, Color(0xFF5B6478), rp(70))
-                Text("No ${filter.label.lowercase()} yet", color = Color.White, fontSize = rs(30), fontWeight = FontWeight.Medium)
-                Text("Nothing to show here yet.", color = RefMuted, fontSize = rs(22))
+                RefIcon(filter.icon, Color(0xFF5B6478), rp(72))
+                Text(
+                    if (query.isNotBlank()) "No matches for \"$query\"" else "No ${filter.label.lowercase()} yet",
+                    color = Color.White, fontSize = rs(28), fontWeight = FontWeight.Medium, textAlign = TextAlign.Center
+                )
+                Text(
+                    if (library.isEmpty()) "Record your first dual-camera video or photo — it will show up right here."
+                    else "Try another filter or record a new clip.",
+                    color = RefMuted, fontSize = rs(20), textAlign = TextAlign.Center
+                )
+                if (library.isEmpty()) {
+                    Spacer(Modifier.height(rv(8)))
+                    Box(
+                        Modifier.clip(RoundedCornerShape(rp(24)))
+                            .background(Brush.horizontalGradient(listOf(Color(0xFFFF5A0A), Color(0xFFFF9A1C))))
+                            .clickable(onClick = onStartRecording)
+                            .padding(horizontal = rp(40), vertical = rv(18))
+                    ) {
+                        Text("Start Recording", color = Color(0xFF1C0D05), fontSize = rs(21), fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
         Spacer(Modifier.height(rv(40)))
@@ -220,18 +256,7 @@ fun GalleryScreen(
 }
 
 @Composable
-private fun SectionHead(title: String, top: Int, onSeeAll: () -> Unit) {
-    Row(
-        Modifier.padding(start = rp(50), end = rp(52), top = rv(top)).fillMaxWidth().height(rv(36)),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(title, color = Color.White, fontSize = rs(30), lineHeight = rs(36), fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-        SeeAll(onSeeAll)
-    }
-}
-
-@Composable
-private fun GalleryCard(e: LibraryEntry, modifier: Modifier, onClick: () -> Unit) {
+private fun GalleryCard(e: LibraryEntry, isFavorite: Boolean, onToggleFavorite: () -> Unit, modifier: Modifier, onClick: () -> Unit) {
     Column(
         modifier.clip(RoundedCornerShape(rp(20))).background(RefCard)
             .border(rp(2), RefCardBorder, RoundedCornerShape(rp(20))).clickable(onClick = onClick).padding(rp(3))
@@ -242,14 +267,16 @@ private fun GalleryCard(e: LibraryEntry, modifier: Modifier, onClick: () -> Unit
                 .clip(RoundedCornerShape(topStart = rp(18), topEnd = rp(18), bottomStart = rp(4), bottomEnd = rp(4)))
         )
         Row(
-            Modifier.fillMaxWidth().padding(start = rp(12), end = rp(8), top = rv(8), bottom = rv(10)),
+            Modifier.fillMaxWidth().padding(start = rp(12), end = rp(10), top = rv(8), bottom = rv(10)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
                 Text(e.title, color = Color.White, fontSize = rs(19), lineHeight = rs(26), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(e.date, color = RefMuted, fontSize = rs(15), lineHeight = rs(22), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            RefIcon(RefIconKind.DOTS, RefSub, rp(28))
+            Box(Modifier.clickable(onClick = onToggleFavorite).padding(rp(6))) {
+                RefIcon(RefIconKind.HEART, if (isFavorite) RefOrange else RefSub, rp(28))
+            }
         }
     }
 }
@@ -324,16 +351,32 @@ fun EntryThumb(e: LibraryEntry, modifier: Modifier) {
     }
 }
 
-/** Spelare för video, bildvisare för foto – med dela/radera/stäng. */
+/** Spelare för video (med MediaController/seekbar), bildvisare för foto – med favorit/dela/radera/stäng. */
 @Composable
-fun MediaDialog(item: MediaItem, onClose: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
+fun MediaDialog(
+    item: MediaItem,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onClose: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit
+) {
     val context = LocalContext.current
     Dialog(onDismissRequest = onClose) {
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(DuelSurface2)
                 .border(1.dp, DuelLine, RoundedCornerShape(24.dp)).padding(16.dp)
         ) {
-            Text(item.name, color = DuelText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    item.name, color = DuelText, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.clickable(onClick = onToggleFavorite).padding(4.dp)) {
+                    RefIcon(RefIconKind.HEART, if (isFavorite) RefOrange else DuelTextMuted, 20.dp)
+                }
+            }
             Spacer(Modifier.height(10.dp))
             if (item.isPhoto) {
                 var bmp by remember(item.id) { mutableStateOf<Bitmap?>(null) }
@@ -348,6 +391,9 @@ fun MediaDialog(item: MediaItem, onClose: () -> Unit, onShare: () -> Unit, onDel
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(16.dp)).background(Color.Black),
                     factory = { ctx ->
                         VideoView(ctx).apply {
+                            val mc = MediaController(ctx)
+                            mc.setAnchorView(this)
+                            setMediaController(mc)
                             setVideoURI(item.uri)
                             setOnPreparedListener { mp -> mp.isLooping = true; start() }
                         }

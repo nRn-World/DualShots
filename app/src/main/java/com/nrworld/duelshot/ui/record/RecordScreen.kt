@@ -62,8 +62,15 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import com.nrworld.duelshot.model.AspectOption
+import com.nrworld.duelshot.model.CodecOption
+import com.nrworld.duelshot.model.PipStyle
 import com.nrworld.duelshot.model.QualityOption
+import com.nrworld.duelshot.ui.components.RefIcon
+import com.nrworld.duelshot.ui.components.RefIconKind
 import com.nrworld.duelshot.ui.components.SegmentedControl
+import com.nrworld.duelshot.ui.gallery.EntryThumb
+import com.nrworld.duelshot.ui.gallery.MediaItem
+import com.nrworld.duelshot.ui.gallery.toEntry
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -99,7 +106,13 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
-fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
+fun RecordScreen(
+    vm: AppViewModel,
+    latestItem: MediaItem? = null,
+    onOpenLatest: (MediaItem) -> Unit = {},
+    onSaved: () -> Unit = {},
+    onExit: () -> Unit
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptic = LocalHapticFeedback.current
@@ -120,6 +133,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     // Satt när valt läge inte stöds och vi bundit om i ett enklare läge.
     var fallbackFrom by remember { mutableStateOf<RecordingMode?>(null) }
     var isRecording by remember { mutableStateOf(false) }
+    var countdownLeft by remember { mutableIntStateOf(0) }
     var elapsed by remember { mutableIntStateOf(0) }
     var savedNames by remember { mutableStateOf<List<String>>(emptyList()) }
     var showTune by remember { mutableStateOf(false) }
@@ -186,6 +200,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         } else if (backView == null && frontView == null) return@LaunchedEffect
 
         controller.recordAudio = vm.recordAudio
+        controller.useHevc = vm.codec == CodecOption.HEVC
         controller.mainPaused = mainPaused
         status = controller.bind(
             wanted = wanted,
@@ -220,13 +235,15 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 cy = l.cy,
                 scale = l.scale,
                 largeRatio = (if (l.swapCameras) vm.frontAspect else vm.backAspect).ratio(),
-                smallRatio = (if (l.swapCameras) vm.backAspect else vm.frontAspect).ratio()
+                smallRatio = (if (l.swapCameras) vm.backAspect else vm.frontAspect).ratio(),
+                circle = vm.pipStyle == PipStyle.CIRCLE,
+                split = vm.pipStyle == PipStyle.SPLIT
             )
         )
     }
 
     // Den lilla rutan följer fingret direkt i Dual View – ingen ombindning behövs.
-    LaunchedEffect(pipLive, mainPaused, vm.frontAspect, vm.backAspect, vm.saveAspect) {
+    LaunchedEffect(pipLive, mainPaused, vm.frontAspect, vm.backAspect, vm.saveAspect, vm.pipStyle) {
         if (!controller.glActive) return@LaunchedEffect
         controller.setGlLayout(
             GlLayout(
@@ -238,7 +255,9 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 cy = pipLive.cy,
                 scale = pipLive.scale,
                 largeRatio = (if (pipLive.swapCameras) vm.frontAspect else vm.backAspect).ratio(),
-                smallRatio = (if (pipLive.swapCameras) vm.backAspect else vm.frontAspect).ratio()
+                smallRatio = (if (pipLive.swapCameras) vm.backAspect else vm.frontAspect).ratio(),
+                circle = vm.pipStyle == PipStyle.CIRCLE,
+                split = vm.pipStyle == PipStyle.SPLIT
             )
         )
     }
@@ -272,6 +291,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 1 -> "Photo saved – Gallery → Photos"
                 else -> "$saved photos saved – Gallery → Photos"
             }
+            if (saved > 0) onSaved()
         }
     }
 
@@ -318,12 +338,59 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 }
             }
             Spacer(Modifier.weight(1f))
+            if (hasTorch) {
+                IconChip(DuelIconKind.FLASH, active = torch) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    torch = controller.setTorch(!torch)
+                }
+                Spacer(Modifier.width(6.dp))
+            }
+            // Snabbknapp för mikrofon (på/av).
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape)
+                    .background(DuelSurface2)
+                    .border(1.dp, if (vm.recordAudio) DuelLine else DuelRecord, CircleShape)
+                    .clickable(enabled = !isRecording) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        vm.recordAudio = !vm.recordAudio
+                        controller.recordAudio = vm.recordAudio
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                RefIcon(RefIconKind.AUDIO, if (vm.recordAudio) DuelText else DuelRecord, 18.dp)
+            }
+            Spacer(Modifier.width(6.dp))
+            // Snabbknapp för nedräkning (Off / 3s / 5s).
+            Box(
+                modifier = Modifier.height(40.dp).clip(RoundedCornerShape(20.dp))
+                    .background(DuelSurface2)
+                    .border(1.dp, if (vm.countdownSec > 0) DuelOrange else DuelLine, RoundedCornerShape(20.dp))
+                    .clickable(enabled = !isRecording && countdownLeft == 0) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        vm.countdownSec = when (vm.countdownSec) {
+                            0 -> 3
+                            3 -> 5
+                            else -> 0
+                        }
+                    }
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (vm.countdownSec > 0) "${vm.countdownSec}s" else "0s",
+                    color = if (vm.countdownSec > 0) DuelOrangeLight else DuelTextMuted,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+            }
+            Spacer(Modifier.width(6.dp))
             IconChip(DuelIconKind.GRID, active = showGrid) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 showGrid = !showGrid
                 vm.grid = showGrid
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             IconChip(DuelIconKind.SETTINGS, active = showTune) { showTune = !showTune }
         }
 
@@ -399,10 +466,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                                 smallAspect = smallAspect
                             )
 
-                            if (pipLive.visible) PipOutline(
+                            if (pipLive.visible && vm.pipStyle != PipStyle.SPLIT) PipOutline(
                                 layout = pipLive,
-                                // Rutan har den lilla kamerans format, inte filens.
-                                aspect = smallAspect,
+                                // Rutan har den lilla kamerans format (eller 1:1 för cirkel-PiP).
+                                aspect = if (vm.pipStyle == PipStyle.CIRCLE) AspectOption.R_1_1 else smallAspect,
                                 onDrag = { dx, dy ->
                                     val moved = pipLive.copy(
                                         cx = (pipLive.cx + dx).coerceIn(0.12f, 0.88f),
@@ -576,6 +643,19 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 }
             }
             if (showGrid) GridOverlay(Modifier.fillMaxSize().padding(11.dp))
+            if (countdownLeft > 0) {
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = .45f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "$countdownLeft",
+                        color = Color.White,
+                        fontSize = 84.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
         }
 
         // Ändra live: läge, kvalitet, format och layout.
@@ -655,35 +735,54 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(top = 8.dp, bottom = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            fun beginRecordingNow() {
+                controller.recordAudio = vm.recordAudio
+                controller.useHevc = vm.codec == CodecOption.HEVC
+                controller.startRecording(
+                    onStarted = { names ->
+                        savedNames = names
+                        isRecording = true
+                        paused = false
+                        backPaused = false
+                        frontPaused = false
+                        hideBack = false
+                        hideFront = false
+                        status = "Recording – one continuous file"
+                    },
+                    onError = { status = it }
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
-            PhotoButton(enabled = ready && controller.canBind, onClick = { takePhoto() })
+            PhotoButton(enabled = ready && controller.canBind && countdownLeft == 0, onClick = { takePhoto() })
             Spacer(Modifier.width(28.dp))
             RecordButton(
                 recording = isRecording,
                 enabled = ready && controller.canBind,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (countdownLeft > 0) {
+                        countdownLeft = 0
+                        return@RecordButton
+                    }
                     if (!isRecording) {
                         val freeMb = runCatching { context.filesDir.usableSpace / (1024 * 1024) }.getOrDefault(0L)
                         if (freeMb in 1..299) {
                             status = "Low storage: ${freeMb} MB free – free up space first"
+                        } else if (vm.countdownSec > 0) {
+                            scope.launch {
+                                countdownLeft = vm.countdownSec
+                                while (countdownLeft > 0) {
+                                    delay(1000)
+                                    if (countdownLeft == 0) return@launch
+                                    countdownLeft--
+                                }
+                                beginRecordingNow()
+                            }
                         } else {
-                            controller.startRecording(
-                                onStarted = { names ->
-                                    savedNames = names
-                                    isRecording = true
-                                    paused = false
-                                    backPaused = false
-                                    frontPaused = false
-                                    hideBack = false
-                                    hideFront = false
-                                    status = "Recording – one continuous file"
-                                },
-                                onError = { status = it }
-                            )
+                            beginRecordingNow()
                         }
                     } else {
-                        controller.stopRecording()
+                        controller.stopRecording { onSaved() }
                         isRecording = false
                         paused = false
                         backPaused = false
@@ -695,13 +794,24 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 }
             )
             Spacer(Modifier.width(28.dp))
-            Spacer(Modifier.size(52.dp))
+            // Senaste klippet/fotot som klickbar miniatyr bredvid slutarknappen.
+            if (latestItem != null && !isRecording) {
+                Box(
+                    Modifier.size(52.dp).clip(RoundedCornerShape(14.dp))
+                        .border(1.5.dp, DuelOrange, RoundedCornerShape(14.dp))
+                        .clickable { onOpenLatest(latestItem) }
+                ) {
+                    EntryThumb(latestItem.toEntry(), Modifier.fillMaxSize())
+                }
+            } else {
+                Spacer(Modifier.size(52.dp))
+            }
             }
 
             if (dualOk) {
                 Spacer(Modifier.height(12.dp))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ZoomChip(
@@ -726,6 +836,30 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     )
 
                     if (displayMode == RecordingMode.DUAL_VIEW) {
+                        // 1-trycks layout-förval: PiP → Circle → 50/50.
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(DuelSurface2)
+                                .border(1.dp, if (vm.pipStyle != PipStyle.PIP) DuelOrange else DuelLine, RoundedCornerShape(16.dp))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    val all = PipStyle.values()
+                                    vm.pipStyle = all[(vm.pipStyle.ordinal + 1) % all.size]
+                                }
+                                .padding(horizontal = 12.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                vm.pipStyle.label.uppercase(),
+                                color = if (vm.pipStyle != PipStyle.PIP) DuelOrangeLight else DuelText,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
                         SwapButton(
                             swapped = pipLive.swapCameras,
                             onClick = {
@@ -767,43 +901,6 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     )
                 }
             }
-        }
-    }
-
-    // Ficklampa och kryss längst uppe på skärmen, alltid ovanpå videon.
-    Row(
-        modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (hasTorch) {
-            Box(
-                modifier = Modifier.size(44.dp).clip(CircleShape)
-                    .background(if (torch) Color(0xFFFF6A1A).copy(alpha = .92f) else Color.Black.copy(alpha = .5f))
-                    .border(1.dp, if (torch) Color(0xFFFF9A3C) else Color.White.copy(alpha = .35f), CircleShape)
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        torch = controller.setTorch(!torch)
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                DuelIcon(DuelIconKind.FLASH, Color.White, 20.dp)
-            }
-        }
-        Box(
-            modifier = Modifier.size(44.dp).clip(CircleShape)
-                .background(Color.Black.copy(alpha = .5f))
-                .border(1.dp, Color.White.copy(alpha = .35f), CircleShape)
-                .clickable {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (isRecording) {
-                        isRecording = false
-                        controller.stopRecording { onExit() }
-                    } else onExit()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Text("✕", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
         }
     }
     }

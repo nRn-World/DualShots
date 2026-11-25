@@ -83,13 +83,14 @@ private data class Stats(
 )
 
 /** Statistik ur de egna filerna — allt är noll tills man spelat in eller fotat. */
-private fun realStats(items: List<MediaItem>): Stats {
+private fun realStats(items: List<MediaItem>, favorites: Set<String>): Stats {
     val videos = items.filter { !it.isPhoto }
     val photos = items.filter { it.isPhoto }
     val totalSec = videos.sumOf { it.durationMs } / 1000
     val avg = if (videos.isEmpty()) 0L else totalSec / videos.size
     val videoBytes = videos.sumOf { it.sizeBytes }
     val photoBytes = photos.sumOf { it.sizeBytes }
+    val favCount = items.count { ((if (it.isPhoto) "p" else "v") + it.id) in favorites }
     val dayFmt = SimpleDateFormat("EEE", Locale.ENGLISH)
     val dateFmt = SimpleDateFormat("d MMM", Locale.ENGLISH)
     val days = mutableListOf<Pair<String, String>>()
@@ -115,7 +116,7 @@ private fun realStats(items: List<MediaItem>): Stats {
             Triple(RefIconKind.CAMERA, "RECORDING TIME", "${totalSec / 60} min" to ""),
             Triple(RefIconKind.DATABASE, "STORAGE USED", formatSize(videoBytes) to ""),
             Triple(RefIconKind.FILM, "AVERAGE LENGTH", "${avg / 60}:${"%02d".format(avg % 60)}" to ""),
-            Triple(RefIconKind.STAR, "FAVORITES", "0 clips" to ""),
+            Triple(RefIconKind.STAR, "FAVORITES", "$favCount clips" to ""),
         ),
         days = days,
         series = mapOf("clips" to clips, "minutes" to minutes, "storage" to storage),
@@ -128,8 +129,8 @@ private fun realStats(items: List<MediaItem>): Stats {
 
 /** Stats enligt design/reference/stats.png. */
 @Composable
-fun StatsScreen(library: List<MediaItem>, onSoon: (String) -> Unit) {
-    val s = realStats(library)
+fun StatsScreen(library: List<MediaItem>, favorites: Set<String>) {
+    val s = realStats(library, favorites)
     var metric by remember { mutableStateOf("clips") }
     val values = s.series.getValue(metric)
     val maxV = values.maxOrNull() ?: 0f
@@ -141,15 +142,14 @@ fun StatsScreen(library: List<MediaItem>, onSoon: (String) -> Unit) {
             RText("Stats", 55, 71.5, 54, 60, weight = FontWeight.Bold, ls = -.5)
             RText("Your DualShots recording history", 57, 133, 25, 30, color = RefSub)
             Row(
-                Modifier.absoluteOffset(rp(630), rv(75)).size(rp(343), rv(63)).clip(RoundedCornerShape(rp(32)))
+                Modifier.absoluteOffset(rp(660), rv(75)).size(rp(313), rv(63)).clip(RoundedCornerShape(rp(32)))
                     .background(Color(0xFF121826)).border(rp(2), Color(0xFF252D3F), RoundedCornerShape(rp(32)))
-                    .clickable { onSoon("Date range") }.padding(start = rp(24), end = rp(26)),
+                    .padding(horizontal = rp(24)),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(rp(16))
+                horizontalArrangement = Arrangement.spacedBy(rp(14))
             ) {
                 RefIcon(RefIconKind.CALENDAR, RefSoft, rp(30))
-                Text("Last 7 days", color = Color(0xFFE3E8F0), fontSize = rs(18), maxLines = 1, softWrap = false, modifier = Modifier.weight(1f))
-                RefIcon(RefIconKind.CHEV_DOWN, RefSoft, rp(26), stroke = 2.4f)
+                Text("Last 7 days", color = Color(0xFFE3E8F0), fontSize = rs(18), maxLines = 1, softWrap = false)
             }
         }
 

@@ -32,3 +32,10 @@ enum class CodecOption(val label: String, val mime: String) {
     MP4("MP4", "video/mp4"),
     HEVC("HEVC", "video/hevc")
 }
+
+/** Förvalda layouter i Dual View: rektangulär PiP, rund cirkel-PiP eller 50/50 delad vy. */
+enum class PipStyle(val label: String) {
+    PIP("PiP"),
+    CIRCLE("Circle"),
+    SPLIT("50/50")
+}

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.camera.core.AspectRatio
 import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.CodecOption
+import com.nrworld.duelshot.model.PipStyle
 import com.nrworld.duelshot.model.QualityOption
 import com.nrworld.duelshot.model.RecordingMode
 
@@ -61,10 +62,6 @@ class AppPrefs(context: Context) {
         get() = sp.getString(KEY_SAVE_ASPECT, null)?.let { n -> AspectOption.values().firstOrNull { it.name == n } }
         set(v) = sp.edit().putString(KEY_SAVE_ASPECT, v?.name).apply()
 
-    var stabilize: Boolean
-        get() = sp.getBoolean(KEY_STABILIZE, true)
-        set(v) = sp.edit().putBoolean(KEY_STABILIZE, v).apply()
-
     var grid: Boolean
         get() = sp.getBoolean(KEY_GRID, true)
         set(v) = sp.edit().putBoolean(KEY_GRID, v).apply()
@@ -73,9 +70,20 @@ class AppPrefs(context: Context) {
         get() = sp.getBoolean(KEY_AUDIO, true)
         set(v) = sp.edit().putBoolean(KEY_AUDIO, v).apply()
 
-    var saveLocation: Boolean
-        get() = sp.getBoolean(KEY_LOCATION, false)
-        set(v) = sp.edit().putBoolean(KEY_LOCATION, v).apply()
+    /** Nedräkning innan inspelning startar (0, 3 eller 5 sekunder). */
+    var countdownSec: Int
+        get() = sp.getInt(KEY_COUNTDOWN, 0).let { if (it == 3 || it == 5) it else 0 }
+        set(v) = sp.edit().putInt(KEY_COUNTDOWN, if (v == 3 || v == 5) v else 0).apply()
+
+    /** Dual View-layout: PiP, Circle eller 50/50 Split. */
+    var pipStyle: PipStyle
+        get() = read(KEY_PIP_STYLE, PipStyle.PIP)
+        set(v) = sp.edit().putString(KEY_PIP_STYLE, v.name).apply()
+
+    /** Favoritmarkerade klipp/foton (nycklar som "v123" / "p456"). */
+    var favorites: Set<String>
+        get() = sp.getStringSet(KEY_FAVORITES, emptySet())?.toSet() ?: emptySet()
+        set(v) = sp.edit().putStringSet(KEY_FAVORITES, v.toSet()).apply()
 
     /** Visas onboarding bara första gången. */
     var onboarded: Boolean
@@ -91,10 +99,11 @@ class AppPrefs(context: Context) {
         private const val KEY_ONBOARDED = "onboarded"
         private const val KEY_SETUP_DONE = "setup_done"
         private const val KEY_SAVE_ASPECT = "save_aspect"
-        private const val KEY_STABILIZE = "stabilize"
         private const val KEY_GRID = "grid"
         private const val KEY_AUDIO = "record_audio"
-        private const val KEY_LOCATION = "save_location"
+        private const val KEY_COUNTDOWN = "countdown_sec"
+        private const val KEY_PIP_STYLE = "pip_style"
+        private const val KEY_FAVORITES = "favorites"
     }
 }
 

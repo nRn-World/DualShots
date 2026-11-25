@@ -38,7 +38,11 @@ data class GlLayout(
     /** Bredd/höjd för stora kamerans valda format. */
     val largeRatio: Float = 16f / 9f,
     /** Bredd/höjd för lilla kamerans valda format (t.ex. 9:16 = stående ruta). */
-    val smallRatio: Float = 9f / 16f
+    val smallRatio: Float = 9f / 16f,
+    /** true = rund cirkel-PiP (1:1 cirkel). */
+    val circle: Boolean = false,
+    /** true = 50/50 delad bild (halva vardera) i stället för PiP-ruta. */
+    val split: Boolean = false
 )
 
 /**
@@ -321,22 +325,29 @@ class GlCompositor {
         val largeIdx = if (l.swap) 1 else 0
         val smallIdx = 1 - largeIdx
 
+        if (l.split && l.smallVisible) {
+            val topHalf = RectF(0f, 0f, w, h / 2f)
+            val botHalf = RectF(0f, h / 2f, w, h)
+            if (!l.mainPaused) drawCam(largeIdx, topHalf, w, h, round = false, solid = false)
+            drawCam(smallIdx, botHalf, w, h, round = false, solid = l.smallPaused)
+            return
+        }
+
         // Stora kameran fyller alltid hela bilden – samma utsnitt som webbens canvas.
-        // Kamerans eget format beskärs i stället för att ge svarta kanter.
         val large = RectF(0f, 0f, w, h)
         if (!l.mainPaused) drawCam(largeIdx, large, w, h, round = false, solid = false)
 
         if (l.smallVisible) {
             val scale = l.scale.coerceIn(0.18f, 0.6f)
             val pw = w * scale
-            val ph = pw / l.smallRatio
+            val ph = if (l.circle) pw else pw / l.smallRatio
             val left = (l.cx * w - pw / 2f).coerceIn(0f, max(0f, w - pw))
             val top = (l.cy * h - ph / 2f).coerceIn(0f, max(0f, h - ph))
-            drawCam(smallIdx, RectF(left, top, left + pw, top + ph), w, h, round = true, solid = l.smallPaused)
+            drawCam(smallIdx, RectF(left, top, left + pw, top + ph), w, h, round = true, solid = l.smallPaused, circle = l.circle)
         }
     }
 
-    private fun drawCam(index: Int, r: RectF, w: Float, h: Float, round: Boolean, solid: Boolean) {
+    private fun drawCam(index: Int, r: RectF, w: Float, h: Float, round: Boolean, solid: Boolean, circle: Boolean = false) {
         val texIndex = if (index == 1 && simulateFront) 0 else index
         val cam = cams[texIndex]
         if (!cam.hasFrame && !solid) return
@@ -349,7 +360,12 @@ class GlCompositor {
         GLES20.glUniform3f(uM0, m[0], m[1], m[2])
         GLES20.glUniform3f(uM1, m[3], m[4], m[5])
         GLES20.glUniform2f(uSize, dw, dh)
-        GLES20.glUniform1f(uRadius, if (round) 0.07f * min(dw, dh) else 0f)
+        val radius = when {
+            !round -> 0f
+            circle -> 0.5f * min(dw, dh)
+            else -> 0.07f * min(dw, dh)
+        }
+        GLES20.glUniform1f(uRadius, radius)
         GLES20.glUniform1f(uBorder, max(2f, w / 340f))
         GLES20.glUniform1f(uSolid, if (solid) 1f else 0f)
         GLES20.glUniform1f(uRound, if (round) 1f else 0f)

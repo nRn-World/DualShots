@@ -130,16 +130,26 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit) {
             vm.codec = CodecOption.values()[idx]
         }
 
+        Section("COUNTDOWN TIMER", top = 22)
+        val timers = listOf(0, 3, 5)
+        SegRow(
+            icon = { RefIcon(RefIconKind.CALENDAR, RefOrange, rp(42), Modifier.absoluteOffset(rp(25), rv(23))) },
+            title = "Timer", sub = "Delay before recording starts", height = 86,
+            options = listOf("Off", "3s", "5s"),
+            selected = timers.indexOf(vm.countdownSec).coerceAtLeast(0),
+            segX = 560, segW = 320, chevron = false
+        ) { idx ->
+            vm.countdownSec = timers[idx]
+        }
+
         Section("ADDITIONAL SETTINGS", top = 22)
         Column(
             Modifier.padding(start = rp(63), end = rp(53), top = rv(9)).fillMaxWidth()
                 .clip(RoundedCornerShape(rp(22))).background(RefCard).border(rp(2), RefCardBorder, RoundedCornerShape(rp(22)))
                 .padding(vertical = rv(3))
         ) {
-            ToggleRow(RefIconKind.STABILIZE, "Stabilization", "Reduce camera shake", vm.stabilize, true) { vm.stabilize = it }
-            ToggleRow(RefIconKind.GRID4, "Grid", "Show grid while recording", vm.grid, true) { vm.grid = it }
-            ToggleRow(RefIconKind.AUDIO, "Record Audio", "Include audio from both cameras", vm.recordAudio, true) { vm.recordAudio = it }
-            ToggleRow(RefIconKind.PIN, "Save Location", "Add location info to your videos", vm.saveLocation, false) { vm.saveLocation = it }
+            ToggleRow(RefIconKind.GRID4, "Grid", "Show 3×3 framing grid", vm.grid, true) { vm.grid = it }
+            ToggleRow(RefIconKind.AUDIO, "Record Audio", "Capture microphone audio", vm.recordAudio, false) { vm.recordAudio = it }
         }
         Spacer(Modifier.height(rv(40)))
     }
@@ -200,7 +210,12 @@ private fun CameraCard(title: String, icon: RefIconKind, value: AspectOption, mo
         ) {
             listOf(AspectOption.R_9_16, AspectOption.R_16_9, AspectOption.R_1_1).forEach { a ->
                 val active = a == value
-                val (short, word) = a.label.split(' ').let { it[0] to it.getOrElse(1) { "" } }
+                val short = a.label.substringBefore(' ')
+                val word = when (a) {
+                    AspectOption.R_9_16 -> "Reels"
+                    AspectOption.R_16_9 -> "YouTube"
+                    else -> "Feed"
+                }
                 Box(
                     Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(rp(14)))
                         .background(if (active) Color(0xFF2A1A12) else Color(0xFF161C2A))

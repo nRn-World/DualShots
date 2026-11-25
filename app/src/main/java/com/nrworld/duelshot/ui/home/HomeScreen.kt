@@ -153,18 +153,36 @@ fun HomeScreen(
         ) {
             Box(Modifier.fillMaxWidth().height(rv(84))) {
                 RText("Recent Recordings", 2, 27, 29, 36, weight = FontWeight.Medium)
-                SeeAll(onOpenGallery, Modifier.align(Alignment.TopEnd).absoluteOffset(x = -rp(9), y = rv(30)))
+                if (recent.isNotEmpty()) SeeAll(onOpenGallery, Modifier.align(Alignment.TopEnd).absoluteOffset(x = -rp(9), y = rv(30)))
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(rp(20))) {
-                recent.take(3).forEach { e ->
-                    Column(Modifier.weight(1f).clickable { onOpenEntry(e) }) {
-                        EntryThumb(e, Modifier.fillMaxWidth().aspectRatio(1.72f).clip(RoundedCornerShape(rp(14))))
-                        Text(
-                            e.title, color = Color.White, fontSize = rs(20), lineHeight = rs(26), fontWeight = FontWeight.Medium,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = rv(10))
-                        )
-                        Text(e.date, color = RefMuted, fontSize = rs(16), lineHeight = rs(22), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (recent.isEmpty()) {
+                Column(
+                    Modifier.fillMaxWidth().padding(vertical = rv(16)),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "No recordings yet",
+                        color = Color.White, fontSize = rs(22), fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(rv(6)))
+                    Text(
+                        "Tap Start Recording above to capture your first dual-camera take.",
+                        color = RefMuted, fontSize = rs(17), lineHeight = rs(23)
+                    )
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(rp(20))) {
+                    recent.take(3).forEach { e ->
+                        Column(Modifier.weight(1f).clickable { onOpenEntry(e) }) {
+                            EntryThumb(e, Modifier.fillMaxWidth().aspectRatio(1.72f).clip(RoundedCornerShape(rp(14))))
+                            Text(
+                                e.title, color = Color.White, fontSize = rs(20), lineHeight = rs(26), fontWeight = FontWeight.Medium,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = rv(10))
+                            )
+                            Text(e.date, color = RefMuted, fontSize = rs(16), lineHeight = rs(22), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
+                    repeat((3 - recent.take(3).size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                 }
             }
             Spacer(Modifier.height(rv(26)))
