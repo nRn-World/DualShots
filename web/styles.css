@@ -2020,3 +2020,42 @@ body.ref .device-inner { border-radius: 0; }
 .pip.paused video, .pip.paused canvas { opacity: 0; }
 .main-controls { right: auto; top: auto; left: 10px; bottom: 10px; }
 .pip-ctl.on { color: var(--orange-light); border-color: rgba(255, 102, 0, .55); }
+
+/* -------------------------------------------------- mobile APK install prompt */
+.apk-dialog {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.apk-tile {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(255, 102, 0, .28);
+}
+.apk-tile .logo-mark {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.apk-body {
+  margin: 4px 0 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.apk-dl {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.apk-dl svg {
+  width: 18px;
+  height: 18px;
+}

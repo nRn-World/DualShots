@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.sp
 import com.nrworld.duelshot.ui.components.LocalRefFont
 import com.nrworld.duelshot.ui.components.LocalRefScale
 import com.nrworld.duelshot.ui.components.LocalRefStretch
-import com.nrworld.duelshot.ui.components.PremiumDialog
 import com.nrworld.duelshot.ui.components.RefBg
 import com.nrworld.duelshot.ui.components.RefIcon
 import com.nrworld.duelshot.ui.components.RefIconKind
@@ -86,7 +85,6 @@ fun DuelShotsApp(vm: AppViewModel) {
     val context = LocalContext.current
     var tab by remember { mutableStateOf(Tab.HOME) }
     var recording by remember { mutableStateOf(false) }
-    var showPremium by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showTips by remember { mutableStateOf(false) }
     var openItem by remember { mutableStateOf<MediaItem?>(null) }
@@ -127,10 +125,9 @@ fun DuelShotsApp(vm: AppViewModel) {
                     } else {
                         when (tab) {
                             Tab.HOME -> HomeScreen(
-                                vm = vm,
                                 recent = if (library.isEmpty()) DemoEntries else library.map { it.toEntry() },
                                 onStart = { recording = true },
-                                onOpenPremium = { showPremium = true },
+                                onOpenStats = { tab = Tab.STATS },
                                 onOpenGallery = { tab = Tab.GALLERY },
                                 onOpenSettings = { tab = Tab.SETTINGS },
                                 onOpenTips = { showTips = true },
@@ -138,8 +135,8 @@ fun DuelShotsApp(vm: AppViewModel) {
                                 onOpenEntry = openEntry
                             )
                             Tab.GALLERY -> GalleryScreen(library, openEntry, soon) { showAbout = true }
-                            Tab.STATS -> StatsScreen(library, vm.isPremium, soon) { showPremium = true }
-                            Tab.SETTINGS -> SettingsScreen(vm, onOpenAbout = { showAbout = true }, onOpenPremium = { showPremium = true })
+                            Tab.STATS -> StatsScreen(library, soon)
+                            Tab.SETTINGS -> SettingsScreen(vm, onOpenAbout = { showAbout = true })
                         }
                     }
                 }
@@ -166,13 +163,6 @@ fun DuelShotsApp(vm: AppViewModel) {
                 reload++
             },
             onCancel = { pendingDelete = null }
-        )
-    }
-    if (showPremium) {
-        PremiumDialog(
-            feature = "DualShots Premium",
-            onDismiss = { showPremium = false },
-            onUpgrade = { vm.grantPremium(); showPremium = false }
         )
     }
     if (showAbout) {

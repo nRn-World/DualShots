@@ -63,7 +63,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.QualityOption
-import com.nrworld.duelshot.ui.components.PremiumDialog
 import com.nrworld.duelshot.ui.components.SegmentedControl
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -74,6 +73,7 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
@@ -120,9 +120,8 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     // Satt när valt läge inte stöds och vi bundit om i ett enklare läge.
     var fallbackFrom by remember { mutableStateOf<RecordingMode?>(null) }
     var isRecording by remember { mutableStateOf(false) }
-    var elapsed by remember { mutableStateOf(0) }
+    var elapsed by remember { mutableIntStateOf(0) }
     var savedNames by remember { mutableStateOf<List<String>>(emptyList()) }
-    var part by remember { mutableStateOf(1) }
     var showTune by remember { mutableStateOf(false) }
     // Ficklampa (bara om bakkameran har blixt).
     var torch by remember { mutableStateOf(false) }
@@ -133,7 +132,6 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
     // Stora kameran i Dual View kan pausas på egen hand (svart bild, samma fil).
     var mainPaused by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    var premiumFeature by remember { mutableStateOf<String?>(null) }
     // Bild-i-bild: [pip] är sparad placering, [pipLive] följer fingret.
     var pip by remember { mutableStateOf(PipLayout()) }
     var pipLive by remember { mutableStateOf(PipLayout()) }
@@ -297,8 +295,10 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
         ) {
             IconChip(DuelIconKind.CLOSE) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                if (isRecording) controller.stopRecording()
-                onExit()
+                if (isRecording) {
+                    isRecording = false
+                    controller.stopRecording { onExit() }
+                } else onExit()
             }
             Spacer(Modifier.width(12.dp))
             TimerPill(elapsed, isRecording && !paused)
@@ -321,6 +321,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
             IconChip(DuelIconKind.GRID, active = showGrid) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 showGrid = !showGrid
+                vm.grid = showGrid
             }
             Spacer(Modifier.width(8.dp))
             IconChip(DuelIconKind.SETTINGS, active = showTune) { showTune = !showTune }
@@ -556,7 +557,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                         }
                         if (showBack && showFront) SplitHandle(
                             stacked = stacked,
-                            modifier = if (stacked) Modifier.align(Alignment.Center).offset {
+                            modifier = if (stacked) Modifier.align(Alignment.TopCenter).offset {
                                 IntOffset(0, (aFrac * totalPx - 12.dp.toPx()).roundToInt())
                             } else Modifier.align(Alignment.CenterStart).offset {
                                 IntOffset((aFrac * totalPx - 12.dp.toPx()).roundToInt(), 0)
@@ -604,10 +605,7 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                     SegmentedControl(
                         options = listOf("720p", "1080p", "4K"),
                         selectedIndex = vm.quality.ordinal,
-                        onSelect = { idx ->
-                            val q = QualityOption.values()[idx]
-                            if (q.premium && !vm.isPremium) premiumFeature = q.label else vm.quality = q
-                        }
+                        onSelect = { vm.quality = QualityOption.values()[it] }
                     )
                 }
                 TuneRow("BACK") {
@@ -798,22 +796,16 @@ fun RecordScreen(vm: AppViewModel, onExit: () -> Unit) {
                 .border(1.dp, Color.White.copy(alpha = .35f), CircleShape)
                 .clickable {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (isRecording) controller.stopRecording()
-                    onExit()
+                    if (isRecording) {
+                        isRecording = false
+                        controller.stopRecording { onExit() }
+                    } else onExit()
                 },
             contentAlignment = Alignment.Center
         ) {
             Text("✕", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
         }
     }
-    }
-
-    premiumFeature?.let { feature ->
-        PremiumDialog(
-            feature = feature,
-            onDismiss = { premiumFeature = null },
-            onUpgrade = { vm.grantPremium(); premiumFeature = null }
-        )
     }
 }
 

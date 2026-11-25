@@ -128,7 +128,7 @@ private fun realStats(items: List<MediaItem>): Stats {
 
 /** Stats enligt design/reference/stats.png. */
 @Composable
-fun StatsScreen(library: List<MediaItem>, isPremium: Boolean, onSoon: (String) -> Unit, onOpenPremium: () -> Unit) {
+fun StatsScreen(library: List<MediaItem>, onSoon: (String) -> Unit) {
     val s = realStats(library)
     var metric by remember { mutableStateOf("clips") }
     val values = s.series.getValue(metric)
@@ -324,36 +324,6 @@ fun StatsScreen(library: List<MediaItem>, isPremium: Boolean, onSoon: (String) -
                     LegendRow(RefOrange, "Videos", s.rows[0], 37.5f)
                     LegendRow(Color(0xFF4B7BE0), "Photos", s.rows[1], 37.5f)
                     LegendRow(Color(0xFF3A4256), "Other", s.rows[2], 37.5f)
-                }
-            }
-        }
-
-        // Premium
-        Box(
-            Modifier.padding(start = rp(50), end = rp(49), top = rv(19)).fillMaxWidth().height(rv(107))
-                .shadow(rp(20), RoundedCornerShape(rp(22)), spotColor = RefOrange, ambientColor = RefOrange)
-                .clip(RoundedCornerShape(rp(22)))
-                .background(Brush.horizontalGradient(listOf(Color(0xFF24140C), Color(0xFF1A110D))))
-                .border(rp(3), RefOrange, RoundedCornerShape(rp(22)))
-        ) {
-            Box(
-                Modifier.absoluteOffset(rp(26), rv(19)).size(rp(63), rv(64)).clip(RoundedCornerShape(rp(14))).background(Color(0xFF2E1C11)),
-                contentAlignment = Alignment.Center
-            ) { RefIcon(RefIconKind.CROWN, RefCrown, rp(42), stroke = 2.2f) }
-            RText("Unlock deeper insights", 116, 22, 21, 30, color = RefGold, weight = FontWeight.Bold)
-            RText("Get advanced stats, export data and more.", 116, 57, 15, 24, color = RefSoft, maxWidth = 540)
-            if (isPremium) {
-                RText("Premium active", 40, 36, 22, 30, color = RefGold, right = true)
-            } else {
-                Row(
-                    Modifier.absoluteOffset(rp(671), rv(15)).size(rp(230), rv(66)).clip(RoundedCornerShape(rp(22)))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFFFF7A00), Color(0xFFFFA01E))))
-                        .clickable(onClick = onOpenPremium),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(rp(22), Alignment.CenterHorizontally)
-                ) {
-                    Text("GO PREMIUM", color = Color(0xFF1C0D05), fontSize = rs(18), fontWeight = FontWeight.Bold, letterSpacing = rs(.5), maxLines = 1, softWrap = false)
-                    RefIcon(RefIconKind.CHEVRON, Color(0xFF1C0D05), rp(24), stroke = 2.8f)
                 }
             }
         }

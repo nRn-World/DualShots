@@ -23,9 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,14 +41,11 @@ import com.nrworld.duelshot.model.QualityOption
 import com.nrworld.duelshot.model.RecordingMode
 import com.nrworld.duelshot.ui.AppViewModel
 import com.nrworld.duelshot.ui.components.Brand
-import com.nrworld.duelshot.ui.components.PremiumDialog
 import com.nrworld.duelshot.ui.components.RCircle
 import com.nrworld.duelshot.ui.components.RText
 import com.nrworld.duelshot.ui.components.RefCard
 import com.nrworld.duelshot.ui.components.RefCardBorder
-import com.nrworld.duelshot.ui.components.RefCrown
 import com.nrworld.duelshot.ui.components.RefFaint
-import com.nrworld.duelshot.ui.components.RefGold
 import com.nrworld.duelshot.ui.components.RefIcon
 import com.nrworld.duelshot.ui.components.RefIconKind
 import com.nrworld.duelshot.ui.components.RefLabel
@@ -65,9 +59,7 @@ import com.nrworld.duelshot.ui.components.rs
 
 /** Settings enligt design/reference/settings.png, plus raden för filformat. */
 @Composable
-fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () -> Unit) {
-    var premiumFeature by remember { mutableStateOf<String?>(null) }
-
+fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Box(Modifier.fillMaxWidth().height(rv(131))) {
             Brand(63, 11, 53)
@@ -87,9 +79,9 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
             Modifier.padding(start = rp(63), end = rp(53), top = rv(12)).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(rv(14))
         ) {
-            ModeCard(RecordingMode.DUAL_VIEW, RefIconKind.VIDEO, "Both cameras in one video", vm)
-            ModeCard(RecordingMode.SEPARATE, RefIconKind.SEPARATE, "Two files, one for each", vm)
-            ModeCard(RecordingMode.BOTH, RefIconKind.OVERLAP, "Combined + two separate files", vm)
+            ModeCard(RecordingMode.DUAL_VIEW, RefIconKind.VIDEO, "Both cameras in one video", vm) { vm.mode = it }
+            ModeCard(RecordingMode.SEPARATE, RefIconKind.SEPARATE, "Two files, one for each", vm) { vm.mode = it }
+            ModeCard(RecordingMode.BOTH, RefIconKind.OVERLAP, "Combined + two separate files", vm) { vm.mode = it }
         }
 
         Section("CAMERA FORMATS", top = 27)
@@ -109,7 +101,9 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
             options = listOf("Auto", "9:16", "16:9", "1:1"),
             selected = formats.indexOf(vm.saveAspect).coerceAtLeast(0),
             segX = 500, segW = 380, chevron = false
-        ) { vm.saveAspect = formats[it] }
+        ) { idx ->
+            vm.saveAspect = formats[idx]
+        }
 
         Section("VIDEO QUALITY", top = 22, customHint = "HIGHER QUALITY. BETTER STORIES." to "")
         SegRow(
@@ -123,8 +117,7 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
             options = listOf("720p", "1080p", "4K"),
             selected = vm.quality.ordinal, segX = 548, segW = 296, chevron = true
         ) { idx ->
-            val q = QualityOption.values()[idx]
-            if (q.premium && !vm.isPremium) premiumFeature = q.label else vm.quality = q
+            vm.quality = QualityOption.values()[idx]
         }
 
         Section("CONTAINER / CODEC", top = 22)
@@ -134,8 +127,7 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
             options = listOf("MP4", "HEVC"),
             selected = vm.codec.ordinal, segX = 632, segW = 206, chevron = true
         ) { idx ->
-            val c = CodecOption.values()[idx]
-            if (c.premium && !vm.isPremium) premiumFeature = c.label else vm.codec = c
+            vm.codec = CodecOption.values()[idx]
         }
 
         Section("ADDITIONAL SETTINGS", top = 22)
@@ -149,40 +141,7 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit, onOpenPremium: () 
             ToggleRow(RefIconKind.AUDIO, "Record Audio", "Include audio from both cameras", vm.recordAudio, true) { vm.recordAudio = it }
             ToggleRow(RefIconKind.PIN, "Save Location", "Add location info to your videos", vm.saveLocation, false) { vm.saveLocation = it }
         }
-
-        Box(
-            Modifier.padding(start = rp(63), end = rp(53), top = rv(26)).fillMaxWidth().height(rv(94))
-                .clip(RoundedCornerShape(rp(22)))
-                .background(Brush.horizontalGradient(listOf(Color(0xFF24160D), Color(0xFF1A120E), Color(0xFF1D130E))))
-                .border(rp(2), Color(0xFF5A2E12), RoundedCornerShape(rp(22)))
-        ) {
-            RefIcon(RefIconKind.CROWN, RefCrown, rp(48), Modifier.absoluteOffset(rp(31), rv(23)), stroke = 2f)
-            RText("Premium Features", 116, 18, 22, 30, color = RefGold, weight = FontWeight.Medium)
-            RText("Unlock 4K, 60fps, more formats and more.", 116, 52, 14.5, 22, color = RefSub, maxWidth = 530)
-            if (vm.isPremium) {
-                RText("Premium active", 40, 30, 22, 30, color = RefGold, right = true)
-            } else {
-                Row(
-                    Modifier.absoluteOffset(rp(659), rv(16)).size(rp(229), rv(58)).clip(RoundedCornerShape(rp(18)))
-                        .border(rp(3), RefOrange, RoundedCornerShape(rp(18))).clickable(onClick = onOpenPremium)
-                        .padding(start = rp(36), end = rp(26)),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("GO PREMIUM", color = RefOrange, fontSize = rs(17), fontWeight = FontWeight.Medium, letterSpacing = rs(.5), maxLines = 1, softWrap = false)
-                    RefIcon(RefIconKind.CHEVRON, RefOrange, rp(24), stroke = 2.6f)
-                }
-            }
-        }
         Spacer(Modifier.height(rv(40)))
-    }
-
-    premiumFeature?.let { feature ->
-        PremiumDialog(
-            feature = feature,
-            onDismiss = { premiumFeature = null },
-            onUpgrade = { vm.grantPremium(); premiumFeature = null }
-        )
     }
 }
 
@@ -208,7 +167,7 @@ private fun Section(label: String, top: Int, hint: Boolean = false, customHint: 
 }
 
 @Composable
-private fun ModeCard(mode: RecordingMode, icon: RefIconKind, sub: String, vm: AppViewModel) {
+private fun ModeCard(mode: RecordingMode, icon: RefIconKind, sub: String, vm: AppViewModel, onClick: (RecordingMode) -> Unit) {
     val sel = vm.mode == mode
     val shape = RoundedCornerShape(rp(22))
     Box(
@@ -217,7 +176,7 @@ private fun ModeCard(mode: RecordingMode, icon: RefIconKind, sub: String, vm: Ap
             .clip(shape)
             .background(if (sel) Brush.verticalGradient(listOf(Color(0xFF1D1410), Color(0xFF16120F))) else Brush.verticalGradient(listOf(RefCard, RefCard)))
             .border(rp(if (sel) 3 else 2), if (sel) RefOrange else RefCardBorder, shape)
-            .clickable { vm.mode = mode }
+            .clickable { onClick(mode) }
     ) {
         RefIcon(icon, if (sel) RefOrange else Color(0xFFE3E8F0), rp(54), Modifier.absoluteOffset(rp(28), rv(31)))
         RText(mode.title, 112, 22, 21, 30, weight = FontWeight.Medium, maxWidth = 620)
@@ -242,16 +201,16 @@ private fun CameraCard(title: String, icon: RefIconKind, value: AspectOption, mo
             listOf(AspectOption.R_9_16, AspectOption.R_16_9, AspectOption.R_1_1).forEach { a ->
                 val active = a == value
                 val (short, word) = a.label.split(' ').let { it[0] to it.getOrElse(1) { "" } }
-                Column(
+                Box(
                     Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(rp(14)))
                         .background(if (active) Color(0xFF2A1A12) else Color(0xFF161C2A))
                         .border(rp(if (active) 3 else 2), if (active) RefOrange else Color(0xFF232B3C), RoundedCornerShape(rp(14)))
-                        .clickable { onPick(a) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .clickable { onPick(a) }
                 ) {
-                    Text(short, color = if (active) Color.White else RefSoft, fontSize = rs(21), lineHeight = rs(26), fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
-                    Text(word, color = if (active) Color(0xFFE3E8F0) else RefMuted, fontSize = rs(16), lineHeight = rs(21), maxLines = 1, softWrap = false)
+                    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        Text(short, color = if (active) Color.White else RefSoft, fontSize = rs(21), lineHeight = rs(26), fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+                        Text(word, color = if (active) Color(0xFFE3E8F0) else RefMuted, fontSize = rs(16), lineHeight = rs(21), maxLines = 1, softWrap = false)
+                    }
                 }
             }
         }

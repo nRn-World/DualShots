@@ -807,13 +807,16 @@ class DualCameraController(private val context: Context) {
         }
     }
 
-    /** Stoppar alla inspelningar; [then] körs när alla filer är färdigskrivna. */
+    /** Stoppar alla inspelningar; [then] körs på huvudtråden när alla filer är färdigskrivna. */
     fun stopRecording(then: (() -> Unit)? = null) {
+        val main = ContextCompat.getMainExecutor(context)
         glRecorder?.let { rec ->
             gl?.recorder = null
             gl?.setEncoder(null)
             glRecorder = null
-            rec.stop(context, "dualshot_combined_$glStamp") { then?.invoke() }
+            rec.stop(context, "dualshot_combined_$glStamp") {
+                if (then != null) main.execute { then() }
+            }
             return
         }
         if (activeRecordings.isEmpty()) { then?.invoke(); return }

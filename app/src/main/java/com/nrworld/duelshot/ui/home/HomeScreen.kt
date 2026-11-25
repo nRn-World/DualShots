@@ -41,7 +41,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import com.nrworld.duelshot.R
-import com.nrworld.duelshot.ui.AppViewModel
 import com.nrworld.duelshot.ui.components.Brand
 import com.nrworld.duelshot.ui.components.LocalRefFont
 import com.nrworld.duelshot.ui.components.LocalRefStretch
@@ -63,10 +62,9 @@ import com.nrworld.duelshot.ui.gallery.LibraryEntry
 /** Home enligt design/reference/home.png, anpassad för hög mobilskärm (större text, 2×2-genvägar). */
 @Composable
 fun HomeScreen(
-    vm: AppViewModel,
     recent: List<LibraryEntry>,
     onStart: () -> Unit,
-    onOpenPremium: () -> Unit,
+    onOpenStats: () -> Unit,
     onOpenGallery: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTips: () -> Unit,
@@ -139,7 +137,7 @@ fun HomeScreen(
                 QuickCard(RefIconKind.GEAR, "Settings", "Customize your\nexperience", onOpenSettings)
             }
             Row(Modifier.fillMaxWidth().height(rv(176)), horizontalArrangement = Arrangement.spacedBy(rp(21))) {
-                QuickCard(RefIconKind.CROWN, "Premium", if (vm.isPremium) "Premium\nactive" else "Unlock more\nfeatures", onOpenPremium)
+                QuickCard(RefIconKind.STATS, "Stats", "View your\nrecording stats", onOpenStats)
                 QuickCard(RefIconKind.BULB, "Tips", "Get the most out\nof DualShots", onOpenTips)
             }
         }

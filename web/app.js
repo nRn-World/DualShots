@@ -51,16 +51,16 @@ function composedAspect(take) {
 const QUALITY_ORDER = ['HD720', 'FHD1080', 'UHD4K'];
 
 const QUALITIES = {
-  HD720: { label: '720p', premium: false, long: 1280 },
-  FHD1080: { label: '1080p', premium: false, long: 1920 },
-  UHD4K: { label: '4K', premium: true, long: 3840 },
+  HD720: { label: '720p', long: 1280 },
+  FHD1080: { label: '1080p', long: 1920 },
+  UHD4K: { label: '4K', long: 3840 },
 };
 
 const CODEC_ORDER = ['MP4', 'HEVC'];
 
 const CODECS = {
-  MP4: { label: 'MP4', premium: false },
-  HEVC: { label: 'HEVC', premium: true },
+  MP4: { label: 'MP4' },
+  HEVC: { label: 'HEVC' },
 };
 
 const STORE_KEY = 'duelshot_prefs';
@@ -73,7 +73,6 @@ const state = {
   backAspect: 'R_16_9',
   quality: 'FHD1080',
   codec: 'MP4',
-  premium: false,
   audio: true,
   grid: true,
   stabilize: true,
@@ -273,7 +272,6 @@ function savePrefs() {
       backAspect: state.backAspect,
       quality: state.quality,
       codec: state.codec,
-      premium: state.premium,
       audio: state.audio,
       grid: state.grid,
       stabilize: state.stabilize,
@@ -296,7 +294,6 @@ function loadPrefs() {
     if (ASPECTS[p.backAspect]) state.backAspect = p.backAspect;
     if (QUALITIES[p.quality]) state.quality = p.quality;
     if (CODECS[p.codec]) state.codec = p.codec;
-    state.premium = !!p.premium;
     state.swap = !!p.swap;
     state.onboarded = !!p.onboarded;
     if (typeof p.audio === 'boolean') state.audio = p.audio;
@@ -367,59 +364,13 @@ function wireSheet() {
   $$('[data-close]', modalRoot).forEach((b) => b.addEventListener('click', closeSheet));
 }
 
-const PREMIUM_LINES = [
-  '4K Ultra HD recording',
-  'HEVC codec',
-  '60fps & custom bitrate',
-  'Per-camera aspect control',
-  'Watermark-free export',
-];
-
-/* PremiumDialog from Components.kt: crown tile, feature list, orange CTA. */
-function showPremium(pending = null) {
-  const feature = pending ? pending.label : 'DualShots Premium';
-
-  modalRoot.innerHTML = `
-    <div class="modal">
-      <div class="dialog premium-dialog">
-        <div class="dlg-mark">${ICONS.crown}</div>
-        <div class="dlg-title">DualShots PRO</div>
-        <div class="dlg-sub">${esc(String(feature).toUpperCase())}</div>
-        <div class="dlg-list">
-          ${PREMIUM_LINES.map((line) => `
-            <div class="dlg-item"><span class="dlg-check">${ICONS.check}</span><span>${line}</span></div>`).join('')}
-        </div>
-        <button class="dlg-btn" data-upgrade type="button" ${state.premium ? 'disabled' : ''}>
-          ${state.premium ? 'PRO ACTIVE' : 'UNLOCK PRO'}
-        </button>
-        <button class="dlg-close" data-close type="button">Close</button>
-      </div>
-    </div>`;
-
-  const backdrop = $('.modal', modalRoot);
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
-  wireSheet();
-
-  const up = $('[data-upgrade]', modalRoot);
-  if (up) up.addEventListener('click', () => {
-    if (state.premium) return;
-    state.premium = true;
-    if (pending && pending.kind === 'quality' && QUALITIES[pending.key]) state.quality = pending.key;
-    if (pending && pending.kind === 'codec' && CODECS[pending.key]) state.codec = pending.key;
-    savePrefs();
-    closeSheet();
-    toast('Premium unlocked');
-    if (state.record) refreshRecord(); else render();
-  });
-}
-
 /* AlertDialog from HomeScreen.kt. */
 function showAbout() {
   modalRoot.innerHTML = `
     <div class="modal">
       <div class="dialog about-dialog">
         <div class="about-title">DualShots</div>
-        <div class="about-version">Version 1.0 · Dual lens recording engine</div>
+        <div class="about-version">Version 1.2.8 · Dual lens recording engine</div>
         <button class="about-ok" data-close type="button">OK</button>
       </div>
     </div>`;
@@ -607,7 +558,7 @@ async function startCameras() {
   const mk = (stream, mirror) => {
     const v = videoEl();
     v.srcObject = stream;
-    v.play().catch(() => {});
+    v.play().catch(() => { });
     sinkEl.appendChild(v);
     return { el: v, kind: 'camera', mirror };
   };
@@ -652,7 +603,7 @@ async function switchCamera() {
     const stream = await openStream(other === 'back' ? 'environment' : 'user');
     const v = videoEl();
     v.srcObject = stream;
-    v.play().catch(() => {});
+    v.play().catch(() => { });
     cam.feeds[other] = { el: v, kind: 'camera', mirror: other === 'front' };
     sinkEl.appendChild(v);
     delete cam.feeds[cam.active];
@@ -709,7 +660,8 @@ function onPreviewPointerDown(e) {
 
 function onPreviewPointerMove(e) {
   if (!gesture.pointers.has(e.pointerId) || !recDom.feeds) return;
-  gesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const prev = gesture.pointers.get(e.pointerId);
+  gesture.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, onPip: prev ? prev.onPip : false });
 
   if (gesture.pointers.size >= 2 && gesture.pinch && gesture.pinch.dist > 0) {
     const zoom = clampZoom(gesture.pinch.zoom * (pointerDistance() / gesture.pinch.dist));
@@ -1369,6 +1321,7 @@ function buildRecordShell() {
   recDom.pauseBtn.addEventListener('click', () => (rec.paused ? resumeTake() : pauseTake()));
   recDom.gridBtn.addEventListener('click', () => {
     state.grid = !state.grid;
+    savePrefs();
     applyGrid();
     toast(state.grid ? 'Grid on' : 'Grid off');
   });
@@ -1378,6 +1331,20 @@ function buildRecordShell() {
   recDom.zoom = $('#rec-zoom');
   recDom.pipBtn = $('#rec-pip');
   recDom.pipBtn.addEventListener('click', () => {
+    if (activeTake().mode !== 'DUAL_VIEW') {
+      state.mode = 'DUAL_VIEW';
+      state.pipOff = false;
+      state.pipPaused = false;
+      savePrefs();
+      if (rec.active) {
+        toast('Dual View — applies to the next take');
+      } else {
+        mountFeeds();
+        refreshRecord();
+        toast('Dual View — small camera on');
+      }
+      return;
+    }
     state.pipOff = !state.pipOff;
     if (!state.pipOff) state.pipPaused = false;
     mountFeeds();
@@ -1394,6 +1361,7 @@ function buildRecordShell() {
     state.swap = !state.swap;
     savePrefs();
     mountFeeds();
+    refreshRecord();
     toast(state.swap ? 'Front camera large' : 'Back camera large');
   });
   $('#rec-mode').addEventListener('click', mountCameraSheet);
@@ -1774,6 +1742,10 @@ function buildTileControls(key, canHide) {
       rec.tilePaused[key] = false;
       const tile = recDom.stackTiles && recDom.stackTiles[key];
       if (tile) tile.hidden = true;
+      const otherKey = key === 'back' ? 'front' : 'back';
+      const otherTile = recDom.stackTiles && recDom.stackTiles[otherKey];
+      const otherClose = otherTile && otherTile.querySelector('[aria-label="Remove this camera"]');
+      if (otherClose) otherClose.hidden = true;
       applySplit();
       recordMessage = `${key.toUpperCase()} removed — recording continues with the other camera`;
       refreshRecord();
@@ -1820,15 +1792,16 @@ function refreshRecord() {
   if (recDom.preview) recDom.preview.classList.toggle('recording', rec.active);
   if (recDom.root) recDom.root.classList.toggle('recording', rec.active);
   const dual = !!(cam.feeds.back && cam.feeds.front);
+  const isDualView = activeTake().mode === 'DUAL_VIEW';
   if (recDom.swap) {
-    recDom.swap.hidden = !dual;
+    recDom.swap.hidden = !dual || !isDualView;
     recDom.swap.classList.toggle('swapped', state.swap);
   }
   if (recDom.flip) recDom.flip.hidden = dual;
   if (recDom.pipBtn) {
     recDom.pipBtn.hidden = !dual;
-    recDom.pipBtn.classList.toggle('off', state.pipOff);
-    recDom.pipBtn.setAttribute('aria-label', state.pipOff ? 'Show small camera' : 'Hide small camera');
+    recDom.pipBtn.classList.toggle('off', !isDualView || state.pipOff);
+    recDom.pipBtn.setAttribute('aria-label', (!isDualView || state.pipOff) ? 'Show small camera' : 'Hide small camera');
   }
   const photoBtn = $('#rec-photo');
   if (photoBtn) photoBtn.disabled = !cam.ready;
@@ -2095,7 +2068,6 @@ function bindCommon(root) {
   $$('[data-item]', root).forEach((el) => el.addEventListener('click', () => openItem(el.dataset.item)));
   $$('[data-soon]', root).forEach((el) => el.addEventListener('click', () => toast(`${el.dataset.soon} is coming soon`)));
   $$('[data-go]', root).forEach((el) => el.addEventListener('click', () => go(el.dataset.go)));
-  $$('[data-premium]', root).forEach((el) => el.addEventListener('click', () => showPremium()));
   $$('[data-about]', root).forEach((el) => el.addEventListener('click', showAbout));
 }
 
@@ -2111,7 +2083,7 @@ const brand = (cls = '') => `<div class="v5-brand ${cls}">Dual<span>Shots</span>
 const QUICK_ACTIONS = [
   { go: 'GALLERY', title: 'My Recordings', sub: 'View and manage<br>your videos', icon: ICONS.layers },
   { go: 'SETTINGS', title: 'Settings', sub: 'Customize your<br>experience', icon: ICONS.gear },
-  { premium: true, title: 'Premium', sub: 'Unlock more<br>features', icon: ICONS.crown },
+  { go: 'STATS', title: 'Stats', sub: 'View your<br>recording stats', icon: ICONS.stats },
   { tips: true, title: 'Tips', sub: 'Get the most<br>out of DualShots', icon: ICONS.bulb },
 ];
 
@@ -2146,10 +2118,10 @@ function renderHome() {
 
       <div class="h-quick">
         ${QUICK_ACTIONS.map((q) => `
-          <button class="h-qcard" type="button" ${q.go ? `data-go="${q.go}"` : ''} ${q.premium ? 'data-premium' : ''} ${q.tips ? 'data-tips' : ''}>
+          <button class="h-qcard" type="button" ${q.go ? `data-go="${q.go}"` : ''} ${q.tips ? 'data-tips' : ''}>
             <span class="h-qico">${q.icon}</span>
             <b>${q.title}</b>
-            <span class="h-qsub">${q.premium && state.premium ? 'Premium<br>active' : q.sub}</span>
+            <span class="h-qsub">${q.sub}</span>
             <span class="h-qchev">${ICONS.chevron}</span>
           </button>`).join('')}
       </div>
@@ -2396,10 +2368,10 @@ function renderStats() {
         <div class="s-plot">
           ${ticks.map((t, i) => `<span class="s-tick" style="top:${i * 30.4}px">${t}</span><i class="s-grid" style="top:${i * 30.4}px"></i>`).join('')}
           ${values.map((v, i) => {
-            const h = top ? (v / top) * 152 : 0;
-            return `<span class="s-bar" style="left:${109 + i * 123.8}px;height:${h}px"><em>${v}</em></span>
+    const h = top ? (v / top) * 152 : 0;
+    return `<span class="s-bar" style="left:${109 + i * 123.8}px;height:${h}px"><em>${v}</em></span>
               <span class="s-day" style="left:${109 + i * 123.8}px"><b>${s.days[i][0]}</b>${s.days[i][1]}</span>`;
-          }).join('')}
+  }).join('')}
         </div>
       </section>
 
@@ -2426,15 +2398,6 @@ function renderStats() {
           </ul>
         </section>
       </div>
-
-      <section class="s-prem">
-        <span class="s-prem-ico">${ICONS.crown}</span>
-        <b>Unlock deeper insights</b>
-        <span class="s-prem-sub">Get advanced stats, export data and more.</span>
-        ${state.premium
-          ? '<span class="s-prem-active">Premium active</span>'
-          : `<button class="s-prem-btn" data-premium type="button">GO PREMIUM ${ICONS.chevron}</button>`}
-      </section>
     </div>`;
 
   $$('[data-metric]', screenEl).forEach((b) => b.addEventListener('click', () => {
@@ -2474,9 +2437,9 @@ function cameraCardHTML(title, icon, key, attr) {
       <b>${title}</b>
       <div class="st-chips">
         ${CAMERA_ASPECTS.map((k) => {
-          const [short, word] = ASPECTS[k].label.split(' ');
-          return `<button class="st-chip ${state[key] === k ? 'active' : ''}" data-${attr}="${k}" type="button"><b>${short}</b><span>${word}</span></button>`;
-        }).join('')}
+    const [short, word] = ASPECTS[k].label.split(' ');
+    return `<button class="st-chip ${state[key] === k ? 'active' : ''}" data-${attr}="${k}" type="button"><b>${short}</b><span>${word}</span></button>`;
+  }).join('')}
       </div>
     </div>`;
 }
@@ -2487,7 +2450,7 @@ function renderSettings() {
       <header class="st-head">
         ${brand('st-brand')}
         <div class="v5-tagline st-tagline">CUSTOMIZE YOUR EXPERIENCE</div>
-        <span class="st-version">SETTINGS<br><em>V1.0.0</em></span>
+        <span class="st-version">SETTINGS<br><em>V1.2.8</em></span>
         <button class="v5-circle st-gear" data-about type="button" aria-label="About">${ICONS.gear}</button>
       </header>
 
@@ -2550,15 +2513,6 @@ function renderSettings() {
             <button class="st-switch ${state[key] ? 'on' : ''}" data-toggle="${key}" type="button" role="switch" aria-checked="${!!state[key]}" aria-label="${title}"></button>
           </div>`).join('')}
       </div>
-
-      <div class="st-prem">
-        <span class="st-prem-ico">${ICONS.crown}</span>
-        <b>Premium Features</b>
-        <span class="st-rsub">Unlock 4K, 60fps, more formats and more.</span>
-        ${state.premium
-          ? '<span class="st-prem-active">Premium active</span>'
-          : `<button class="st-prem-btn" data-premium type="button">GO PREMIUM ${ICONS.chevron}</button>`}
-      </div>
     </div>`;
 
   $$('[data-mode]', screenEl).forEach((b) => b.addEventListener('click', () => {
@@ -2586,23 +2540,13 @@ function renderSettings() {
   }));
 
   $$('[data-quality]', screenEl).forEach((b) => b.addEventListener('click', () => {
-    const key = b.dataset.quality;
-    if (QUALITIES[key].premium && !state.premium) {
-      showPremium({ kind: 'quality', key, label: QUALITIES[key].label });
-      return;
-    }
-    state.quality = key;
+    state.quality = b.dataset.quality;
     savePrefs();
     renderSettings();
   }));
 
   $$('[data-codec]', screenEl).forEach((b) => b.addEventListener('click', () => {
-    const key = b.dataset.codec;
-    if (CODECS[key].premium && !state.premium) {
-      showPremium({ kind: 'codec', key, label: CODECS[key].label });
-      return;
-    }
-    state.codec = key;
+    state.codec = b.dataset.codec;
     savePrefs();
     renderSettings();
   }));
@@ -2624,8 +2568,8 @@ function playClip(clip) {
       <div class="dialog clip-dialog">
         <div class="clip-dialog-name">${esc(clip.name)}</div>
         ${clip.kind === 'photo'
-          ? `<img class="clip-video" src="${clip.url}" alt="${esc(clip.name)}" />`
-          : `<video class="clip-video" src="${clip.url}" controls autoplay playsinline></video>`}
+      ? `<img class="clip-video" src="${clip.url}" alt="${esc(clip.name)}" />`
+      : `<video class="clip-video" src="${clip.url}" controls autoplay playsinline></video>`}
         <div class="clip-dialog-meta">${esc(clipMetaLine(clip))}${clip.duration ? ` · ${esc(clip.duration)}` : ''}</div>
         <div class="pill-row">
           <button class="pill" data-share type="button">${ICONS.share}<span>Share</span></button>
@@ -2664,7 +2608,7 @@ function confirmDeleteClip(clip) {
     state.clips = state.clips.filter((c) => c.id !== clip.id);
     closeSheet();
     toast('Clip deleted');
-    if (state.page === 'GALLERY') renderGallery();
+    render();
   });
 }
 
@@ -2756,6 +2700,59 @@ function go(page) {
 
 /* ------------------------------------------------------------------ boot */
 
+const APK_URL = 'https://github.com/nRn-World/DualShots/releases/latest/download/DualShots-v1.2.8.apk';
+const APK_PROMPT_KEY = 'dualshots_apk_prompt_dismissed';
+
+function isMobileVisitor() {
+  const ua = navigator.userAgent || '';
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+  return !!(window.matchMedia && window.matchMedia('(pointer: coarse) and (max-width: 820px)').matches);
+}
+
+function maybeShowApkPrompt() {
+  const params = new URLSearchParams(location.search);
+  if (params.has('ref')) return;
+  const force = params.has('install');
+  if (!force) {
+    if (!isMobileVisitor()) return;
+    try {
+      if (localStorage.getItem(APK_PROMPT_KEY) === '1') return;
+    } catch (_) { /* private mode */ }
+  }
+
+  const isAndroid = /Android/i.test(navigator.userAgent || '') || force;
+  modalRoot.innerHTML = `
+    <div class="modal">
+      <div class="dialog apk-dialog">
+        <div class="apk-tile"><img class="logo-mark" src="assets/icon.png" alt="DualShots" /></div>
+        <div class="dlg-title">Install DualShots</div>
+        <div class="dlg-sub">ANDROID APP · V1.2.8 · FREE</div>
+        <p class="apk-body">
+          ${isAndroid
+            ? 'Vill du installera DualShots som APK på mobilen? Med Android-appen får du riktig dubbelkamera (fram + bak samtidigt), 4K och direkt sparning i Galleriet.'
+            : 'DualShots finns som gratis Android-app (APK) med riktig dubbelkamera (fram + bak samtidigt). Ladda ner APK-filen eller fortsätt i webbläsaren.'}
+        </p>
+        <a class="dlg-btn apk-dl" href="${APK_URL}" download="DualShots-v1.2.8.apk" data-apk-install>
+          ${ICONS.download}<span>Installera APK (Android)</span>
+        </a>
+        <button class="dlg-close" data-apk-dismiss type="button">Fortsätt i webbläsaren</button>
+      </div>
+    </div>`;
+
+  const dismiss = () => {
+    try { localStorage.setItem(APK_PROMPT_KEY, '1'); } catch (_) { /* ignore */ }
+    closeSheet();
+  };
+  const backdrop = $('.modal', modalRoot);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) dismiss(); });
+  $('[data-apk-dismiss]', modalRoot).addEventListener('click', dismiss);
+  $('[data-apk-install]', modalRoot).addEventListener('click', () => {
+    try { localStorage.setItem(APK_PROMPT_KEY, '1'); } catch (_) { /* ignore */ }
+    closeSheet();
+    toast('Laddar ner DualShots-v1.2.8.apk — öppna filen för att installera');
+  });
+}
+
 function tickClock() {
   const now = new Date();
   const h = now.getHours() % 12 || 12;
@@ -2775,6 +2772,7 @@ function init() {
   }
   if (window.ResizeObserver) new ResizeObserver(fitZoom).observe(screenEl);
   render();
+  maybeShowApkPrompt();
 }
 
 init();

@@ -56,11 +56,6 @@ class AppPrefs(context: Context) {
         get() = read(KEY_CODEC, CodecOption.MP4)
         set(v) = sp.edit().putString(KEY_CODEC, v.name).apply()
 
-    /** Premium-låst: sätts av köpflödet (här mockad). */
-    var isPremium: Boolean
-        get() = sp.getBoolean(KEY_PREMIUM, false)
-        set(v) = sp.edit().putBoolean(KEY_PREMIUM, v).apply()
-
     /** Format på Dual View-filen; null = följer bakkameran (Auto). */
     var saveAspect: AspectOption?
         get() = sp.getString(KEY_SAVE_ASPECT, null)?.let { n -> AspectOption.values().firstOrNull { it.name == n } }
@@ -93,7 +88,6 @@ class AppPrefs(context: Context) {
         private const val KEY_BACK = "back_aspect"
         private const val KEY_QUALITY = "quality"
         private const val KEY_CODEC = "codec"
-        private const val KEY_PREMIUM = "premium"
         private const val KEY_ONBOARDED = "onboarded"
         private const val KEY_SETUP_DONE = "setup_done"
         private const val KEY_SAVE_ASPECT = "save_aspect"

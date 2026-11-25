@@ -31,3 +31,5 @@ keystore.properties
 /.claude/
 .freebuff/
 *.apk
+
+web/__pycache__/

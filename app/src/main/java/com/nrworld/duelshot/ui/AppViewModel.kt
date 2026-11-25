@@ -13,8 +13,7 @@ import com.nrworld.duelshot.model.RecordingMode
 
 /**
  * Håller appens inställningar som observerbar state och speglar dem till prefs.
- * Delas av alla skärmar via activityViewModels. Egenskapernas setters persistrar,
- * kvalitet/codec är premium-låsta.
+ * Delas av alla skärmar via activityViewModels. Egenskapernas setters persistrar.
  */
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -36,19 +35,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         set(v) { backState = v; prefs.backAspect = v }
 
     private var qualityState by mutableStateOf(prefs.quality)
-    /** Kvalitet går bara att ändra om premium (eller valet är gratis). */
     var quality: QualityOption
         get() = qualityState
-        set(v) {
-            if (!v.premium || isPremium) { qualityState = v; prefs.quality = v }
-        }
+        set(v) { qualityState = v; prefs.quality = v }
 
     private var codecState by mutableStateOf(prefs.codec)
     var codec: CodecOption
         get() = codecState
-        set(v) {
-            if (!v.premium || isPremium) { codecState = v; prefs.codec = v }
-        }
+        set(v) { codecState = v; prefs.codec = v }
 
     private var saveAspectState by mutableStateOf(prefs.saveAspect)
     /** Format på Dual View-filen; null = Auto (följer bakkameran). */
@@ -75,12 +69,4 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var saveLocation: Boolean
         get() = locationState
         set(v) { locationState = v; prefs.saveLocation = v }
-
-    private var premiumState by mutableStateOf(prefs.isPremium)
-    var isPremium: Boolean
-        get() = premiumState
-        set(v) { premiumState = v; prefs.isPremium = v }
-
-    /** Mockat premium-köp – sätter flaggan direkt. Byt mot Play Billing sen. */
-    fun grantPremium() { isPremium = true }
 }
