@@ -29,11 +29,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import android.widget.Toast
 import com.nrworld.duelshot.BuildConfig
 import com.nrworld.duelshot.model.AspectOption
 import com.nrworld.duelshot.model.CodecOption
@@ -41,6 +47,8 @@ import com.nrworld.duelshot.model.QualityOption
 import com.nrworld.duelshot.model.RecordingMode
 import com.nrworld.duelshot.ui.AppViewModel
 import com.nrworld.duelshot.ui.components.Brand
+import com.nrworld.duelshot.ui.components.DuelIcon
+import com.nrworld.duelshot.ui.components.DuelIconKind
 import com.nrworld.duelshot.ui.components.RCircle
 import com.nrworld.duelshot.ui.components.RText
 import com.nrworld.duelshot.ui.components.RefCard
@@ -144,16 +152,45 @@ fun SettingsScreen(vm: AppViewModel, onOpenAbout: () -> Unit) {
             ToggleRow(RefIconKind.AUDIO, "Record Audio", "Capture microphone audio", vm.recordAudio, false) { vm.recordAudio = it }
         }
         Spacer(Modifier.height(rv(28)))
-        Box(
-            Modifier.fillMaxWidth().clickable(onClick = onOpenAbout).padding(vertical = rv(10)),
-            contentAlignment = Alignment.Center
+        val uriHandler = LocalUriHandler.current
+        val clipboard = LocalClipboardManager.current
+        val context = LocalContext.current
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = rv(10)),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(rv(8))
         ) {
-            Text(
-                "DualShots · v${BuildConfig.VERSION_NAME} · Made by nRnWorld",
-                color = RefFaint, fontSize = rs(16), fontFamily = FontFamily.Monospace, letterSpacing = rs(1.2),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    "DualShots · v${BuildConfig.VERSION_NAME} · ",
+                    color = RefFaint, fontSize = rs(16), fontFamily = FontFamily.Monospace, letterSpacing = rs(1.2)
+                )
+                Text(
+                    "Made by nRnWorld",
+                    color = RefOrange, fontSize = rs(16), fontFamily = FontFamily.Monospace, letterSpacing = rs(1.2),
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clickable { runCatching { uriHandler.openUri("https://nrnworld.one") } }
+                )
+            }
+            Row(
+                Modifier.clip(RoundedCornerShape(rp(12)))
+                    .clickable {
+                        clipboard.setText(AnnotatedString("bynrnworld@gmail.com"))
+                        Toast.makeText(context, "Email copied", Toast.LENGTH_SHORT).show()
+                    }
+                    .padding(horizontal = rp(14), vertical = rv(6)),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(rp(10))
+            ) {
+                Text(
+                    "bynrnworld@gmail.com",
+                    color = RefSub, fontSize = rs(16), fontFamily = FontFamily.Monospace, letterSpacing = rs(0.8)
+                )
+                DuelIcon(DuelIconKind.COPY, RefOrange, rp(24))
+            }
         }
         Spacer(Modifier.height(rv(32)))
     }

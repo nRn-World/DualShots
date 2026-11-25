@@ -2292,6 +2292,14 @@ function renderHome() {
 
   $('#start-btn').addEventListener('click', openRecord);
   $$('[data-tips]', screenEl).forEach((b) => b.addEventListener('click', showTips));
+  const copyMail = $('#st-copy-email', screenEl);
+  if (copyMail) {
+    copyMail.addEventListener('click', async () => {
+      const ok = await copyText('bynrnworld@gmail.com');
+      toast(ok ? 'Email copied: bynrnworld@gmail.com' : 'bynrnworld@gmail.com');
+    });
+  }
+
   bindCommon(screenEl);
 }
 
@@ -2411,6 +2419,14 @@ function renderGallery() {
     toggleFavorite(b.dataset.fav);
     renderGallery();
   }));
+  const copyMail = $('#st-copy-email', screenEl);
+  if (copyMail) {
+    copyMail.addEventListener('click', async () => {
+      const ok = await copyText('bynrnworld@gmail.com');
+      toast(ok ? 'Email copied: bynrnworld@gmail.com' : 'bynrnworld@gmail.com');
+    });
+  }
+
   bindCommon(screenEl);
 }
 
@@ -2551,6 +2567,14 @@ function renderStats() {
     state.statsMetric = b.dataset.metric;
     renderStats();
   }));
+  const copyMail = $('#st-copy-email', screenEl);
+  if (copyMail) {
+    copyMail.addEventListener('click', async () => {
+      const ok = await copyText('bynrnworld@gmail.com');
+      toast(ok ? 'Email copied: bynrnworld@gmail.com' : 'bynrnworld@gmail.com');
+    });
+  }
+
   bindCommon(screenEl);
 }
 
@@ -2669,7 +2693,16 @@ function renderSettings() {
           </div>`).join('')}
       </div>
 
-      <button class="st-footer-ver" data-about type="button">DualShots · v1.2.8 · Made by nRnWorld</button>
+      <div class="st-footer">
+        <div class="st-footer-ver">
+          <span>DualShots · v1.2.8 · </span>
+          <a class="st-footer-link" href="https://nrnworld.one" target="_blank" rel="noopener noreferrer">Made by nRnWorld</a>
+        </div>
+        <button class="st-footer-mail" id="st-copy-email" type="button" aria-label="Copy email address">
+          <span>bynrnworld@gmail.com</span>
+          ${ICONS.copy}
+        </button>
+      </div>
     </div>`;
 
   $$('[data-mode]', screenEl).forEach((b) => b.addEventListener('click', () => {
@@ -2720,6 +2753,14 @@ function renderSettings() {
     savePrefs();
     renderSettings();
   }));
+
+  const copyMail = $('#st-copy-email', screenEl);
+  if (copyMail) {
+    copyMail.addEventListener('click', async () => {
+      const ok = await copyText('bynrnworld@gmail.com');
+      toast(ok ? 'Email copied: bynrnworld@gmail.com' : 'bynrnworld@gmail.com');
+    });
+  }
 
   bindCommon(screenEl);
 }
